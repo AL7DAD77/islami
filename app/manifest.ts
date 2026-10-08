@@ -1,0 +1,19 @@
+import type { MetadataRoute } from 'next'
+
+export default function manifest(): MetadataRoute.Manifest {
+  return {
+    name: 'نور - التطبيق الإسلامي الشامل',
+    short_name: 'نور',
+    description: 'مواقيت الصلاة والأذان، القرآن الكريم، الأذكار، القبلة، وتعليم الأطفال',
+    start_url: '/',
+    display: 'standalone',
+    dir: 'rtl',
+    lang: 'ar',
+    background_color: '#f7f3ea',
+    theme_color: '#1f5c4a',
+    icons: [
+      { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+      { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+    ],
+  }
+}
