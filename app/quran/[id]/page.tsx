@@ -11,11 +11,10 @@ import { getReciters, getSurah, toArabicNumber, type Ayah, type SurahMeta, type 
 
 export default function SurahPage() {
   const params = useParams()
-  const searchParams = useSearchParams() // <--- جديد: لقراءة الرابط
+  const searchParams = useSearchParams()
   const n = Number(params.id)
   const router = useRouter()
   
-  // قراءة رقم الآية من الرابط (إن وجد)
   const initialAyahParam = searchParams.get('ayah')
 
   const [meta, setMeta] = useState<SurahMeta | null>(null)
@@ -23,10 +22,7 @@ export default function SurahPage() {
   const [reciters, setReciters] = useState<Reciter[]>([])
   const [loading, setLoading] = useState(true)
   
-  // حالة لإظهار وإخفاء المشغل
   const [isPlayerOpen, setIsPlayerOpen] = useState(false)
-  
-  // حالة لحفظ رقم الآية التي يتم تشغيلها حالياً
   const [currentAyah, setCurrentAyah] = useState<number | null>(null)
 
   // ============ Swipe Navigation ============
@@ -108,14 +104,13 @@ export default function SurahPage() {
   }
 
   return (
-    <div className="pb-28 relative">
+    <div className="pb-36 relative">
       <PageHeader
         title={meta.name}
         subtitle={`${meta.revelationType === 'Meccan' ? 'مكية' : 'مدنية'} · ${toArabicNumber(meta.numberOfAyahs)} آية${ayahs[0] ? ` · الجزء ${toArabicNumber(ayahs[0].juz)}` : ''}`}
         backHref="/quran"
       />
       
-      {/* نمرر currentAyah و initialAyah هنا */}
       <SurahReader 
         surah={n} 
         surahName={meta.name} 
@@ -124,7 +119,7 @@ export default function SurahPage() {
         initialAyah={initialAyahParam ? Number(initialAyahParam) : null}
       />
       
-      <nav className="mt-4 flex items-center justify-between gap-3" aria-label="التنقل بين السور">
+      <nav className="mt-6 flex items-center justify-between gap-3 px-2" aria-label="التنقل بين السور">
         {n > 1 ? (
           <Link href={`/quran/${n - 1}`} className="flex items-center gap-1 rounded-full bg-card px-4 py-2 text-sm shadow-sm ring-1 ring-border">
             <ChevronRight className="size-4" aria-hidden="true" />
@@ -141,10 +136,10 @@ export default function SurahPage() {
         )}
       </nav>
 
-      {/* ====== الزر العائم (Floating Action Button) ====== */}
+      {/* ====== الزر العائم (تم تعديل الموضع ليصبح فوق الشريط السفلي تماماً) ====== */}
       <button
         onClick={() => setIsPlayerOpen(true)}
-        className="fixed bottom-6 right-6 z-40 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl transition-transform hover:scale-105 active:scale-95"
+        className="fixed bottom-24 right-6 z-40 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-2xl transition-transform hover:scale-105 active:scale-95"
         aria-label="فتح مشغل الصوت"
       >
         <Play className="size-6 ml-1" />
@@ -152,7 +147,7 @@ export default function SurahPage() {
 
       {/* ====== نافذة المشغل المنبثقة ====== */}
       {isPlayerOpen && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 pb-6 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 pb-24 backdrop-blur-sm">
           <div className="relative w-full max-w-md rounded-3xl bg-card p-2 shadow-2xl border border-border">
             <button 
               onClick={() => setIsPlayerOpen(false)}
@@ -161,7 +156,6 @@ export default function SurahPage() {
               <X className="size-5" />
             </button>
             
-            {/* نمرر onAyahChange و totalAyahs هنا */}
             <SurahPlayer 
               surah={n} 
               surahName={meta.name} 

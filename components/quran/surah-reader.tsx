@@ -11,7 +11,7 @@ export function SurahReader({
   surahName, 
   ayahs,
   currentAyah,
-  initialAyah // خاصية جديدة نستقبلها من الرابط (مثلاً ?ayah=5)
+  initialAyah
 }: { 
   surah: number; 
   surahName: string; 
@@ -23,15 +23,10 @@ export function SurahReader({
   const hydrated = useHydrated()
   const fontSize = hydrated ? settings.quranFontSize : 30
   
-  // حالة الآية المحددة يدوياً بواسطة المستخدم
   const [selectedAyah, setSelectedAyah] = useState<number | null>(initialAyah || null)
-  
-  // حالة لإظهار رسالة "تم الحفظ"
   const [savedMessage, setSavedMessage] = useState(false)
 
-  // ============ التمرير التلقائي ============
   useEffect(() => {
-    // إذا فتحنا الصفحة من رابط به علامة مرجعية، نمرر إليها
     if (initialAyah) {
       setTimeout(() => {
         const element = document.getElementById(`ayah-${initialAyah}`)
@@ -40,7 +35,6 @@ export function SurahReader({
     }
   }, [initialAyah])
 
-  // التمرير للآية التي يتم تشغيلها حالياً
   useEffect(() => {
     if (currentAyah && !selectedAyah) {
       const element = document.getElementById(`ayah-${currentAyah}`)
@@ -54,7 +48,6 @@ export function SurahReader({
     update({ lastRead: { surah, name: surahName } })
   }, [surah, surahName, update])
 
-  // دالة حفظ العلامة المرجعية
   const saveBookmark = () => {
     if (selectedAyah) {
       localStorage.setItem('quran-bookmark', JSON.stringify({ surah, ayah: selectedAyah }))
@@ -64,10 +57,9 @@ export function SurahReader({
   }
 
   return (
-    <article className="rounded-3xl bg-card p-5 shadow-sm ring-1 ring-border sm:p-8">
+    <article className="rounded-3xl bg-card p-5 shadow-sm ring-1 ring-border sm:p-8 pb-36 overflow-y-auto">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          {/* زر حفظ العلامة المرجعية */}
           {selectedAyah && (
             <button
               onClick={saveBookmark}
