@@ -1,6 +1,6 @@
-'use client'
+'use client';
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { Loader2, Pause, Play, Repeat, UserRound } from 'lucide-react'
 import type { Reciter } from '@/lib/quran'
@@ -12,13 +12,19 @@ export function SurahPlayer({
   surah,
   surahName,
   reciters,
+  onAyahChange,
+  totalAyahs,
 }: {
   surah: number
   surahName: string
   reciters: Reciter[]
+  onAyahChange?: (ayah: number | null) => void
+  totalAyahs: number
 }) {
   const [settings, update] = useSettings()
   const player = useQuranPlayer()
+  
+  const lastAyahRef = useRef<number | null>(null)
 
   const reciter =
     reciters.find((r) => r.id === settings.reciterId) ??
@@ -37,6 +43,24 @@ export function SurahPlayer({
         ? 'playing'
         : 'paused'
     : 'idle'
+
+  // === تصحيح الخطأ الإملائي هنا (حذف حرف s الزائد) ===
+  useEffect(() => {
+    if (isCurrent && player.progress > 0 && onAyahChange) {
+      // حسبة رياضية: نقسم التقدم على 100 ونضربه في عدد الآيات
+      const estimatedAyah = Math.round((player.progress / 100) * totalAyahs)
+      // نتأكد أن الرقم لا يتجاوز عدد الآيات
+      const safeAyah = Math.min(Math.max(estimatedAyah, 1), totalAyahs)
+
+      if (safeAyah !== lastAyahRef.current) {
+        lastAyahRef.current = safeAyah
+        onAyahChange(safeAyah)
+      }
+    } else if (!isCurrent && onAyahChange) {
+      lastAyahRef.current = null
+      onAyahChange(null)
+    }
+  }, [isCurrent, player.progress, totalAyahs, onAyahChange])
 
   // إيقاف القرآن عند الأذان
   useEffect(() => {
@@ -58,8 +82,8 @@ export function SurahPlayer({
   const featured = reciters.filter((r) => r.featured)
 
   return (
-    <div className="fixed inset-x-0 bottom-[4.5rem] z-30 px-3 pb-[env(safe-area-inset-bottom)]">
-      <div className="mx-auto max-w-2xl rounded-2xl bg-primary p-3 text-primary-foreground shadow-lg">
+    <div className="w-full">
+      <div className="rounded-2xl bg-primary p-3 text-primary-foreground shadow-lg">
         <div className="flex items-center gap-3">
           <button
             type="button"

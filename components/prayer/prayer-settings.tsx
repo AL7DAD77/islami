@@ -7,6 +7,12 @@ import { PRAYER_NAMES, PRAYER_ORDER } from '@/lib/prayer'
 import { COUNTRY_METHOD } from '@/lib/places'
 import { toArabicNumber } from '@/lib/quran'
 import { cn } from '@/lib/utils'
+import {
+  getNativeLocation,
+  requestNativeNotificationPermission,
+  showNativeNotification,
+  getNotificationStatus,
+} from '@/lib/native'
 
 const METHODS: { id: MethodKey; name: string }[] = [
   { id: 'UmmAlQura', name: 'أم القرى (السعودية)' },
@@ -44,56 +50,73 @@ export function PrayerSettings() {
   const [openCityPicker, setOpenCityPicker] = useState(false)
   const [openMethodPicker, setOpenMethodPicker] = useState(false)
   const [locating, setLocating] = useState(false)
-  const [notifPermission, setNotifPermission] = useState<NotificationPermission>('default')
+  const [notifPermission, setNotifPermission] = useState<string>('prompt')
 
   useEffect(() => {
-    if (typeof Notification !== 'undefined') {
-      setNotifPermission(Notification.permission)
-    }
+    setNotifPermission(getNotificationStatus())
   }, [])
 
-  if (!hydrated) {
-    return <div className="h-96 animate-pulse rounded-2xl bg-card" aria-hidden="true" />
-  }
-
-  const detectLocation = () => {
-    if (!('geolocation' in navigator)) return
+  // ============ Location ============
+  const detectLocation = async () => {
     setLocating(true)
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        try {
-          const res = await fetch(
-            `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${pos.coords.latitude}&longitude=${pos.coords.longitude}&localityLanguage=ar`
-          )
-          const data = await res.json()
-          const countryCode = data.countryCode
-          update((s) => ({
-            location: {
-              lat: pos.coords.latitude,
-              lng: pos.coords.longitude,
-              city: data.city || data.locality || 'موقعي',
-              country: data.countryName || '',
-              auto: true,
-            },
-            method: COUNTRY_METHOD[countryCode] ?? s.method,
-          }))
-        } catch {
-          update((s) => ({
-            location: { ...s.location, lat: pos.coords.latitude, lng: pos.coords.longitude, city: 'موقعي الحالي', auto: true },
-          }))
-        }
+    try {
+      const result = await getNativeLocation()
+
+      if (result.status === 'denied') {
         setLocating(false)
-      },
-      () => setLocating(false),
-      { enableHighAccuracy: false, timeout: 15000 }
-    )
+        alert(
+          '⚠️ تم رفض الوصول للموقع\n\nلتفعيله:\n• اضغط على 🔒 بجانب الرابط\n• Site settings → Location → Allow'
+        )
+        return
+      }
+
+      if (result.status === 'error') {
+        setLocating(false)
+        alert(`⚠️ ${result.message}`)
+        return
+      }
+
+      // ✅ النجاح
+      const { lat, lng } = result
+      const res = await fetch(
+        `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=ar`
+      )
+      const data = await res.json()
+      update((s) => ({
+        location: {
+          lat,
+          lng,
+          city: data.city || data.locality || 'موقعي',
+          country: data.countryName || '',
+          auto: true,
+        },
+        method: COUNTRY_METHOD[data.countryCode] ?? s.method,
+      }))
+    } catch (e) {
+      console.warn(e)
+    }
+    setLocating(false)
   }
 
+  // ============ Select City ============
   const selectCity = (city: (typeof CITIES)[0]) => {
     update({
       location: { lat: city.lat, lng: city.lng, city: city.name, country: city.country, auto: false },
     })
     setOpenCityPicker(false)
+  }
+
+  // ============ Notifications ============
+  const handleEnableNotifications = async () => {
+    const result = await requestNativeNotificationPermission()
+    setNotifPermission(result)
+    if (result === 'granted') {
+      await showNativeNotification('تم تفعيل الإشعارات', 'ستصلك تنبيهات الصلاة في وقتها')
+    }
+  }
+
+  if (!hydrated) {
+    return <div className="h-96 animate-pulse rounded-2xl bg-card" aria-hidden="true" />
   }
 
   return (
@@ -289,8 +312,8 @@ export function PrayerSettings() {
           <h3 className="font-bold text-zinc-800 dark:text-zinc-100">الإشعارات</h3>
         </div>
         <div className="space-y-3">
-          <div className="flex items-center justify-between rounded-xl bg-muted/50 p-3">
-            <div>
+          <div className="flex items-center justify-between gap-3 rounded-xl bg-muted/50 p-3">
+            <div className="flex-1">
               <p className="font-medium text-zinc-800 dark:text-zinc-100">
                 إشعارات الأذان
               </p>
@@ -298,44 +321,42 @@ export function PrayerSettings() {
                 {notifPermission === 'granted'
                   ? 'مُفعّلة ✅'
                   : notifPermission === 'denied'
-                    ? 'مرفوضة ❌ (فعّلها من إعدادات المتصفح)'
-                    : 'غير مُفعّلة'}
+                    ? 'مرفوضة ❌ (افتح الإعدادات)'
+                    : notifPermission === 'unsupported'
+                      ? 'غير مدعومة'
+                      : 'غير مُفعّلة'}
               </p>
             </div>
-            {notifPermission !== 'granted' && notifPermission !== 'denied' && (
+
+            {notifPermission === 'granted' ? (
               <button
                 type="button"
                 onClick={async () => {
-                  if (typeof Notification === 'undefined') return
-                  const p = await Notification.requestPermission()
-                  setNotifPermission(p)
-                  if (p === 'granted') {
-                    new Notification('تم تفعيل الإشعارات', {
-                      body: 'ستصلك تنبيهات الصلاة في وقتها',
-                      icon: '/icon-512.png',
-                      dir: 'rtl',
-                      lang: 'ar',
-                    })
-                  }
-                }}
-                className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white"
-              >
-                تفعيل
-              </button>
-            )}
-            {notifPermission === 'granted' && (
-              <button
-                type="button"
-                onClick={() => {
-                  new Notification('اختبار', {
-                    body: 'الإشعارات تعمل بنجاح',
-                    icon: '/icon-512.png',
-                    dir: 'rtl',
-                  })
+                  await showNativeNotification('اختبار', 'الإشعارات تعمل بنجاح')
                 }}
                 className="rounded-xl bg-muted px-3 py-2 text-xs"
               >
                 تجربة
+              </button>
+            ) : notifPermission === 'denied' ? (
+              <button
+                type="button"
+                onClick={() => {
+                  alert(
+                    'لتفعيل الإشعارات:\n\n1. اضغط 🔒 بجانب الرابط\n2. Site settings\n3. Notifications → Allow\n4. أعد تحميل الصفحة'
+                  )
+                }}
+                className="rounded-xl bg-muted px-3 py-2 text-xs"
+              >
+                إعادة التفعيل
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleEnableNotifications}
+                className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white"
+              >
+                تفعيل
               </button>
             )}
           </div>

@@ -1,11 +1,11 @@
 import type { CapacitorConfig } from '@capacitor/cli'
 
 const config: CapacitorConfig = {
-  appId: 'com.islami.app',
+  appId: 'com.alhaddad.islami',
   appName: 'إسلامي',
   webDir: 'public',
   server: {
-    url: 'https://islami-shaml.netlify.app',
+    url: 'https://islami-blush.vercel.app',
     cleartext: false,
   },
 }

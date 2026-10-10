@@ -5,40 +5,62 @@ import { Volume2, Check, Play } from 'lucide-react'
 import { useSettings } from '@/lib/settings'
 import { ADHAN_VOICES, getAdhanVoice } from '@/lib/adhan-list'
 
+// ⚠️ Audio Singleton — يبقى عبر تغيير الصفحات
+let previewAudio: HTMLAudioElement | null = null
+let previewVoiceId: string | null = null
+
+function stopPreview() {
+  if (previewAudio) {
+    previewAudio.pause()
+    previewAudio.currentTime = 0
+    previewAudio = null
+  }
+  previewVoiceId = null
+}
+
 export function AdhanSettings() {
   const [settings, update] = useSettings()
-  const [playingId, setPlayingId] = useState<string | null>(null)
-  const [audio, setAudio] = useState<HTMLAudioElement | null>(null)
+  const [playingId, setPlayingId] = useState<string | null>(previewVoiceId)
 
   const currentVoice = getAdhanVoice(settings.adhanVoice) || ADHAN_VOICES[0]
 
   const playPreview = (id: string, file: string) => {
-    if (audio) {
-      audio.pause()
-      audio.currentTime = 0
-    }
+    // ⚠️ 1. أوقف أي صوت سابق (حتى لو في الخلفية)
+    stopPreview()
+
+    // ⚠️ 2. إذا كان نفس الصوت → إيقاف فقط
     if (playingId === id) {
       setPlayingId(null)
       return
     }
-    const newAudio = new Audio(`/audio/adhans/${file}`)
-    newAudio.volume = 0.5
-    newAudio.onended = () => setPlayingId(null)
-    newAudio.onerror = () => setPlayingId(null)
-    newAudio.play()
+
+    // ⚠️ 3. شغّل الجديد
+    const audio = new Audio(`/audio/adhans/${file}`)
+    audio.volume = 0.5
+    audio.onended = () => {
+      previewAudio = null
+      previewVoiceId = null
+      setPlayingId(null)
+    }
+
+    audio
+      .play()
       .then(() => {
-        setAudio(newAudio)
+        previewAudio = audio
+        previewVoiceId = id
         setPlayingId(id)
       })
-      .catch(() => setPlayingId(null))
+      .catch(() => {
+        previewAudio = null
+        previewVoiceId = null
+        setPlayingId(null)
+      })
   }
 
   const selectVoice = (id: string) => {
     update({ adhanVoice: id })
-    if (audio) {
-      audio.pause()
-      setPlayingId(null)
-    }
+    stopPreview()
+    setPlayingId(null)
   }
 
   return (

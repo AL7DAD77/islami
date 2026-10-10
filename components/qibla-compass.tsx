@@ -102,7 +102,7 @@ export function QiblaCompass() {
         </div>
         <div className="rounded-2xl bg-card p-4 text-center shadow-sm ring-1 ring-border">
           <p className="text-xs text-muted-foreground">{'المسافة إلى مكة'}</p>
-          <p className="text-2xl font-bold text-primary">{toArabicNumber(distance.toLocaleString('en'))}</p>
+          <p className="text-2xl font-bold text-primary">{toArabicNumber(Math.round(distance))}</p>
           <p className="text-xs text-muted-foreground">{'كيلومتر'}</p>
         </div>
       </div>

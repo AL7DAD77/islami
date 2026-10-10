@@ -4,12 +4,16 @@ import Link from 'next/link'
 import { useState } from 'react'
 
 // ⚠️ ضع رابط التطبيق الحقيقي على Google Play هنا لاحقاً
-const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.islami.app'
+const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.alhaddad.islami'
 
 export default function MorePage() {
   const [copied, setCopied] = useState(false)
 
   const links = [
+    // تم إصلاح السطر التالي: استخدام رمز تعبيري بدلاً من أيقونة غير مستوردة
+    { href: '/seerah', title: 'السيرة النبوية', desc: 'سيرة النبي صلى الله عليه وسلم', icon: '🕌' },
+    { href: '/guide', title: 'الدليل', desc: 'دليل شامل للمسلم', icon: '📚' },
+    { href: '/calendar', title: 'التقويم', desc: 'الهجري والميلادي', icon: '📅' },
     { href: '/more/support', title: 'الدعم والتواصل', desc: 'تواصل معنا لأي استفسار', icon: '📞' },
     { href: '/more/privacy', title: 'سياسة الخصوصية', desc: 'كيف نحمي بياناتك', icon: '🔒' },
     { href: '/more/disclaimer', title: 'إخلاء المسؤولية', desc: 'حقوق الملكية والنشر', icon: '⚖️' },
@@ -33,7 +37,6 @@ export default function MorePage() {
       if (navigator.share) {
         await navigator.share(shareData)
       } else {
-        // بديل: نسخ الرابط
         await navigator.clipboard.writeText(`${shareData.text}\n${shareData.url}`)
         setCopied(true)
         setTimeout(() => setCopied(false), 2000)
@@ -55,7 +58,8 @@ export default function MorePage() {
       </header>
 
       <section className="mx-auto max-w-2xl space-y-3 px-4 pb-24">
-        <ThemeToggle/>
+        <ThemeToggle />
+
         {/* زر التقييم */}
         <button
           onClick={handleRate}

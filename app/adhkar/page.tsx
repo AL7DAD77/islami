@@ -11,6 +11,19 @@ export default function AdhkarPage() {
   return (
     <>
       <PageHeader title="الأذكار والأدعية" subtitle="من حصن المسلم والكتاب والسنة الصحيحة مع ذكر المصدر" />
+      رب<Link
+  href="/tasbih"
+  className="mb-4 flex items-center gap-4 rounded-2xl bg-gradient-to-l from-emerald-700 to-emerald-800 p-5 text-white shadow-lg transition hover:shadow-xl"
+>
+  <span className="flex size-14 items-center justify-center rounded-2xl bg-white/20 text-3xl">
+    🔵
+  </span>
+  <div className="flex-1">
+    <p className="text-lg font-bold">المسبحة الإلكترونية</p>
+    <p className="text-xs opacity-80">سبّح مع انتقال تلقائي بين الأذكار</p>
+  </div>
+  <ChevronLeft className="size-5 opacity-70" />
+</Link>
       <div className="flex flex-col gap-6">
         {ADHKAR_GROUPS.map((g) => (
           <section key={g.id} aria-labelledby={`g-${g.id}`}>

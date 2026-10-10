@@ -5,6 +5,7 @@ import { AdhanEngine } from '@/components/adhan-engine'
 import { BottomNav } from '@/components/bottom-nav'
 import { DailyMessageModal } from '@/components/daily-message'
 import { SplashScreen } from '@/components/splash-screen'
+import { SwipeNavigation } from '@/components/swipe-navigation'
 import { QuranPlayerProvider } from '@/lib/quran-player'
 import './globals.css'
 
@@ -29,6 +30,8 @@ export const viewport: Viewport = {
   colorScheme: 'light dark',
   width: 'device-width',
   initialScale: 1,
+  maximumScale: 5,
+  userScalable: true,
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#f7f3ea' },
     { media: '(prefers-color-scheme: dark)', color: '#10211c' },
@@ -43,6 +46,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <QuranPlayerProvider>
           <AdhanEngine />
           <DailyMessageModal />
+          <SwipeNavigation />
           <main className="mx-auto min-h-dvh max-w-2xl px-4 pb-28">{children}</main>
           <BottomNav />
           {process.env.NODE_ENV === 'production' && <Analytics />}
