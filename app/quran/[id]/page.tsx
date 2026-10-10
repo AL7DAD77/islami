@@ -104,7 +104,7 @@ export default function SurahPage() {
   }
 
   return (
-    <div className="pb-36 relative">
+    <div className="min-h-screen pb-44 relative">
       <PageHeader
         title={meta.name}
         subtitle={`${meta.revelationType === 'Meccan' ? 'مكية' : 'مدنية'} · ${toArabicNumber(meta.numberOfAyahs)} آية${ayahs[0] ? ` · الجزء ${toArabicNumber(ayahs[0].juz)}` : ''}`}
@@ -119,7 +119,7 @@ export default function SurahPage() {
         initialAyah={initialAyahParam ? Number(initialAyahParam) : null}
       />
       
-      <nav className="mt-6 flex items-center justify-between gap-3 px-2" aria-label="التنقل بين السور">
+      <nav className="mt-6 flex items-center justify-between gap-3 px-2 pb-10" aria-label="التنقل بين السور">
         {n > 1 ? (
           <Link href={`/quran/${n - 1}`} className="flex items-center gap-1 rounded-full bg-card px-4 py-2 text-sm shadow-sm ring-1 ring-border">
             <ChevronRight className="size-4" aria-hidden="true" />
@@ -136,10 +136,10 @@ export default function SurahPage() {
         )}
       </nav>
 
-      {/* ====== الزر العائم (تم تعديل الموضع ليصبح فوق الشريط السفلي تماماً) ====== */}
+      {/* ====== الزر العائم (Floating Action Button) ====== */}
       <button
         onClick={() => setIsPlayerOpen(true)}
-        className="fixed bottom-24 right-6 z-40 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-2xl transition-transform hover:scale-105 active:scale-95"
+        className="fixed bottom-20 right-6 z-40 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-2xl transition-transform hover:scale-105 active:scale-95"
         aria-label="فتح مشغل الصوت"
       >
         <Play className="size-6 ml-1" />
@@ -147,7 +147,7 @@ export default function SurahPage() {
 
       {/* ====== نافذة المشغل المنبثقة ====== */}
       {isPlayerOpen && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 pb-24 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 pb-20 backdrop-blur-sm">
           <div className="relative w-full max-w-md rounded-3xl bg-card p-2 shadow-2xl border border-border">
             <button 
               onClick={() => setIsPlayerOpen(false)}

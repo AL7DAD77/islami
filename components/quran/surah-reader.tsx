@@ -26,6 +26,7 @@ export function SurahReader({
   const [selectedAyah, setSelectedAyah] = useState<number | null>(initialAyah || null)
   const [savedMessage, setSavedMessage] = useState(false)
 
+  // التمرير التلقائي للآية المحددة عند فتح الصفحة
   useEffect(() => {
     if (initialAyah) {
       setTimeout(() => {
@@ -35,6 +36,7 @@ export function SurahReader({
     }
   }, [initialAyah])
 
+  // التمرير للآية الشغالة حالياً أثناء الاستماع
   useEffect(() => {
     if (currentAyah && !selectedAyah) {
       const element = document.getElementById(`ayah-${currentAyah}`)
@@ -57,7 +59,7 @@ export function SurahReader({
   }
 
   return (
-    <article className="rounded-3xl bg-card p-5 shadow-sm ring-1 ring-border sm:p-8 pb-36 overflow-y-auto">
+    <article className="rounded-3xl bg-card p-5 shadow-sm ring-1 ring-border sm:p-8 pb-48 w-full">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           {selectedAyah && (
