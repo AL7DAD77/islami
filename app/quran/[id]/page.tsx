@@ -25,7 +25,7 @@ export default function SurahPage() {
   const [isPlayerOpen, setIsPlayerOpen] = useState(false)
   const [currentAyah, setCurrentAyah] = useState<number | null>(null)
 
-  // ============ Swipe Navigation ============
+  // ============ Swipe Navigation (معدل لعدم اعتراض السحب العمودي) ============
   useEffect(() => {
     let startX = 0
     let startY = 0
@@ -44,9 +44,10 @@ export default function SurahPage() {
       const deltaY = t.clientY - startY
       const duration = Date.now() - startTime
 
+      // إذا كانت الحركة عمودية أكبر من الأفقية، تجاهل السحب تماماً ودع التمرير العمودي يعمل
+      if (Math.abs(deltaY) > Math.abs(deltaX)) return
       if (duration > 500) return
-      if (Math.abs(deltaX) < 80) return
-      if (Math.abs(deltaY) > Math.abs(deltaX) / 2) return
+      if (Math.abs(deltaX) < 100) return
 
       if (deltaX > 0 && n > 1) {
         router.push(`/quran/${n - 1}`)
@@ -104,7 +105,7 @@ export default function SurahPage() {
   }
 
   return (
-    <div className="min-h-screen pb-44 relative">
+    <div className="w-full pb-44">
       <PageHeader
         title={meta.name}
         subtitle={`${meta.revelationType === 'Meccan' ? 'مكية' : 'مدنية'} · ${toArabicNumber(meta.numberOfAyahs)} آية${ayahs[0] ? ` · الجزء ${toArabicNumber(ayahs[0].juz)}` : ''}`}
@@ -119,7 +120,7 @@ export default function SurahPage() {
         initialAyah={initialAyahParam ? Number(initialAyahParam) : null}
       />
       
-      <nav className="mt-6 flex items-center justify-between gap-3 px-2 pb-10" aria-label="التنقل بين السور">
+      <nav className="mt-6 flex items-center justify-between gap-3 px-2 pb-12" aria-label="التنقل بين السور">
         {n > 1 ? (
           <Link href={`/quran/${n - 1}`} className="flex items-center gap-1 rounded-full bg-card px-4 py-2 text-sm shadow-sm ring-1 ring-border">
             <ChevronRight className="size-4" aria-hidden="true" />
@@ -136,7 +137,7 @@ export default function SurahPage() {
         )}
       </nav>
 
-      {/* ====== الزر العائم (Floating Action Button) ====== */}
+      {/* ====== الزر العائم ====== */}
       <button
         onClick={() => setIsPlayerOpen(true)}
         className="fixed bottom-20 right-6 z-40 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-2xl transition-transform hover:scale-105 active:scale-95"
