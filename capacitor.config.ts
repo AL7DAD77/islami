@@ -1,13 +1,13 @@
-import type { CapacitorConfig } from '@capacitor/cli'
+import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.alhaddad.islami',
   appName: 'إسلامي',
-  webDir: 'public',
-  server: {
-    url: 'https://islami-blush.vercel.app',
-    cleartext: false,
-  },
-}
+  webDir: 'out',
+  android: {
+    webContentsDebuggingEnabled: true,
+    allowMixedContent: true
+  }
+};
 
-export default config
+export default config;

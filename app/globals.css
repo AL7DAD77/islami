@@ -59,7 +59,7 @@
   --radius: 1rem;
 }
 
-/* ============ الوضع الداكن (أخضر داكن + ذهبي — مستوحى من سكينة) ============ */
+/* ============ الوضع الداكن (أخضر داكن + ذهبي) ============ */
 .dark {
   color-scheme: dark;
   --background: oklch(0.15 0.025 170);
@@ -99,4 +99,12 @@
 .ayah-marker {
   font-family: var(--font-amiri), serif;
   color: var(--gold);
+}
+
+/* ============ حل جذري للتمرير والسحب في تطبيق الأندرويد ============ */
+html, body {
+  overflow-y: auto !important;
+  height: 100%;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y pinch-zoom;
 }
