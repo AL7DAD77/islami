@@ -25,7 +25,7 @@ export default function SurahPage() {
   const [isPlayerOpen, setIsPlayerOpen] = useState(false)
   const [currentAyah, setCurrentAyah] = useState<number | null>(null)
 
-  // ============ Swipe Navigation (معدل لعدم اعتراض السحب العمودي) ============
+  // ============ Swipe Navigation (منع اعتراض التمرير العمودي) ============
   useEffect(() => {
     let startX = 0
     let startY = 0
@@ -44,10 +44,10 @@ export default function SurahPage() {
       const deltaY = t.clientY - startY
       const duration = Date.now() - startTime
 
-      // إذا كانت الحركة عمودية أكبر من الأفقية، تجاهل السحب تماماً ودع التمرير العمودي يعمل
-      if (Math.abs(deltaY) > Math.abs(deltaX)) return
-      if (duration > 500) return
-      if (Math.abs(deltaX) < 100) return
+      // إذا كانت الحركة عمودية أعلى أو متقاربة مع الأفقي، نمنع التغيير ونترك التمرير يعمل بسلاسة
+      if (Math.abs(deltaY) * 1.5 > Math.abs(deltaX)) return
+      if (duration > 400) return
+      if (Math.abs(deltaX) < 120) return
 
       if (deltaX > 0 && n > 1) {
         router.push(`/quran/${n - 1}`)
@@ -105,7 +105,10 @@ export default function SurahPage() {
   }
 
   return (
-    <div className="w-full pb-44">
+    <div 
+      className="w-full min-h-screen pb-44 overscroll-contain touch-pan-y"
+      style={{ WebkitOverflowScrolling: 'touch' }}
+    >
       <PageHeader
         title={meta.name}
         subtitle={`${meta.revelationType === 'Meccan' ? 'مكية' : 'مدنية'} · ${toArabicNumber(meta.numberOfAyahs)} آية${ayahs[0] ? ` · الجزء ${toArabicNumber(ayahs[0].juz)}` : ''}`}

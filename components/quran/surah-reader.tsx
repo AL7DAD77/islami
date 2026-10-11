@@ -59,7 +59,7 @@ export function SurahReader({
   }
 
   return (
-    <article className="rounded-3xl bg-card p-5 shadow-sm ring-1 ring-border sm:p-8 pb-48 w-full">
+    <article className="w-full rounded-3xl bg-card p-5 shadow-sm ring-1 ring-border sm:p-8 pb-48 touch-pan-y">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           {selectedAyah && (
@@ -99,8 +99,8 @@ export function SurahReader({
       )}
       
       <p
-        className="text-justify font-quran leading-[2.3]"
-        style={{ fontSize, touchAction: 'pinch-zoom' }}
+        className="text-justify font-quran leading-[2.3] touch-pan-y"
+        style={{ fontSize, touchAction: 'pan-y' }}
       >
         {ayahs.map((a) => {
           const isPlaying = currentAyah === a.numberInSurah
