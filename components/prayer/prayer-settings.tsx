@@ -4,14 +4,23 @@ import { useState, useEffect } from 'react'
 import { MapPin, Calculator, Bell, BellRing, ChevronDown, RefreshCw, Check } from 'lucide-react'
 import { useSettings, useHydrated, type MethodKey, type PrayerKey } from '@/lib/settings'
 import { PRAYER_NAMES, PRAYER_ORDER } from '@/lib/prayer'
-import { COUNTRY_METHOD } from '@/lib/places'
+import { getAdhanVoice } from '@/lib/adhan-list'
+import { CITIES, type City } from '@/lib/places'
+import { methodForCountry, searchCities, searchCitiesOnline, normalizeArabic, type OnlineCity } from '@/lib/city-search'
+import { updateAutoLocation } from '@/lib/location'
 import { toArabicNumber } from '@/lib/quran'
 import { cn } from '@/lib/utils'
 import {
-  getNativeLocation,
   requestNativeNotificationPermission,
   showNativeNotification,
-  getNotificationStatus,
+  getNotificationStatusAsync,
+  registerAppStateListener,
+  isNativePlatform,
+  isAdhanSchedulerAvailable,
+  getNativeAlarmStatus,
+  requestExactAlarmPermission,
+  setPersistentNotification,
+  testNativeAdhan,
 } from '@/lib/native'
 
 const METHODS: { id: MethodKey; name: string }[] = [
@@ -27,23 +36,6 @@ const METHODS: { id: MethodKey; name: string }[] = [
   { id: 'Singapore', name: 'سنغافورة' },
 ]
 
-const CITIES = [
-  { name: 'مكة المكرمة', lat: 21.4225, lng: 39.8262, country: 'السعودية' },
-  { name: 'المدينة المنورة', lat: 24.4672, lng: 39.6111, country: 'السعودية' },
-  { name: 'القاهرة', lat: 30.0444, lng: 31.2357, country: 'مصر' },
-  { name: 'الرياض', lat: 24.7136, lng: 46.6753, country: 'السعودية' },
-  { name: 'دبي', lat: 25.2048, lng: 55.2708, country: 'الإمارات' },
-  { name: 'عمان', lat: 31.9454, lng: 35.9284, country: 'الأردن' },
-  { name: 'بغداد', lat: 33.3152, lng: 44.3661, country: 'العراق' },
-  { name: 'دمشق', lat: 33.5138, lng: 36.2765, country: 'سوريا' },
-  { name: 'بيروت', lat: 33.8938, lng: 35.5018, country: 'لبنان' },
-  { name: 'الخرطوم', lat: 15.5007, lng: 32.5599, country: 'السودان' },
-  { name: 'الدار البيضاء', lat: 33.5731, lng: -7.5898, country: 'المغرب' },
-  { name: 'تونس', lat: 36.8065, lng: 10.1815, country: 'تونس' },
-  { name: 'الجزائر', lat: 36.7538, lng: 3.0588, country: 'الجزائر' },
-  { name: 'القدس', lat: 31.7683, lng: 35.2137, country: 'فلسطين' },
-]
-
 export function PrayerSettings() {
   const [settings, update] = useSettings()
   const hydrated = useHydrated()
@@ -52,59 +44,88 @@ export function PrayerSettings() {
   const [locating, setLocating] = useState(false)
   const [notifPermission, setNotifPermission] = useState<string>('prompt')
 
+  const [exactAlarmOk, setExactAlarmOk] = useState<boolean | null>(null)
+  const [nativeSched, setNativeSched] = useState(false)
+
+  // الحالة الفعلية من النظام، وتُعاد قراءتها عند العودة للتطبيق (بعد تغيير الإعدادات من الهاتف)
   useEffect(() => {
-    setNotifPermission(getNotificationStatus())
+    const refresh = async () => {
+      setNotifPermission(await getNotificationStatusAsync())
+      const available = isAdhanSchedulerAvailable()
+      setNativeSched(available)
+      if (available) {
+        const st = await getNativeAlarmStatus()
+        setExactAlarmOk(st ? st.exactAlarmAllowed : null)
+      }
+    }
+    refresh()
+    return registerAppStateListener(refresh)
   }, [])
 
   // ============ Location ============
+  const [query, setQuery] = useState('')
+  const [online, setOnline] = useState<OnlineCity[]>([])
+  const [searching, setSearching] = useState(false)
+
   const detectLocation = async () => {
     setLocating(true)
-    try {
-      const result = await getNativeLocation()
-
-      if (result.status === 'denied') {
-        setLocating(false)
-        alert(
-          '⚠️ تم رفض الوصول للموقع\n\nلتفعيله:\n• اضغط على 🔒 بجانب الرابط\n• Site settings → Location → Allow'
-        )
-        return
-      }
-
-      if (result.status === 'error') {
-        setLocating(false)
-        alert(`⚠️ ${result.message}`)
-        return
-      }
-
-      // ✅ النجاح
-      const { lat, lng } = result
-      const res = await fetch(
-        `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=ar`
-      )
-      const data = await res.json()
-      update((s) => ({
-        location: {
-          lat,
-          lng,
-          city: data.city || data.locality || 'موقعي',
-          country: data.countryName || '',
-          auto: true,
-        },
-        method: COUNTRY_METHOD[data.countryCode] ?? s.method,
-      }))
-    } catch (e) {
-      console.warn(e)
-    }
+    const result = await updateAutoLocation({ force: true, askPermission: true, highAccuracy: true })
     setLocating(false)
+    if (result === 'denied') {
+      alert(
+        isNativePlatform()
+          ? '⚠️ لم يُسمح للتطبيق بالوصول إلى الموقع\n\nلتفعيله:\n١. إعدادات الهاتف ← التطبيقات ← إسلامي\n٢. الأذونات ← الموقع\n٣. اختر «السماح أثناء استخدام التطبيق»\n٤. ارجع واضغط «تحديد موقعي تلقائياً»'
+          : '⚠️ تم رفض الوصول للموقع\n\nلتفعيله:\n• اضغط على 🔒 بجانب الرابط\n• Site settings → Location → Allow',
+      )
+    } else if (result === 'error') {
+      alert('⚠️ تعذّر تحديد موقعك. تأكد من تشغيل خدمة الموقع (GPS) ثم أعد المحاولة.')
+    }
   }
 
-  // ============ Select City ============
-  const selectCity = (city: (typeof CITIES)[0]) => {
-    update({
-      location: { lat: city.lat, lng: city.lng, city: city.name, country: city.country, auto: false },
+  // البحث عن مدن من الإنترنت أثناء الكتابة (بالإضافة إلى القائمة المحلية)
+  useEffect(() => {
+    if (!openCityPicker) return
+    const q = query.trim()
+    if (q.length < 2) {
+      setOnline([])
+      return
+    }
+    const ctrl = new AbortController()
+    const t = setTimeout(async () => {
+      setSearching(true)
+      const rows = await searchCitiesOnline(q, ctrl.signal)
+      if (!ctrl.signal.aborted) {
+        setOnline(rows)
+        setSearching(false)
+      }
+    }, 450)
+    return () => {
+      clearTimeout(t)
+      ctrl.abort()
+      setSearching(false)
+    }
+  }, [query, openCityPicker])
+
+  const applyManualCity = (name: string, country: string, cc: string, lat: number, lng: number, method?: MethodKey) => {
+    update((s) => {
+      const countryChanged = !!cc && cc !== s.location.countryCode
+      return {
+        locationStatus: 'ok',
+        location: { lat, lng, city: name, country, countryCode: cc, auto: false },
+        method: countryChanged ? (method ?? methodForCountry(cc, s.method)) : s.method,
+      }
     })
     setOpenCityPicker(false)
+    setQuery('')
   }
+
+  const selectCity = (c: City) => applyManualCity(c.name, c.country, c.cc, c.lat, c.lng, c.method)
+  const selectOnline = (c: OnlineCity) =>
+    applyManualCity(c.admin && c.admin !== c.name ? `${c.name} - ${c.admin}` : c.name, c.country, c.cc, c.lat, c.lng)
+
+  const localMatches = searchCities(query)
+  const localNames = new Set(localMatches.map((c) => normalizeArabic(c.name)))
+  const onlineMatches = online.filter((o) => !localNames.has(normalizeArabic(o.name)))
 
   // ============ Notifications ============
   const handleEnableNotifications = async () => {
@@ -137,6 +158,20 @@ export function PrayerSettings() {
               {settings.location.country && ` - ${settings.location.country}`}
             </p>
           </div>
+          {settings.location.auto && settings.locationStatus === 'ok' && (
+            <p className="text-xs text-emerald-600">✓ يتم تحديد موقعك تلقائياً وتحديث المواقيت عند سفرك</p>
+          )}
+          {settings.locationStatus === 'denied' && (
+            <p className="rounded-xl bg-amber-100 p-3 text-xs leading-relaxed text-amber-900 dark:bg-amber-950 dark:text-amber-100">
+              لم يُسمح بالوصول للموقع، فالمواقيت الحالية لمدينة {settings.location.city}. اضغط «تحديد موقعي تلقائياً» وامنح
+              الإذن، أو اختر مدينتك يدوياً.
+            </p>
+          )}
+          {settings.locationStatus === 'error' && (
+            <p className="rounded-xl bg-amber-100 p-3 text-xs leading-relaxed text-amber-900 dark:bg-amber-950 dark:text-amber-100">
+              تعذّر تحديد موقعك. تأكد من تشغيل خدمة الموقع (GPS) في الهاتف.
+            </p>
+          )}
           <div className="flex gap-2">
             <button
               type="button"
@@ -157,20 +192,51 @@ export function PrayerSettings() {
             </button>
           </div>
           {openCityPicker && (
-            <div className="max-h-60 overflow-y-auto rounded-xl border border-border">
-              {CITIES.map((c) => (
-                <button
-                  key={c.name}
-                  type="button"
-                  onClick={() => selectCity(c)}
-                  className="flex w-full items-center justify-between border-b border-border px-3 py-2.5 text-right text-sm last:border-0 hover:bg-muted"
-                >
-                  <span>
-                    {c.name} <span className="text-xs text-muted-foreground">- {c.country}</span>
-                  </span>
-                  {settings.location.city === c.name && <Check className="size-4 text-emerald-600" />}
-                </button>
-              ))}
+            <div className="space-y-2">
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="ابحث عن مدينتك (مثال: أسيوط، تبوك، لندن...)"
+                aria-label="ابحث عن مدينة"
+                className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm"
+              />
+              <div className="max-h-72 overflow-y-auto rounded-xl border border-border">
+                {localMatches.map((c) => (
+                  <button
+                    key={`${c.cc}-${c.name}`}
+                    type="button"
+                    onClick={() => selectCity(c)}
+                    className="flex w-full items-center justify-between border-b border-border px-3 py-2.5 text-right text-sm last:border-0 hover:bg-muted"
+                  >
+                    <span>
+                      {c.name} <span className="text-xs text-muted-foreground">- {c.country}</span>
+                    </span>
+                    {settings.location.city === c.name && <Check className="size-4 text-emerald-600" />}
+                  </button>
+                ))}
+                {onlineMatches.map((c) => (
+                  <button
+                    key={`online-${c.lat}-${c.lng}`}
+                    type="button"
+                    onClick={() => selectOnline(c)}
+                    className="flex w-full items-center justify-between border-b border-border px-3 py-2.5 text-right text-sm last:border-0 hover:bg-muted"
+                  >
+                    <span>
+                      {c.name}
+                      <span className="text-xs text-muted-foreground">
+                        {` - ${[c.admin, c.country].filter(Boolean).join('، ')}`}
+                      </span>
+                    </span>
+                  </button>
+                ))}
+                {searching && <p className="p-3 text-center text-xs text-muted-foreground">جارٍ البحث في مدن العالم...</p>}
+                {!searching && localMatches.length === 0 && onlineMatches.length === 0 && (
+                  <p className="p-3 text-center text-xs text-muted-foreground">
+                    {query.trim().length < 2 ? 'اكتب حرفين على الأقل' : 'لا توجد نتائج. جرّب كتابة الاسم بطريقة أخرى.'}
+                  </p>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -343,7 +409,9 @@ export function PrayerSettings() {
                 type="button"
                 onClick={() => {
                   alert(
-                    'لتفعيل الإشعارات:\n\n1. اضغط 🔒 بجانب الرابط\n2. Site settings\n3. Notifications → Allow\n4. أعد تحميل الصفحة'
+                    isNativePlatform()
+                      ? 'لتفعيل الإشعارات:\n\n١. افتح إعدادات الهاتف\n٢. التطبيقات ← إسلامي\n٣. الإشعارات ← فعّلها\n٤. ارجع للتطبيق'
+                      : 'لتفعيل الإشعارات:\n\n1. اضغط 🔒 بجانب الرابط\n2. Site settings\n3. Notifications → Allow\n4. أعد تحميل الصفحة'
                   )
                 }}
                 className="rounded-xl bg-muted px-3 py-2 text-xs"
@@ -360,6 +428,75 @@ export function PrayerSettings() {
               </button>
             )}
           </div>
+
+          {nativeSched && (
+            <>
+              <div className="flex items-center justify-between gap-3 rounded-xl bg-muted/50 p-3">
+                <div className="flex-1">
+                  <p className="font-medium text-zinc-800 dark:text-zinc-100">إشعار دائم بالصلاة القادمة</p>
+                  <p className="text-xs text-muted-foreground">
+                    يبقى ظاهراً في الخلفية ويعرض الوقت المتبقي للصلاة القادمة
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={settings.persistentNotification}
+                  onClick={() => {
+                    const next = !settings.persistentNotification
+                    update({ persistentNotification: next })
+                    setPersistentNotification(next)
+                  }}
+                  className={cn(
+                    'relative h-6 w-11 shrink-0 rounded-full transition-colors',
+                    settings.persistentNotification ? 'bg-emerald-600' : 'bg-zinc-400',
+                  )}
+                >
+                  <span
+                    className={cn(
+                      'absolute top-0.5 size-5 rounded-full bg-white transition-all',
+                      settings.persistentNotification ? 'right-0.5' : 'right-[1.375rem]',
+                    )}
+                  />
+                </button>
+              </div>
+
+              <div className="rounded-xl bg-muted/50 p-3">
+                <p className="font-medium text-zinc-800 dark:text-zinc-100">تجربة الأذان</p>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  اضغط الزر ثم أغلق التطبيق تماماً وانتظر دقيقة؛ يجب أن يرتفع الأذان من تلقاء نفسه.
+                </p>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const voice = getAdhanVoice(settings.adhanVoice)
+                    const ok = await testNativeAdhan(60, voice?.file ?? '', settings.adhanVolume)
+                    alert(ok ? 'سيُرفع الأذان بعد دقيقة. أغلق التطبيق الآن للتجربة.' : 'تعذّرت التجربة، حدّث التطبيق من المتجر.')
+                  }}
+                  className="mt-2 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white"
+                >
+                  تجربة الأذان بعد دقيقة
+                </button>
+                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                  إن لم يعمل في الخلفية على هواتف شاومي وهواوي وأوبو وسامسونج: فعّل «التشغيل التلقائي» للتطبيق واستثنِه من
+                  «توفير البطارية» في إعدادات الهاتف.
+                </p>
+              </div>
+
+              {exactAlarmOk === false && (
+                <div className="rounded-xl bg-amber-100 p-3 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-100">
+                  <p className="font-medium">لتشغيل الأذان في وقته بدقة والتطبيق مغلق، اسمح بـ «المنبهات والتذكيرات».</p>
+                  <button
+                    type="button"
+                    onClick={() => requestExactAlarmPermission()}
+                    className="mt-2 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white"
+                  >
+                    فتح الإعدادات
+                  </button>
+                </div>
+              )}
+            </>
+          )}
         </div>
       </section>
     </div>

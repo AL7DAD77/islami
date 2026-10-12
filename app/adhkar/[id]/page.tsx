@@ -18,10 +18,20 @@ export default async function AdhkarCategoryPage({ params }: { params: Promise<{
   const { id } = await params
   const category = getCategory(id)
   if (!category) notFound()
+
+  // القسم التالي بحسب ترتيب الأقسام، للانتقال إليه تلقائياً بعد إتمام هذا القسم
+  const index = ADHKAR.findIndex((c) => c.id === category.id)
+  const next = index >= 0 && index < ADHKAR.length - 1 ? ADHKAR[index + 1] : null
+
   return (
     <>
       <PageHeader title={category.title} subtitle={category.description} backHref="/adhkar" />
-      <DhikrList items={category.items} />
+      <DhikrList
+        key={category.id}
+        items={category.items}
+        nextHref={next ? `/adhkar/${next.id}` : undefined}
+        nextTitle={next?.title}
+      />
     </>
   )
 }

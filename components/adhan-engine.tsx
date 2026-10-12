@@ -2,16 +2,63 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { BellRing, X } from 'lucide-react'
-import { getSettings, updateSettings, useSettings } from '@/lib/settings'
-import { PRAYER_NAMES, PRAYER_ORDER, distanceKm, getPrayerTimes } from '@/lib/prayer'
-import { COUNTRY_METHOD, reverseGeocode } from '@/lib/places'
+import { getSettings, useSettings } from '@/lib/settings'
+import { PRAYER_NAMES, PRAYER_ORDER, getPrayerTimes } from '@/lib/prayer'
+import { updateAutoLocation } from '@/lib/location'
 import { getAdhanVoice } from '@/lib/adhan-list'
 import {
   registerAppStateListener,
   showNativeNotification,
   requestNativeNotificationPermission,
-  getNativeLocation,
+  isAdhanSchedulerAvailable,
+  scheduleNativeAdhans,
+  stopNativeAdhan,
+  type ScheduledItem,
 } from '@/lib/native'
+import type { AppSettings } from '@/lib/settings'
+
+// ============ جدولة الأذان على مستوى النظام (أندرويد) ============
+// تُجدول الأذانات والتذكيرات للأيام القادمة، فتعمل والتطبيق مغلق وبدون فتحه.
+const SCHEDULE_DAYS = 25
+
+function buildSchedule(s: AppSettings): ScheduledItem[] {
+  const items: ScheduledItem[] = []
+  const now = Date.now()
+  for (let d = 0; d < SCHEDULE_DAYS; d++) {
+    const date = new Date()
+    date.setDate(date.getDate() + d)
+    const times = getPrayerTimes(s, date)
+    PRAYER_ORDER.forEach((key, idx) => {
+      const t = times[key].getTime()
+      if (t <= now) return
+      const name = PRAYER_NAMES[key]
+      if (s.reminderMinutes > 0 && t - s.reminderMinutes * 60000 > now) {
+        items.push({
+          id: d * 10 + idx * 2 + 1,
+          at: t - s.reminderMinutes * 60000,
+          kind: 'reminder',
+          prayer: key,
+          title: `اقتربت صلاة ${name}`,
+          body: `بعد ${s.reminderMinutes} دقائق - ${s.location.city}`,
+        })
+      }
+      if (s.adhanEnabled[key]) {
+        const voice = getAdhanVoice(key === 'fajr' ? s.fajrVoice : s.adhanVoice)
+        items.push({
+          id: d * 10 + idx * 2 + 2,
+          at: t,
+          kind: 'adhan',
+          prayer: key,
+          title: `حان الآن موعد أذان ${name}`,
+          body: `حسب التوقيت المحلي لمدينة ${s.location.city}`,
+          file: voice?.file,
+          volume: s.adhanVolume,
+        })
+      }
+    })
+  }
+  return items.sort((a, b) => a.at - b.at)
+}
 
 // ============ Audio Singleton ============
 let globalAudio: HTMLAudioElement | null = null
@@ -72,55 +119,62 @@ export function AdhanEngine() {
   }, [playing])
 
   // ============ Geolocation Auto ============
+  // - يطلب الإذن مرة واحدة فقط (لا يكرر النافذة كل بضع دقائق)
+  // - يستخدم الموقع التقريبي (يكفي للمدن ويوفر البطارية)
+  // - يحدّث عند فتح التطبيق/العودة إليه وكل ٣٠ دقيقة
   useEffect(() => {
     if (!settings.location.auto) return
+    let asked = false
+    let lastRun = 0
 
-    const updateLocation = async () => {
-      const result = await getNativeLocation()
-
-      // ⚠️ فقط إذا نجح الحصول على الموقع
-      if (result.status !== 'granted') return
-
-      const { lat, lng } = result
-      const current = getSettings().location
-      const moved = distanceKm(current.lat, current.lng, lat, lng)
-
-      // ⚠️ لا تحدث الموقع إذا لم يتحرك المستخدم 5 كم
-      if (
-        moved < 5 &&
-        current.city !== 'مكة المكرمة' &&
-        current.city !== 'موقعي الحالي'
-      ) {
-        return
-      }
-
-      try {
-        const place = await reverseGeocode(lat, lng)
-        updateSettings((s) => ({
-          location: {
-            ...s.location,
-            lat,
-            lng,
-            city: place.city,
-            country: place.country,
-          },
-          method: COUNTRY_METHOD[place.countryCode] ?? s.method,
-        }))
-      } catch {
-        updateSettings((s) => ({
-          location: { ...s.location, lat, lng },
-        }))
-      }
+    const run = async (force = false) => {
+      if (!force && Date.now() - lastRun < 60_000) return
+      lastRun = Date.now()
+      const result = await updateAutoLocation({ askPermission: !asked })
+      asked = true
+      if (result === 'denied' || result === 'error') return
     }
 
-    updateLocation()
-    const id = setInterval(updateLocation, 5 * 60 * 1000) // كل 5 دقائق
-    return () => clearInterval(id)
+    run(true)
+    const id = setInterval(() => run(true), 30 * 60 * 1000)
+    const off = registerAppStateListener(() => run())
+    return () => {
+      clearInterval(id)
+      off()
+    }
   }, [settings.location.auto])
+
+  // ============ جدولة النظام (تعمل في الخلفية) ============
+  const scheduleKey = JSON.stringify([
+    settings.location.lat,
+    settings.location.lng,
+    settings.location.city,
+    settings.method,
+    settings.madhab,
+    settings.adhanEnabled,
+    settings.adhanVoice,
+    settings.fajrVoice,
+    settings.adhanVolume,
+    settings.reminderMinutes,
+    settings.persistentNotification,
+  ])
+
+  useEffect(() => {
+    if (!isAdhanSchedulerAvailable()) return
+    const run = () => {
+      const s = getSettings()
+      scheduleNativeAdhans(buildSchedule(s), s.persistentNotification, s.location.city)
+    }
+    run()
+    // أعد الجدولة كلما عاد التطبيق للواجهة (لتمديد الأيام المجدولة)
+    return registerAppStateListener(run)
+  }, [scheduleKey])
 
   // ============ Prayer Tick ============
   useEffect(() => {
     const tick = () => {
+      // في تطبيق أندرويد الجديد يتولى النظام الأذان والتذكير (حتى والتطبيق مغلق)
+      if (isAdhanSchedulerAvailable()) return
       const s = getSettings()
       const now = new Date()
       const times = getPrayerTimes(s, now)
@@ -222,6 +276,7 @@ export function AdhanEngine() {
         type="button"
         onClick={() => {
           stopAdhanAudio()
+          stopNativeAdhan()
           setPlaying(null)
         }}
         className="rounded-full bg-primary-foreground/15 p-2 hover:bg-primary-foreground/25"

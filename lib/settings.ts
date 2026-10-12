@@ -24,6 +24,7 @@ export interface AppSettings {
     lng: number
     city: string
     country: string
+    countryCode?: string
     auto: boolean
   }
   method: MethodKey
@@ -40,6 +41,10 @@ export interface AppSettings {
   lastRead: { surah: number; name: string } | null
   wird: { pagesPerDay: number; currentPage: number; lastDoneDate: string | null; streak: number }
   dhikrCounter: number
+  persistentNotification: boolean
+  locationStatus: 'unknown' | 'ok' | 'denied' | 'error'
+  quranView: 'scroll' | 'pages'
+  ayahHighlight: boolean
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -47,8 +52,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   method: 'UmmAlQura',
   madhab: 'shafi',
   hijriAdjust: 0,
-  adhanVoice: 'a1',
-  fajrVoice: 'a2',
+  adhanVoice: 'makkah',
+  fajrVoice: 'fajr',
   adhanEnabled: { fajr: true, dhuhr: true, asr: true, maghrib: true, isha: true },
   adhanVolume: 0.9,
   reminderMinutes: 10,
@@ -58,6 +63,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
   lastRead: null,
   wird: { pagesPerDay: 4, currentPage: 1, lastDoneDate: null, streak: 0 },
   dhikrCounter: 0,
+  persistentNotification: true,
+  locationStatus: 'unknown',
+  quranView: 'scroll',
+  ayahHighlight: true,
 }
 
 const KEY = 'noor-settings-v1'

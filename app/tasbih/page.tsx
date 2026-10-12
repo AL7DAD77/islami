@@ -9,7 +9,7 @@ export default function TasbihPage() {
       <PageHeader 
         title="المسبحة الإلكترونية" 
         subtitle="سبح بحمد ربك"
-        backHref="/"
+        backHref="/adhkar"
       />
       <div className="p-4">
         <TasbihCounter />

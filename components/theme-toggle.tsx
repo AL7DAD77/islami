@@ -1,13 +1,16 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { Moon, Sun } from 'lucide-react'
 
 export function ThemeToggle() {
   const [isDark, setIsDark] = useState(false)
 
   useEffect(() => {
-    const saved = localStorage.getItem('theme')
-    const dark = saved === 'dark'
+    let dark = false
+    try {
+      dark = localStorage.getItem('theme') === 'dark'
+    } catch {}
     setIsDark(dark)
     document.documentElement.classList.toggle('dark', dark)
   }, [])
@@ -16,25 +19,25 @@ export function ThemeToggle() {
     const next = !isDark
     setIsDark(next)
     document.documentElement.classList.toggle('dark', next)
-    localStorage.setItem('theme', next ? 'dark' : 'light')
+    try {
+      localStorage.setItem('theme', next ? 'dark' : 'light')
+    } catch {}
   }
 
   return (
     <button
       type="button"
       onClick={toggle}
-      className="flex w-full items-center gap-3 rounded-2xl border border-emerald-100 bg-white p-4 text-right shadow-sm transition hover:border-emerald-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900"
+      aria-pressed={isDark}
+      className="flex items-center gap-3 rounded-2xl bg-card p-3 text-right shadow-sm ring-1 ring-border transition-colors hover:bg-secondary"
     >
-      <span className="text-3xl">{isDark ? '☀️' : '🌙'}</span>
-      <div className="flex-1">
-        <div className="font-semibold text-zinc-800 dark:text-zinc-100">
-          {isDark ? 'الوضع الفاتح' : 'الوضع الداكن'}
-        </div>
-        <div className="text-xs text-zinc-500 dark:text-zinc-400">
-          {isDark ? 'التبديل للوضع الفاتح' : 'التبديل للوضع الداكن'}
-        </div>
-      </div>
-      <span className="text-zinc-400">‹</span>
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-foreground">
+        {isDark ? <Sun className="size-5" aria-hidden="true" /> : <Moon className="size-5" aria-hidden="true" />}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-bold">{isDark ? 'الوضع الفاتح' : 'الوضع الداكن'}</span>
+        <span className="block text-[11px] text-muted-foreground">تبديل مظهر التطبيق</span>
+      </span>
     </button>
   )
 }

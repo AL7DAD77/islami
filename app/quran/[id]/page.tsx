@@ -2,12 +2,16 @@
 
 import Link from 'next/link'
 import { notFound, useParams, useRouter, useSearchParams } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, Loader2, Play, X } from 'lucide-react'
 import { PageHeader } from '@/components/page-header'
 import { SurahPlayer } from '@/components/quran/surah-player'
 import { SurahReader } from '@/components/quran/surah-reader'
 import { getReciters, getSurah, toArabicNumber, type Ayah, type SurahMeta, type Reciter } from '@/lib/quran'
+import { useQuranPlayer } from '@/lib/quran-player'
+import { useSettings } from '@/lib/settings'
+import { estimateAyah } from '@/lib/ayah-sync'
+import { useHorizontalSwipe } from '@/lib/use-swipe'
 
 export default function SurahPage() {
   const params = useParams()
@@ -23,46 +27,27 @@ export default function SurahPage() {
   const [loading, setLoading] = useState(true)
   
   const [isPlayerOpen, setIsPlayerOpen] = useState(false)
-  const [currentAyah, setCurrentAyah] = useState<number | null>(null)
 
-  // ============ Swipe Navigation (منع اعتراض التمرير العمودي) ============
-  useEffect(() => {
-    let startX = 0
-    let startY = 0
-    let startTime = 0
+  // ============ تظليل الآية الجارية ============
+  // يُحسب مباشرة من مشغّل القرآن العام، فيعمل حتى بعد إغلاق نافذة المشغّل
+  // (سابقاً كان يتجمد عند إغلاقها، ويُحسب خطياً بغض النظر عن طول الآيات).
+  const player = useQuranPlayer()
+  const [settings] = useSettings()
+  const activeHere = player.surah === n && (player.playing || player.progress > 0)
+  const currentAyah = useMemo(
+    () => (activeHere && settings.ayahHighlight && ayahs.length ? estimateAyah(ayahs, n, player.progress / 100) : null),
+    [activeHere, settings.ayahHighlight, ayahs, n, player.progress],
+  )
 
-    const onStart = (e: TouchEvent) => {
-      const t = e.touches[0]
-      startX = t.clientX
-      startY = t.clientY
-      startTime = Date.now()
-    }
-
-    const onEnd = (e: TouchEvent) => {
-      const t = e.changedTouches[0]
-      const deltaX = t.clientX - startX
-      const deltaY = t.clientY - startY
-      const duration = Date.now() - startTime
-
-      // إذا كانت الحركة عمودية أعلى أو متقاربة مع الأفقي، نمنع التغيير ونترك التمرير يعمل بسلاسة
-      if (Math.abs(deltaY) * 1.5 > Math.abs(deltaX)) return
-      if (duration > 400) return
-      if (Math.abs(deltaX) < 120) return
-
-      if (deltaX > 0 && n > 1) {
-        router.push(`/quran/${n - 1}`)
-      } else if (deltaX < 0 && n < 114) {
-        router.push(`/quran/${n + 1}`)
-      }
-    }
-
-    document.addEventListener('touchstart', onStart, { passive: true })
-    document.addEventListener('touchend', onEnd, { passive: true })
-    return () => {
-      document.removeEventListener('touchstart', onStart)
-      document.removeEventListener('touchend', onEnd)
-    }
-  }, [n, router])
+  // ============ سحب للانتقال بين السور (وضع التمرير فقط؛ في وضع الصفحات السحب لتقليب الصفحات) ============
+  useHorizontalSwipe({
+    enabled: settings.quranView !== 'pages' || ayahs.length === 0,
+    minDistance: 120,
+    onSwipe: (dir) => {
+      if (dir === 'right' && n > 1) router.push(`/quran/${n - 1}`)
+      else if (dir === 'left' && n < 114) router.push(`/quran/${n + 1}`)
+    },
+  })
 
   // ============ Load Surah ============
   useEffect(() => {
@@ -164,7 +149,6 @@ export default function SurahPage() {
               surah={n} 
               surahName={meta.name} 
               reciters={reciters} 
-              onAyahChange={setCurrentAyah} 
               totalAyahs={ayahs.length}
             />
           </div>

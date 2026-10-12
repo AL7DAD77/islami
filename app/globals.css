@@ -106,5 +106,13 @@ html, body {
   overflow-y: auto !important;
   height: 100%;
   -webkit-overflow-scrolling: touch;
-  touch-action: pan-y pinch-zoom;
+  /* ⚠️ لا نقيّد touch-action هنا: كان pan-y يمنع التمرير الأفقي داخل صفحات المصحف.
+     manipulation يبقي التمرير والتكبير ويزيل تأخير النقر المزدوج. */
+  touch-action: manipulation;
+  overscroll-behavior-x: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button, a, [role="button"], summary {
+  touch-action: manipulation;
 }

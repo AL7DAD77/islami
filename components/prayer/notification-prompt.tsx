@@ -2,39 +2,58 @@
 
 import { useEffect, useState } from 'react'
 import { Bell, X } from 'lucide-react'
+import {
+  getNotificationStatusAsync,
+  requestNativeNotificationPermission,
+  showNativeNotification,
+  registerAppStateListener,
+} from '@/lib/native'
+
+const DISMISS_KEY = 'notif-dismissed-v2'
 
 export function NotificationPrompt() {
   const [show, setShow] = useState(false)
 
   useEffect(() => {
-    if (typeof Notification === 'undefined') return
-    if (Notification.permission === 'granted') return
-    if (Notification.permission === 'denied') return
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let cancelled = false
 
-    const dismissed = localStorage.getItem('notif-dismissed')
-    if (dismissed) return
+    const check = async () => {
+      // الحالة الفعلية من النظام (وليس من متغير المتصفح) حتى لا يظهر الطلب بعد التفعيل
+      const status = await getNotificationStatusAsync()
+      if (cancelled) return
+      if (status === 'granted' || status === 'unsupported') {
+        setShow(false)
+        return
+      }
+      if (status === 'denied') return // لا فائدة من الطلب، والأزرار في الإعدادات تشرح الطريقة
+      try {
+        if (localStorage.getItem(DISMISS_KEY)) return
+      } catch {}
+      timer = setTimeout(() => !cancelled && setShow(true), 3000)
+    }
 
-    // انتظر 3 ثوانٍ ثم اعرض
-    const timer = setTimeout(() => setShow(true), 3000)
-    return () => clearTimeout(timer)
+    check()
+    const off = registerAppStateListener(check)
+    return () => {
+      cancelled = true
+      if (timer) clearTimeout(timer)
+      off()
+    }
   }, [])
 
   const enable = async () => {
-    if (typeof Notification === 'undefined') return
-    const permission = await Notification.requestPermission()
+    const permission = await requestNativeNotificationPermission()
     if (permission === 'granted') {
-      new Notification('تم تفعيل الإشعارات', {
-        body: 'ستصلك تنبيهات الصلاة والأذان في وقتها',
-        icon: '/icon-512.png',
-        dir: 'rtl',
-        lang: 'ar',
-      })
+      await showNativeNotification('تم تفعيل الإشعارات', 'ستصلك تنبيهات الصلاة والأذان في وقتها')
     }
     setShow(false)
   }
 
   const dismiss = () => {
-    localStorage.setItem('notif-dismissed', '1')
+    try {
+      localStorage.setItem(DISMISS_KEY, '1')
+    } catch {}
     setShow(false)
   }
 
@@ -57,9 +76,7 @@ export function NotificationPrompt() {
         </div>
         <div className="flex-1">
           <p className="font-bold">تفعيل إشعارات الأذان</p>
-          <p className="mt-1 text-xs opacity-90">
-            للتنبيه بمواعيد الصلاة والأذان في وقتها
-          </p>
+          <p className="mt-1 text-xs opacity-90">للتنبيه بمواعيد الصلاة والأذان في وقتها</p>
           <button
             type="button"
             onClick={enable}

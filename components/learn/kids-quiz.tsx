@@ -1,25 +1,38 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { PartyPopper, RotateCcw } from 'lucide-react'
-import { KIDS_QUIZ } from '@/lib/learn'
+import type { QuizQuestion } from '@/lib/learn'
+import { pickQuizRound } from '@/lib/kids-quiz-pool'
 import { toArabicNumber } from '@/lib/quran'
 import { cn } from '@/lib/utils'
 
 export function KidsQuiz() {
+  // جولة عشوائية جديدة في كل مرة (تُختار بعد التحميل لتفادي اختلاف العرض بين الخادم والمتصفح)
+  const [round, setRound] = useState<QuizQuestion[]>([])
   const [index, setIndex] = useState(0)
   const [picked, setPicked] = useState<number | null>(null)
   const [score, setScore] = useState(0)
-  const finished = index >= KIDS_QUIZ.length
+
+  useEffect(() => {
+    setRound(pickQuizRound())
+  }, [])
+
+  if (round.length === 0) {
+    return <div className="h-40 animate-pulse rounded-3xl bg-card" aria-hidden="true" />
+  }
+
+  const finished = index >= round.length
 
   if (finished) {
     return (
       <div className="flex flex-col items-center gap-3 rounded-3xl bg-gold/20 p-6 text-center">
         <PartyPopper className="size-10 text-primary" aria-hidden="true" />
-        <p className="text-xl font-bold">{`أحسنت! نتيجتك ${toArabicNumber(score)} من ${toArabicNumber(KIDS_QUIZ.length)}`}</p>
+        <p className="text-xl font-bold">{`أحسنت! نتيجتك ${toArabicNumber(score)} من ${toArabicNumber(round.length)}`}</p>
         <button
           type="button"
           onClick={() => {
+            setRound(pickQuizRound())
             setIndex(0)
             setScore(0)
             setPicked(null)
@@ -33,7 +46,7 @@ export function KidsQuiz() {
     )
   }
 
-  const q = KIDS_QUIZ[index]
+  const q = round[index]
   const choose = (i: number) => {
     if (picked !== null) return
     setPicked(i)
@@ -46,7 +59,7 @@ export function KidsQuiz() {
 
   return (
     <div className="rounded-3xl bg-card p-5 shadow-sm ring-1 ring-border">
-      <p className="text-xs text-muted-foreground">{`سؤال ${toArabicNumber(index + 1)} من ${toArabicNumber(KIDS_QUIZ.length)}`}</p>
+      <p className="text-xs text-muted-foreground">{`سؤال ${toArabicNumber(index + 1)} من ${toArabicNumber(round.length)}`}</p>
       <p className="mt-2 text-lg font-bold">{q.q}</p>
       <div className="mt-4 grid gap-2" role="group" aria-label="الخيارات">
         {q.options.map((o, i) => {

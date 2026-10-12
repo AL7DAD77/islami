@@ -142,7 +142,7 @@ export function TasbihCounter() {
   return (
     <div className="flex flex-col gap-5">
       {/* ============ بطاقة الذكر الحالي ============ */}
-      <div className="rounded-3xl bg-gradient-to-l from-emerald-700 to-emerald-800 p-6 text-center text-white shadow-lg">
+      <div data-no-swipe className="rounded-3xl bg-gradient-to-l from-emerald-700 to-emerald-800 p-6 text-center text-white shadow-lg">
         <p className="text-xs opacity-70">
           {toArabicNumber(state.index + 1)} من {toArabicNumber(TASBIH_ITEMS.length)}
         </p>
