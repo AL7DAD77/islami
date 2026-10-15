@@ -115,7 +115,6 @@ final class NotificationHelper {
     static String hijriToday() {
         try {
             android.icu.util.IslamicCalendar cal = new android.icu.util.IslamicCalendar();
-            cal.setCalendarType(android.icu.util.IslamicCalendar.CalendarType.UMALQURA);
             cal.setTimeInMillis(System.currentTimeMillis());
             int day = cal.get(android.icu.util.Calendar.DAY_OF_MONTH);
             int month = cal.get(android.icu.util.Calendar.MONTH);

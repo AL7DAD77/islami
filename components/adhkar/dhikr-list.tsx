@@ -13,6 +13,32 @@ const FONT_KEY = 'dhikr-font-size'
 const DEFAULT_FONT = 22
 const NEXT_DELAY_SECONDS = 4
 
+const BUZZ_DONE = [30, 50, 30]
+const BUZZ_NEXT = [120]
+const BUZZ_CATEGORY = [150, 100, 150, 100, 150]
+
+function vibrate(pattern: number | number[]) {
+  try {
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      navigator.vibrate(pattern)
+    }
+  } catch {}
+}
+
+function moveToElement(element: HTMLElement | null) {
+  if (!element) return
+
+  try {
+    element.scrollIntoView({
+      behavior: 'instant',
+      block: 'start',
+      inline: 'nearest',
+    })
+  } catch {
+    element.scrollIntoView(true)
+  }
+}
+
 export function DhikrList({
   items,
   nextHref,
@@ -23,159 +49,268 @@ export function DhikrList({
   nextTitle?: string
 }) {
   const router = useRouter()
-  // حجم نص الذكر: يُحفظ محلياً، ويتغير بإصبعين
+
   const [fontSize, setFontSize] = useState(DEFAULT_FONT)
+  const [counts, setCounts] = useState<number[]>(() =>
+    items.map(() => 0),
+  )
+  const [autoScroll, setAutoScroll] = useState(true)
+  const [settingsLoaded, setSettingsLoaded] = useState(false)
+  const [justCompleted, setJustCompleted] = useState<number | null>(null)
+  const [cancelledNext, setCancelledNext] = useState(false)
+  const [secondsLeft, setSecondsLeft] = useState(NEXT_DELAY_SECONDS)
+
+  const refs = useRef<(HTMLElement | null)[]>([])
+  const doneRef = useRef<HTMLDivElement | null>(null)
+  const toolbarRef = useRef<HTMLDivElement | null>(null)
+
+  const timers = useRef<Set<ReturnType<typeof setTimeout>>>(new Set())
+  const countsRef = useRef<number[]>(items.map(() => 0))
+  const autoScrollRef = useRef(true)
+
+  const clearTimers = useCallback(() => {
+    timers.current.forEach((timer) => clearTimeout(timer))
+    timers.current.clear()
+  }, [])
+
+  const later = useCallback((fn: () => void, ms: number) => {
+    const timer = setTimeout(() => {
+      timers.current.delete(timer)
+      fn()
+    }, ms)
+
+    timers.current.add(timer)
+    return timer
+  }, [])
+
+  // تحميل الإعدادات قبل السماح بحفظها.
   useEffect(() => {
     try {
-      const saved = Number(localStorage.getItem(FONT_KEY))
-      if (saved) setFontSize(saved)
-    } catch {}
+      const savedFont = Number(localStorage.getItem(FONT_KEY))
+
+      if (Number.isFinite(savedFont) && savedFont >= 16 && savedFont <= 40) {
+        setFontSize(savedFont)
+      }
+
+      const savedAutoScroll = localStorage.getItem(AUTO_SCROLL_KEY)
+      const enabled = savedAutoScroll !== 'false'
+
+      autoScrollRef.current = enabled
+      setAutoScroll(enabled)
+    } catch {
+      autoScrollRef.current = true
+      setAutoScroll(true)
+    }
+
+    setSettingsLoaded(true)
   }, [])
+
+  useEffect(() => {
+    if (!settingsLoaded) return
+
+    try {
+      localStorage.setItem(AUTO_SCROLL_KEY, String(autoScroll))
+    } catch {}
+  }, [autoScroll, settingsLoaded])
+
   const pinch = usePinchZoom<HTMLDivElement>(
     fontSize,
-    (v) => {
-      setFontSize(v)
+    (value) => {
+      setFontSize(value)
+
       try {
-        localStorage.setItem(FONT_KEY, String(v))
+        localStorage.setItem(FONT_KEY, String(value))
       } catch {}
     },
     [],
     16,
     40,
   )
-  const [counts, setCounts] = useState<number[]>(() => items.map(() => 0))
-  const [autoScroll, setAutoScroll] = useState(true)
-  const [justCompleted, setJustCompleted] = useState<number | null>(null)
-  const [cancelledNext, setCancelledNext] = useState(false)
-  const [secondsLeft, setSecondsLeft] = useState(NEXT_DELAY_SECONDS)
-  const refs = useRef<(HTMLElement | null)[]>([])
-  const doneRef = useRef<HTMLDivElement | null>(null)
-  const timers = useRef<ReturnType<typeof setTimeout>[]>([])
-
-  // تحميل الإعداد
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(AUTO_SCROLL_KEY)
-      if (saved !== null) setAutoScroll(saved === 'true')
-    } catch {}
-  }, [])
 
   useEffect(() => {
-    try {
-      localStorage.setItem(AUTO_SCROLL_KEY, String(autoScroll))
-    } catch {}
-  }, [autoScroll])
+    return () => {
+      clearTimers()
+    }
+  }, [clearTimers])
 
-  // تنظيف المؤقتات عند مغادرة الصفحة
-  useEffect(() => {
-    const list = timers.current
-    return () => list.forEach(clearTimeout)
-  }, [])
+  const done = items.reduce(
+    (total, item, index) =>
+      total + ((counts[index] ?? 0) >= item.count ? 1 : 0),
+    0,
+  )
 
-  const done = counts.filter((c, i) => c >= items[i].count).length
   const allDone = items.length > 0 && done === items.length
 
-  const later = (fn: () => void, ms: number) => {
-    timers.current.push(setTimeout(fn, ms))
-  }
-
-  const vibrate = (pattern: number | number[]) => {
-    try {
-      if ('vibrate' in navigator) navigator.vibrate(pattern)
-    } catch {}
-  }
-  // أنماط مميزة: إتمام الذكر، والانتقال للذكر التالي، والانتقال للقسم التالي
-  const BUZZ_DONE = [30, 50, 30]
-  const BUZZ_NEXT = [120]
-  const BUZZ_CATEGORY = [150, 100, 150, 100, 150]
-
-  /** أول ذكر غير مكتمل بعد الموضع i، وإن لم يوجد فأول غير مكتمل قبله */
   const nextIncomplete = (from: number, current: number[]) => {
-    for (let k = from + 1; k < items.length; k++) if (current[k] < items[k].count) return k
-    for (let k = 0; k < from; k++) if (current[k] < items[k].count) return k
+    for (let index = from + 1; index < items.length; index++) {
+      if ((current[index] ?? 0) < items[index].count) {
+        return index
+      }
+    }
+
+    for (let index = 0; index < from; index++) {
+      if ((current[index] ?? 0) < items[index].count) {
+        return index
+      }
+    }
+
     return -1
   }
 
-  const tap = (i: number) => {
-    const before = counts[i]
-    if (before >= items[i].count) return
+  const scrollToCard = (element: HTMLElement | null) => {
+    if (!element) return
 
-    const next = counts.map((c, j) => (j === i ? c + 1 : c))
+    const toolbarHeight = toolbarRef.current?.getBoundingClientRect().height ?? 100
+
+    // مسافة أعلى البطاقة حتى لا يغطيها شريط التحكم.
+    element.style.scrollMarginTop = `${Math.ceil(toolbarHeight + 24)}px`
+
+    moveToElement(element)
+  }
+
+  const tap = (index: number) => {
+    const item = items[index]
+    if (!item) return
+
+    const current = countsRef.current
+    const before = current[index] ?? 0
+
+    if (before >= item.count) return
+
+    const next = items.map((_, itemIndex) =>
+      itemIndex === index
+        ? before + 1
+        : (current[itemIndex] ?? 0),
+    )
+
+    // تحديث المرجع فورًا حتى لا تعتمد الضغطات السريعة على قيمة قديمة.
+    countsRef.current = next
     setCounts(next)
 
-    const justDone = next[i] >= items[i].count
-    if (!justDone) {
+    if (next[index] < item.count) {
       vibrate(15)
       return
     }
 
-    // اكتمل هذا الذكر: تأثير بصري واهتزاز
-    setJustCompleted(i)
-    later(() => setJustCompleted(null), 1000)
+    setJustCompleted(index)
     vibrate(BUZZ_DONE)
 
-    if (!autoScroll) return
-
-    const target = nextIncomplete(i, next)
     later(() => {
+      setJustCompleted((currentIndex) =>
+        currentIndex === index ? null : currentIndex,
+      )
+    }, 1000)
+
+    if (!autoScrollRef.current) return
+
+    later(() => {
+      // احترام إلغاء الخيار أثناء فترة الانتظار.
+      if (!autoScrollRef.current) return
+
+      // إعادة حساب الهدف من أحدث قيم العدادات.
+      const target = nextIncomplete(index, countsRef.current)
+
       if (target >= 0) {
-        refs.current[target]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-        vibrate(BUZZ_NEXT) // تنبيه بتغيير الذكر
+        scrollToCard(refs.current[target] ?? null)
       } else {
-        // اكتملت كل الأذكار: انزل إلى بطاقة الإتمام
-        doneRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-        vibrate(BUZZ_NEXT)
+        scrollToCard(doneRef.current)
       }
+
+      vibrate(BUZZ_NEXT)
     }, 450)
   }
 
   const reset = () => {
-    setCounts(items.map(() => 0))
+    clearTimers()
+
+    const initialCounts = items.map(() => 0)
+
+    countsRef.current = initialCounts
+    setCounts(initialCounts)
+    setJustCompleted(null)
     setCancelledNext(false)
     setSecondsLeft(NEXT_DELAY_SECONDS)
   }
 
-  // ===== الانتقال التلقائي إلى القسم التالي بعد إتمام الكل =====
-  // نحفظ الموجّه في مرجع: كائن الموجّه قد يتغير مع كل عرض، وكان ذلك يُعيد ضبط المؤقت باستمرار فلا ينتقل أبدًا
-  const routerRef = useRef(router)
-  routerRef.current = router
+  const changeAutoScroll = (enabled: boolean) => {
+    autoScrollRef.current = enabled
+    setAutoScroll(enabled)
+  }
+
+  // الانتقال إلى القسم التالي.
   const goNext = useCallback(() => {
     if (!nextHref) return
-    try {
-      if ('vibrate' in navigator) navigator.vibrate(BUZZ_CATEGORY)
-    } catch {}
-    routerRef.current.push(nextHref)
-  }, [nextHref])
+
+    vibrate(BUZZ_CATEGORY)
+    router.push(nextHref)
+  }, [nextHref, router])
+
+  // إبقاء مؤقت القسم مستقلاً عن تغير مرجع دالة التنقل.
+  const goNextRef = useRef(goNext)
 
   useEffect(() => {
-    if (!allDone || !autoScroll || !nextHref || cancelledNext) return
+    goNextRef.current = goNext
+  }, [goNext])
+
+  useEffect(() => {
+    if (
+      !settingsLoaded ||
+      !allDone ||
+      !autoScroll ||
+      !nextHref ||
+      cancelledNext
+    ) {
+      return
+    }
+
     setSecondsLeft(NEXT_DELAY_SECONDS)
+
     const tick = setInterval(() => {
-      setSecondsLeft((s) => (s > 0 ? s - 1 : 0))
+      setSecondsLeft((seconds) => Math.max(0, seconds - 1))
     }, 1000)
-    const go = setTimeout(goNext, NEXT_DELAY_SECONDS * 1000)
+
+    const go = setTimeout(() => {
+      goNextRef.current()
+    }, NEXT_DELAY_SECONDS * 1000)
+
     return () => {
       clearInterval(tick)
       clearTimeout(go)
     }
-  }, [allDone, autoScroll, nextHref, cancelledNext, goNext])
+  }, [
+    settingsLoaded,
+    allDone,
+    autoScroll,
+    nextHref,
+    cancelledNext,
+  ])
 
-  const share = async (d: Dhikr) => {
-    const text = `${d.text}\n\n${d.source}`
+  const share = async (dhikr: Dhikr) => {
+    const text = `${dhikr.text}
+
+${dhikr.source}`
+
     try {
-      if (navigator.share) await navigator.share({ text })
-      else await navigator.clipboard.writeText(text)
+      if (navigator.share) {
+        await navigator.share({ text })
+      } else {
+        await navigator.clipboard.writeText(text)
+      }
     } catch {}
   }
 
   return (
     <div ref={pinch.ref} className="flex flex-col gap-3">
-      {/* ============ الشريط العلوي ============ */}
-      <div className="sticky top-0 z-10 -mx-4 flex flex-col gap-2 bg-background/90 px-4 py-2 backdrop-blur">
+      {/* الشريط العلوي */}
+      <div
+        ref={toolbarRef}
+        className="sticky top-0 z-10 -mx-4 flex flex-col gap-2 bg-background/90 px-4 py-2 backdrop-blur"
+      >
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
             {`أنجزت ${toArabicNumber(done)} من ${toArabicNumber(items.length)}`}
           </p>
+
           <button
             type="button"
             onClick={reset}
@@ -187,7 +322,10 @@ export function DhikrList({
         </div>
 
         <label className="flex cursor-pointer items-center justify-between rounded-xl bg-muted/50 px-3 py-2">
-          <span className="text-xs font-medium">{'الانتقال التلقائي للذكر التالي ثم للقسم التالي'}</span>
+          <span className="text-xs font-medium">
+            {'الانتقال التلقائي للذكر التالي ثم للقسم التالي'}
+          </span>
+
           <span
             className={cn(
               'relative inline-flex h-5 w-9 items-center rounded-full transition-colors',
@@ -197,9 +335,10 @@ export function DhikrList({
             <input
               type="checkbox"
               checked={autoScroll}
-              onChange={(e) => setAutoScroll(e.target.checked)}
+              onChange={(event) => changeAutoScroll(event.target.checked)}
               className="sr-only"
             />
+
             <span
               className={cn(
                 'inline-block size-4 transform rounded-full bg-white shadow transition-transform',
@@ -210,16 +349,19 @@ export function DhikrList({
         </label>
       </div>
 
-      {/* ============ قائمة الأذكار ============ */}
-      {items.map((d, i) => {
-        const complete = counts[i] >= d.count
-        const isJustCompleted = justCompleted === i
+      {/* قائمة الأذكار */}
+      {items.map((dhikr, index) => {
+        const count = counts[index] ?? 0
+        const complete = count >= dhikr.count
+        const isJustCompleted = justCompleted === index
+
         return (
           <article
-            key={i}
-            ref={(el) => {
-              refs.current[i] = el
+            key={index}
+            ref={(element) => {
+              refs.current[index] = element
             }}
+            style={{ scrollMarginTop: 140 }}
             className={cn(
               'overflow-hidden rounded-2xl bg-card shadow-sm ring-1 ring-border transition-all duration-500',
               complete && 'opacity-60',
@@ -228,41 +370,54 @@ export function DhikrList({
           >
             <button
               type="button"
-              onClick={() => tap(i)}
+              onClick={() => tap(index)}
               disabled={complete}
               className="block w-full p-5 text-right"
-              aria-label={`اضغط للعد: ${toArabicNumber(counts[i])} من ${toArabicNumber(d.count)}`}
+              aria-label={`اضغط للعد: ${toArabicNumber(count)} من ${toArabicNumber(dhikr.count)}`}
             >
-              <p className="font-quran leading-loose" style={{ fontSize: pinch.size }}>{d.text}</p>
-              {d.note && (
+              <p
+                className="font-quran leading-loose"
+                style={{ fontSize: pinch.size }}
+              >
+                {dhikr.text}
+              </p>
+
+              {dhikr.note && (
                 <p className="mt-3 rounded-xl bg-accent/60 p-3 text-sm leading-relaxed text-accent-foreground">
-                  {d.note}
+                  {dhikr.note}
                 </p>
               )}
             </button>
+
             <div className="flex items-center gap-3 border-t px-5 py-3">
-              <p className="flex-1 text-xs text-muted-foreground">{d.source}</p>
+              <p className="flex-1 text-xs text-muted-foreground">
+                {dhikr.source}
+              </p>
+
               <button
                 type="button"
-                onClick={() => share(d)}
+                onClick={() => share(dhikr)}
                 className="flex size-8 items-center justify-center rounded-full bg-muted"
                 aria-label="مشاركة الذكر"
               >
                 <Share2 className="size-4" />
               </button>
+
               <button
                 type="button"
-                onClick={() => tap(i)}
+                onClick={() => tap(index)}
                 disabled={complete}
                 className={cn(
                   'flex h-9 min-w-16 items-center justify-center gap-1 rounded-full px-3 text-sm font-bold',
-                  complete ? 'bg-secondary text-primary' : 'bg-primary text-primary-foreground',
+                  complete
+                    ? 'bg-secondary text-primary'
+                    : 'bg-primary text-primary-foreground',
                 )}
               >
                 {complete ? (
                   <Check className="size-4" aria-label="تم" />
                 ) : (
-                  `${toArabicNumber(counts[i])} / ${toArabicNumber(d.count)}`
+                  `${toArabicNumber(count)} / ${toArabicNumber(dhikr.count)}`
                 )}
               </button>
             </div>
@@ -270,15 +425,19 @@ export function DhikrList({
         )
       })}
 
-      {/* ============ بطاقة الإتمام والانتقال للقسم التالي ============ */}
+      {/* بطاقة الإتمام */}
       {allDone && (
         <div
           ref={doneRef}
           role="status"
+          style={{ scrollMarginTop: 140 }}
           className="flex flex-col items-center gap-3 rounded-2xl bg-gradient-to-l from-emerald-600 to-emerald-700 p-5 text-center text-white shadow-lg"
         >
           <PartyPopper className="size-8" aria-hidden="true" />
-          <p className="text-lg font-bold">{'تقبّل الله منك، أتممت هذا القسم'}</p>
+
+          <p className="text-lg font-bold">
+            {'تقبّل الله منك، أتممت هذا القسم'}
+          </p>
 
           {nextHref ? (
             <>
@@ -287,6 +446,7 @@ export function DhikrList({
                   ? `الانتقال إلى «${nextTitle}» بعد ${toArabicNumber(secondsLeft)} ثوانٍ`
                   : `القسم التالي: ${nextTitle}`}
               </p>
+
               <div className="flex w-full gap-2">
                 <button
                   type="button"
@@ -295,6 +455,7 @@ export function DhikrList({
                 >
                   {'الانتقال الآن'}
                 </button>
+
                 {autoScroll && !cancelledNext && (
                   <button
                     type="button"
@@ -307,7 +468,9 @@ export function DhikrList({
               </div>
             </>
           ) : (
-            <p className="text-sm opacity-90">{'هذا آخر قسم من الأذكار والأدعية'}</p>
+            <p className="text-sm opacity-90">
+              {'هذا آخر قسم من الأذكار والأدعية'}
+            </p>
           )}
         </div>
       )}
