@@ -5,10 +5,15 @@ import android.os.Bundle;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
-        // تسجيل إضافة جدولة الأذان قبل إنشاء الـ Bridge
+        // إضافة الأذان الحالية: باقية دون حذف.
         registerPlugin(AdhanSchedulerPlugin.class);
+
+        // إضافة مشغّل القرآن الجديدة.
+        registerPlugin(QuranPlayerPlugin.class);
+
         super.onCreate(savedInstanceState);
     }
 }

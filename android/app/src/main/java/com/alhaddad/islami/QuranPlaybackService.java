@@ -1,24 +1,23 @@
 package com.alhaddad.islami;
 
 import android.content.Intent;
+import android.util.Log;
 
 import androidx.annotation.Nullable;
 import androidx.media3.common.AudioAttributes;
 import androidx.media3.common.C;
+import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.session.DefaultMediaNotificationProvider;
 import androidx.media3.session.MediaSession;
 import androidx.media3.session.MediaSessionService;
 
-/**
- * خدمة مستقلة لتشغيل القرآن.
- *
- * لا تغيّر جدولة الأذان أو إعداداته.
- * سيُضاف ربطها بواجهة التطبيق في المرحلة التالية.
- */
 @UnstableApi
 public class QuranPlaybackService extends MediaSessionService {
+
+    private static final String TAG = "QuranPlayback";
 
     private ExoPlayer player;
     private MediaSession mediaSession;
@@ -26,6 +25,15 @@ public class QuranPlaybackService extends MediaSessionService {
     @Override
     public void onCreate() {
         super.onCreate();
+
+        // قناة ومعرّف مستقلان عن إشعارات الأذان.
+        DefaultMediaNotificationProvider notificationProvider =
+                new DefaultMediaNotificationProvider.Builder(this)
+                        .setChannelId("quran_playback")
+                        .setNotificationId(830021)
+                        .build();
+
+        setMediaNotificationProvider(notificationProvider);
 
         AudioAttributes audioAttributes =
                 new AudioAttributes.Builder()
@@ -40,11 +48,6 @@ public class QuranPlaybackService extends MediaSessionService {
                         .setWakeMode(C.WAKE_MODE_LOCAL)
                         .build();
 
-        /*
-         * عند فقدان التركيز الصوتي لا نسمح للمشغّل
-         * بالاستئناف تلقائياً بعد انتهاء المقاطعة.
-         * سنضيف أيضاً ربطاً صريحاً مع بدء الأذان لاحقاً.
-         */
         player.addListener(
                 new Player.Listener() {
                     @Override
@@ -52,11 +55,21 @@ public class QuranPlaybackService extends MediaSessionService {
                             boolean playWhenReady,
                             int reason
                     ) {
+                        // لا يستأنف القرآن تلقائيًا بعد مقاطعة صوتية.
                         if (!playWhenReady
                                 && reason
                                 == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS) {
                             player.pause();
                         }
+                    }
+
+                    @Override
+                    public void onPlayerError(PlaybackException error) {
+                        Log.e(
+                                TAG,
+                                "Playback failed. Code: " + error.errorCode,
+                                error
+                        );
                     }
                 }
         );
@@ -76,10 +89,6 @@ public class QuranPlaybackService extends MediaSessionService {
 
     @Override
     public void onTaskRemoved(@Nullable Intent rootIntent) {
-        /*
-         * إزالة الواجهة من التطبيقات الأخيرة لا توقف
-         * الخدمة ما دام هناك تشغيل جارٍ.
-         */
         if (!isPlaybackOngoing()) {
             stopSelf();
         }

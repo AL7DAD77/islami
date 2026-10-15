@@ -431,7 +431,7 @@ ${dhikr.source}`
           ref={doneRef}
           role="status"
           style={{ scrollMarginTop: 140 }}
-          className="flex flex-col items-center gap-3 rounded-2xl bg-gradient-to-l from-emerald-600 to-emerald-700 p-5 text-center text-white shadow-lg"
+          className="flex flex-col items-center gap-3 rounded-2xl bg-linear-to-l from-emerald-600 to-emerald-700 p-5 text-center text-white shadow-lg"
         >
           <PartyPopper className="size-8" aria-hidden="true" />
 
