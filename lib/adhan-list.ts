@@ -26,3 +26,13 @@ export function getAdhanVoice(id: string): AdhanVoice | undefined {
   // إن كان المعرّف قديماً أو غير صالح (مثل a1/a2) نرجع الصوت الافتراضي بدل عدم تشغيل أي صوت
   return ADHAN_VOICES.find((v) => v.id === id) ?? (id === 'a2' ? ADHAN_VOICES.find((v) => v.id === 'fajr') : ADHAN_VOICES[0])
 }
+
+/** صوت الصلاة: اختيار الشخص لصلاة بعينها إن وُجد، وإلا الافتراضي (الفجر له صوته الافتراضي) */
+export function voiceIdFor(
+  s: { adhanVoice: string; fajrVoice: string; prayerVoices?: Partial<Record<string, string>> },
+  prayer: string,
+): string {
+  const chosen = s.prayerVoices?.[prayer]
+  if (chosen) return chosen
+  return prayer === 'fajr' ? s.fajrVoice : s.adhanVoice
+}

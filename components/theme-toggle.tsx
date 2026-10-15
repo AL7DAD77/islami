@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Moon, Sun } from 'lucide-react'
 
+/** بطاقة تبديل الوضع الداكن، بنفس شكل بطاقات الشبكة */
 export function ThemeToggle() {
   const [isDark, setIsDark] = useState(false)
 
@@ -29,15 +30,13 @@ export function ThemeToggle() {
       type="button"
       onClick={toggle}
       aria-pressed={isDark}
-      className="flex items-center gap-3 rounded-2xl bg-card p-3 text-right shadow-sm ring-1 ring-border transition-colors hover:bg-secondary"
+      className="flex flex-col items-center gap-1.5 rounded-2xl bg-card p-3 py-4 text-center shadow-sm ring-1 ring-border transition-colors hover:bg-secondary"
     >
-      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-foreground">
+      <span className="flex size-10 items-center justify-center rounded-xl bg-accent text-accent-foreground">
         {isDark ? <Sun className="size-5" aria-hidden="true" /> : <Moon className="size-5" aria-hidden="true" />}
       </span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-sm font-bold">{isDark ? 'الوضع الفاتح' : 'الوضع الداكن'}</span>
-        <span className="block text-[11px] text-muted-foreground">تبديل مظهر التطبيق</span>
-      </span>
+      <span className="line-clamp-2 block text-sm font-bold leading-snug">{isDark ? 'الوضع الفاتح' : 'الوضع الداكن'}</span>
+      <span className="line-clamp-1 block text-[11px] text-muted-foreground">تبديل مظهر التطبيق</span>
     </button>
   )
 }

@@ -13,7 +13,7 @@ export function PageHeader({
   action?: React.ReactNode
 }) {
   return (
-    <header className="flex items-center gap-3 pb-5 pt-6">
+    <header className="flex items-center gap-3 pb-4 pt-4">
       {backHref && (
         <Link
           href={backHref}

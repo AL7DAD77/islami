@@ -6,8 +6,11 @@ import { Check, PartyPopper, RotateCcw, Share2 } from 'lucide-react'
 import type { Dhikr } from '@/lib/adhkar'
 import { toArabicNumber } from '@/lib/quran'
 import { cn } from '@/lib/utils'
+import { usePinchZoom } from '@/lib/use-pinch-zoom'
 
 const AUTO_SCROLL_KEY = 'dhikr-auto-scroll'
+const FONT_KEY = 'dhikr-font-size'
+const DEFAULT_FONT = 22
 const NEXT_DELAY_SECONDS = 4
 
 export function DhikrList({
@@ -20,6 +23,26 @@ export function DhikrList({
   nextTitle?: string
 }) {
   const router = useRouter()
+  // حجم نص الذكر: يُحفظ محلياً، ويتغير بإصبعين
+  const [fontSize, setFontSize] = useState(DEFAULT_FONT)
+  useEffect(() => {
+    try {
+      const saved = Number(localStorage.getItem(FONT_KEY))
+      if (saved) setFontSize(saved)
+    } catch {}
+  }, [])
+  const pinch = usePinchZoom<HTMLDivElement>(
+    fontSize,
+    (v) => {
+      setFontSize(v)
+      try {
+        localStorage.setItem(FONT_KEY, String(v))
+      } catch {}
+    },
+    [],
+    16,
+    40,
+  )
   const [counts, setCounts] = useState<number[]>(() => items.map(() => 0))
   const [autoScroll, setAutoScroll] = useState(true)
   const [justCompleted, setJustCompleted] = useState<number | null>(null)
@@ -61,6 +84,10 @@ export function DhikrList({
       if ('vibrate' in navigator) navigator.vibrate(pattern)
     } catch {}
   }
+  // أنماط مميزة: إتمام الذكر، والانتقال للذكر التالي، والانتقال للقسم التالي
+  const BUZZ_DONE = [30, 50, 30]
+  const BUZZ_NEXT = [120]
+  const BUZZ_CATEGORY = [150, 100, 150, 100, 150]
 
   /** أول ذكر غير مكتمل بعد الموضع i، وإن لم يوجد فأول غير مكتمل قبله */
   const nextIncomplete = (from: number, current: number[]) => {
@@ -85,7 +112,7 @@ export function DhikrList({
     // اكتمل هذا الذكر: تأثير بصري واهتزاز
     setJustCompleted(i)
     later(() => setJustCompleted(null), 1000)
-    vibrate([30, 50, 30])
+    vibrate(BUZZ_DONE)
 
     if (!autoScroll) return
 
@@ -93,9 +120,11 @@ export function DhikrList({
     later(() => {
       if (target >= 0) {
         refs.current[target]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        vibrate(BUZZ_NEXT) // تنبيه بتغيير الذكر
       } else {
         // اكتملت كل الأذكار: انزل إلى بطاقة الإتمام
         doneRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        vibrate(BUZZ_NEXT)
       }
     }, 450)
   }
@@ -107,9 +136,16 @@ export function DhikrList({
   }
 
   // ===== الانتقال التلقائي إلى القسم التالي بعد إتمام الكل =====
+  // نحفظ الموجّه في مرجع: كائن الموجّه قد يتغير مع كل عرض، وكان ذلك يُعيد ضبط المؤقت باستمرار فلا ينتقل أبدًا
+  const routerRef = useRef(router)
+  routerRef.current = router
   const goNext = useCallback(() => {
-    if (nextHref) router.push(nextHref)
-  }, [nextHref, router])
+    if (!nextHref) return
+    try {
+      if ('vibrate' in navigator) navigator.vibrate(BUZZ_CATEGORY)
+    } catch {}
+    routerRef.current.push(nextHref)
+  }, [nextHref])
 
   useEffect(() => {
     if (!allDone || !autoScroll || !nextHref || cancelledNext) return
@@ -133,7 +169,7 @@ export function DhikrList({
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div ref={pinch.ref} className="flex flex-col gap-3">
       {/* ============ الشريط العلوي ============ */}
       <div className="sticky top-0 z-10 -mx-4 flex flex-col gap-2 bg-background/90 px-4 py-2 backdrop-blur">
         <div className="flex items-center justify-between">
@@ -197,7 +233,7 @@ export function DhikrList({
               className="block w-full p-5 text-right"
               aria-label={`اضغط للعد: ${toArabicNumber(counts[i])} من ${toArabicNumber(d.count)}`}
             >
-              <p className="font-quran text-xl leading-loose">{d.text}</p>
+              <p className="font-quran leading-loose" style={{ fontSize: pinch.size }}>{d.text}</p>
               {d.note && (
                 <p className="mt-3 rounded-xl bg-accent/60 p-3 text-sm leading-relaxed text-accent-foreground">
                   {d.note}

@@ -6,7 +6,12 @@ import android.content.Intent;
 
 import androidx.core.content.ContextCompat;
 
-/** يستقبل تنبيه النظام في وقت الأذان/التذكير حتى لو كان التطبيق مغلقاً. */
+/**
+ * يستقبل كل تنبيهات النظام المجدولة، حتى والتطبيق مغلق:
+ * - adhan: يشغّل صوت الأذان في خدمة أمامية
+ * - reminder: إشعار التذكير قبل الصلاة
+ * - time / phase: لا تنبيه، فقط تحديث العداد والتاريخ في الإشعار الدائم
+ */
 public class AdhanReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
@@ -21,12 +26,14 @@ public class AdhanReceiver extends BroadcastReceiver {
                 svc.putExtras(intent);
                 ContextCompat.startForegroundService(context, svc);
             } catch (Exception e) {
-                // إن منع النظام بدء الخدمة (مثلاً بلا صلاحية المنبهات الدقيقة) نكتفي بإشعار بصوت النظام
-                NotificationHelper.showReminder(context, id, title == null ? "حان وقت الأذان" : title, body == null ? "" : body);
+                NotificationHelper.showReminder(context, id,
+                        title == null ? "حان وقت الأذان" : title, body == null ? "" : body);
             }
-        } else {
-            NotificationHelper.showReminder(context, id, title == null ? "اقتربت الصلاة" : title, body == null ? "" : body);
+        } else if ("reminder".equals(kind)) {
+            NotificationHelper.showReminder(context, id,
+                    title == null ? "اقتربت الصلاة" : title, body == null ? "" : body);
         }
+        // في كل الحالات: حدّث الإشعار الدائم (العداد يتحول من (+) إلى (-) أو يبدأ وقتاً جديداً)
         NotificationHelper.updatePersistent(context);
     }
 }

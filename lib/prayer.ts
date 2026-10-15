@@ -14,6 +14,10 @@ export const METHODS: { key: MethodKey; label: string }[] = [
   { key: 'UmmAlQura', label: 'أم القرى - مكة المكرمة' },
   { key: 'Egyptian', label: 'الهيئة المصرية العامة للمساحة' },
   { key: 'MuslimWorldLeague', label: 'رابطة العالم الإسلامي' },
+  { key: 'JordanAwqaf', label: 'الأردن - وزارة الأوقاف' },
+  { key: 'AlgeriaMinistry', label: 'الجزائر - وزارة الشؤون الدينية والأوقاف' },
+  { key: 'TunisiaMinistry', label: 'تونس - وزارة الشؤون الدينية' },
+  { key: 'MoroccoHabous', label: 'المغرب - وزارة الأوقاف والشؤون الإسلامية' },
   { key: 'Karachi', label: 'جامعة العلوم الإسلامية - كراتشي' },
   { key: 'Dubai', label: 'دبي' },
   { key: 'Kuwait', label: 'الكويت' },
@@ -34,9 +38,56 @@ export interface DayTimes {
   isha: Date
 }
 
+type CustomMethodKey = 'JordanAwqaf' | 'AlgeriaMinistry' | 'TunisiaMinistry' | 'MoroccoHabous'
+
+function isCustomMethod(m: MethodKey): m is CustomMethodKey {
+  return m === 'JordanAwqaf' || m === 'AlgeriaMinistry' || m === 'TunisiaMinistry' || m === 'MoroccoHabous'
+}
+
+/**
+ * طرق وطنية غير موجودة في مكتبة adhan، نبنيها فوق Other():
+ * - الأردن (وزارة الأوقاف): فجر 18° وعشاء 18° و+5 دقائق للمغرب.
+ * - الجزائر (وزارة الشؤون الدينية والأوقاف): فجر 18° وعشاء 17°.
+ * - تونس (وزارة الشؤون الدينية): فجر 18° وعشاء 18°.
+ * - المغرب (وزارة الأوقاف والشؤون الإسلامية): فجر 19° وعشاء 17°، الشروق −3 والظهر +5 والمغرب +5.
+ * المصدر: توثيق مكتبة adhan_dart. تُراجع أوقاتها مع الجدول الرسمي لكل دولة.
+ */
+function getCustomParams(method: CustomMethodKey) {
+  const p = CalculationMethod.Other()
+  switch (method) {
+    case 'JordanAwqaf':
+      p.fajrAngle = 18
+      p.ishaAngle = 18
+      p.adjustments.maghrib = 5
+      break
+    case 'AlgeriaMinistry':
+      p.fajrAngle = 18
+      p.ishaAngle = 17
+      break
+    case 'TunisiaMinistry':
+      p.fajrAngle = 18
+      p.ishaAngle = 18
+      break
+    case 'MoroccoHabous':
+      p.fajrAngle = 19
+      p.ishaAngle = 17
+      p.adjustments.sunrise = -3
+      p.adjustments.dhuhr = 5
+      p.adjustments.maghrib = 5
+      break
+  }
+  return p
+}
+
+/** أي قيمة غير معروفة (مثلاً مخزّنة من إصدار آخر) ترجع لأم القرى بدل أن ينهار التطبيق. */
+function getParams(method: MethodKey) {
+  if (isCustomMethod(method)) return getCustomParams(method)
+  return (CalculationMethod[method] ?? CalculationMethod.UmmAlQura)()
+}
+
 export function getPrayerTimes(settings: AppSettings, date = new Date()): DayTimes {
   const coords = new Coordinates(settings.location.lat, settings.location.lng)
-  const params = CalculationMethod[settings.method]()
+  const params = getParams(settings.method)
   params.madhab = settings.madhab === 'hanafi' ? Madhab.Hanafi : Madhab.Shafi
   const t = new PrayerTimes(coords, date, params)
   return { fajr: t.fajr, sunrise: t.sunrise, dhuhr: t.dhuhr, asr: t.asr, maghrib: t.maghrib, isha: t.isha }

@@ -23,7 +23,7 @@ export function BottomNav() {
   return (
     <nav
       aria-label="التنقل الرئيسي"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-border/50 bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-lg"
+      className="app-bottom-nav fixed inset-x-0 bottom-0 z-40 border-t border-border/50 bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-lg"
     >
       <ul className="mx-auto flex max-w-2xl items-stretch justify-around">
         {ITEMS.map(({ href, label, icon: Icon, also }) => {

@@ -10,7 +10,7 @@ export default function AboutPage() {
             إسلامي
           </h1>
           <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            الإصدار 1.0.0
+            الإصدار 1.0.5 (6)
           </p>
         </div>
 
@@ -28,9 +28,12 @@ export default function AboutPage() {
               <li>🕌 <strong>مواقيت الصلاة:</strong> أوقات دقيقة حسب موقعك.</li>
               <li>🧭 <strong>القبلة:</strong> تحديد اتجاه القبلة بسهولة.</li>
               <li>📖 <strong>القرآن الكريم:</strong> قراءة واستماع بعدة قرّاء.</li>
-              <li>📿 <strong>الأذكار:</strong> أذكار الصباح والمساء وأذكار متنوعة.</li>
+              <li>📿 <strong>الأذكار:</strong> أذكار الصباح والمساء، وحصن المسلم كاملاً، وأذكار متنوعة.</li>
               <li>📅 <strong>التقويم:</strong> الهجري والميلادي.</li>
               <li>🧸 <strong>قسم الأطفال:</strong> تعليم مبسط للصغار.</li>
+              <li>🌙 <strong>السنن والأنبياء:</strong> السنن الرواتب والمهجورة، ونبذة عن الأنبياء.</li>
+              <li>🤲 <strong>الأدعية والتسبيح:</strong> أدعية مأثورة ومسبحة إلكترونية.</li>
+              <li>🔖 <strong>العلامات المرجعية:</strong> احفظ موضعك في القرآن وارجع إليه متى شئت.</li>
             </ul>
           </div>
 
@@ -43,6 +46,7 @@ export default function AboutPage() {
               هدفنا نشر الفائدة والأجر بإذن الله.
             </p>
           </div>
+
 
           <div>
             <h2 className="mb-2 text-lg font-semibold text-zinc-800 dark:text-zinc-100">

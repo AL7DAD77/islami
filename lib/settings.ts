@@ -8,6 +8,10 @@ export type MethodKey =
   | 'Egyptian'
   | 'UmmAlQura'
   | 'MuslimWorldLeague'
+  | 'JordanAwqaf'
+  | 'AlgeriaMinistry'
+  | 'TunisiaMinistry'
+  | 'MoroccoHabous'
   | 'Karachi'
   | 'Dubai'
   | 'Kuwait'
@@ -32,6 +36,8 @@ export interface AppSettings {
   hijriAdjust: number
   adhanVoice: string
   fajrVoice: string
+  /** صوت مختار لكل صلاة (إن غاب تُستخدم الافتراضية) */
+  prayerVoices: Partial<Record<PrayerKey, string>>
   adhanEnabled: Record<PrayerKey, boolean>
   adhanVolume: number
   reminderMinutes: number
@@ -44,6 +50,10 @@ export interface AppSettings {
   persistentNotification: boolean
   locationStatus: 'unknown' | 'ok' | 'denied' | 'error'
   quranView: 'scroll' | 'pages'
+  /** ملاءمة الصفحة للشاشة تلقائياً (تُلغى عند اختيار حجم يدوي) */
+  quranFitPage: boolean
+  /** إظهار «دعاء اليوم» مرة واحدة في اليوم */
+  showDailyMessage: boolean
   ayahHighlight: boolean
 }
 
@@ -54,6 +64,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   hijriAdjust: 0,
   adhanVoice: 'makkah',
   fajrVoice: 'fajr',
+  prayerVoices: {},
   adhanEnabled: { fajr: true, dhuhr: true, asr: true, maghrib: true, isha: true },
   adhanVolume: 0.9,
   reminderMinutes: 10,
@@ -66,6 +77,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   persistentNotification: true,
   locationStatus: 'unknown',
   quranView: 'scroll',
+  quranFitPage: true,
+  showDailyMessage: true,
   ayahHighlight: true,
 }
 
@@ -83,6 +96,7 @@ function read(): AppSettings {
       ...parsed,
       location: { ...DEFAULT_SETTINGS.location, ...parsed.location },
       adhanEnabled: { ...DEFAULT_SETTINGS.adhanEnabled, ...parsed.adhanEnabled },
+      prayerVoices: { ...(parsed.prayerVoices ?? {}) },
       wird: { ...DEFAULT_SETTINGS.wird, ...parsed.wird },
     }
   } catch {

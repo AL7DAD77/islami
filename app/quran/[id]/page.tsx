@@ -106,6 +106,7 @@ export default function SurahPage() {
         ayahs={ayahs} 
         currentAyah={currentAyah} 
         initialAyah={initialAyahParam ? Number(initialAyahParam) : null}
+        onOpenPlayer={() => setIsPlayerOpen(true)}
       />
       
       <nav className="mt-6 flex items-center justify-between gap-3 px-2 pb-12" aria-label="التنقل بين السور">
@@ -128,7 +129,7 @@ export default function SurahPage() {
       {/* ====== الزر العائم ====== */}
       <button
         onClick={() => setIsPlayerOpen(true)}
-        className="fixed bottom-20 right-6 z-40 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-2xl transition-transform hover:scale-105 active:scale-95"
+        className="quran-fab fixed bottom-20 right-6 z-40 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-2xl transition-transform hover:scale-105 active:scale-95"
         aria-label="فتح مشغل الصوت"
       >
         <Play className="size-6 ml-1" />

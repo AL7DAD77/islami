@@ -140,90 +140,73 @@ export function TasbihCounter() {
   }
 
   return (
-    <div className="flex flex-col gap-5">
-      {/* ============ بطاقة الذكر الحالي ============ */}
-      <div data-no-swipe className="rounded-3xl bg-gradient-to-l from-emerald-700 to-emerald-800 p-6 text-center text-white shadow-lg">
-        <p className="text-xs opacity-70">
-          {toArabicNumber(state.index + 1)} من {toArabicNumber(TASBIH_ITEMS.length)}
+    <div data-no-swipe className="flex flex-col items-center gap-6">
+      {/* ============ الذكر الحالي ============ */}
+      <div className="w-full text-center">
+        <p className="text-xs text-muted-foreground">
+          {`الذكر ${toArabicNumber(state.index + 1)} من ${toArabicNumber(TASBIH_ITEMS.length)}`}
         </p>
-        <p className="mt-3 font-quran text-3xl leading-relaxed">{current.text}</p>
-        <p className="mt-2 text-sm opacity-80">
-          الهدف: {toArabicNumber(current.target)} مرة
-        </p>
+        <p className="mt-2 font-quran text-2xl leading-relaxed text-foreground">{current.text}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{`الهدف: ${toArabicNumber(current.target)} مرة`}</p>
       </div>
 
-      {/* ============ العدّاد الكبير ============ */}
-      <div className="flex justify-center">
-        <button
-          type="button"
-          onClick={handleTap}
-          aria-label="اضغط للعد"
-          className={cn(
-            'relative flex size-64 items-center justify-center rounded-full transition-transform duration-150 active:scale-95',
-            'bg-gradient-to-br from-emerald-100 to-emerald-200 dark:from-emerald-900 dark:to-emerald-950',
-            completed && 'ring-4 ring-gold',
+      {/* ============ زر العدّ الرئيسي ============ */}
+      <button
+        type="button"
+        onClick={handleTap}
+        aria-label="اضغط للعد"
+        className={cn(
+          'relative flex size-72 max-w-[80vw] items-center justify-center rounded-full bg-card shadow-lg ring-1 ring-border transition-transform duration-150 active:scale-95',
+          completed && 'ring-4 ring-gold',
+        )}
+      >
+        {/* دائرة التقدم */}
+        <svg className="absolute inset-0 size-full -rotate-90" viewBox="0 0 100 100" aria-hidden="true">
+          <circle cx="50" cy="50" r="46" fill="none" stroke="currentColor" strokeWidth="3" className="text-muted-foreground/20" />
+          <circle
+            cx="50"
+            cy="50"
+            r="46"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="3"
+            strokeLinecap="round"
+            className="text-primary transition-all duration-300"
+            strokeDasharray={`${Math.min(percent, 100) * 2.89} 289`}
+          />
+        </svg>
+
+        {/* الرقم */}
+        <div className="flex flex-col items-center">
+          {done ? (
+            <Check className="size-16 text-primary" aria-hidden="true" />
+          ) : (
+            <>
+              <span className="text-7xl font-bold tabular-nums text-foreground">{toArabicNumber(state.count)}</span>
+              <span className="mt-1 text-xs text-muted-foreground">{`من ${toArabicNumber(current.target)}`}</span>
+            </>
           )}
-        >
-          {/* ⚠️ دائرة التقدم */}
-          <svg className="absolute inset-0 size-full -rotate-90" viewBox="0 0 100 100">
-            <circle
-              cx="50"
-              cy="50"
-              r="46"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="4"
-              className="text-emerald-200 dark:text-emerald-950"
-            />
-            <circle
-              cx="50"
-              cy="50"
-              r="46"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="4"
-              strokeLinecap="round"
-              className="text-gold transition-all duration-300"
-              strokeDasharray={`${percent * 2.89} 289`}
-            />
-          </svg>
-
-          {/* ⚠️ الرقم */}
-          <div className="flex flex-col items-center">
-            {done ? (
-              <Check className="size-16 text-gold" />
-            ) : (
-              <>
-                <span className="text-6xl font-bold text-emerald-700 dark:text-emerald-100">
-                  {toArabicNumber(state.count)}
-                </span>
-                <span className="mt-1 text-xs text-emerald-600 dark:text-emerald-400">
-                  من {toArabicNumber(current.target)}
-                </span>
-              </>
-            )}
-          </div>
-        </button>
-      </div>
+        </div>
+      </button>
 
       {/* ============ أزرار التحكم ============ */}
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex w-full items-center justify-between">
         <button
           type="button"
           onClick={handlePrev}
           className="flex size-12 items-center justify-center rounded-full bg-muted transition hover:bg-muted/70"
           aria-label="الذكر السابق"
         >
-          <ChevronRight className="size-5" />
+          <ChevronRight className="size-5" aria-hidden="true" />
         </button>
 
         <button
           type="button"
           onClick={handleReset}
-          className="flex items-center gap-2 rounded-full bg-muted px-5 py-3 text-sm font-medium transition hover:bg-muted/70"
+          className="flex items-center gap-2 rounded-full bg-muted px-4 py-2.5 text-sm font-medium transition hover:bg-muted/70"
         >
-          <RotateCcw className="size-4" />
-          إعادة
+          <RotateCcw className="size-4" aria-hidden="true" />
+          {'تصفير'}
         </button>
 
         <button
@@ -232,33 +215,29 @@ export function TasbihCounter() {
           className="flex size-12 items-center justify-center rounded-full bg-muted transition hover:bg-muted/70"
           aria-label="الذكر التالي"
         >
-          <ChevronRight className="size-5 rotate-180" />
+          <ChevronRight className="size-5 rotate-180" aria-hidden="true" />
         </button>
       </div>
 
-      {/* ============ إجمالي اليوم ============ */}
-      <div className="rounded-2xl bg-card p-4 text-center shadow-sm ring-1 ring-border">
-        <p className="text-xs text-muted-foreground">مجموع اليوم</p>
-        <p className="mt-1 text-2xl font-bold text-emerald-700 dark:text-emerald-400">
-          {toArabicNumber(state.dailyTotal)}
-        </p>
-      </div>
+      {/* ============ مجموع اليوم ============ */}
+      <p className="text-sm text-muted-foreground">
+        {'مجموع اليوم: '}
+        <span className="font-bold text-foreground">{toArabicNumber(state.dailyTotal)}</span>
+      </p>
 
       {/* ============ قائمة الأذكار ============ */}
-      <div className="rounded-2xl bg-card p-4 shadow-sm ring-1 ring-border">
-        <h3 className="mb-3 text-sm font-bold text-muted-foreground">الأذكار المتتالية</h3>
+      <div className="w-full rounded-2xl bg-card p-4 shadow-sm ring-1 ring-border">
+        <h3 className="mb-3 text-sm font-bold text-muted-foreground">{'الأذكار'}</h3>
         <div className="flex flex-wrap gap-2">
           {TASBIH_ITEMS.map((item, i) => (
             <button
               key={i}
               type="button"
-              onClick={() =>
-                setState((prev) => ({ ...prev, index: i, count: 0 }))
-              }
+              onClick={() => setState((prev) => ({ ...prev, index: i, count: 0 }))}
               className={cn(
                 'rounded-full px-3 py-1.5 text-xs transition',
                 i === state.index
-                  ? 'bg-gold text-foreground font-bold'
+                  ? 'bg-primary font-bold text-primary-foreground'
                   : 'bg-muted text-muted-foreground hover:bg-muted/70',
               )}
             >
@@ -268,9 +247,8 @@ export function TasbihCounter() {
         </div>
       </div>
 
-      {/* ============ تنبيه الانتقال ============ */}
       <p className="text-center text-xs text-muted-foreground">
-        ⚠️ عند إكمال العدد، ينتقل تلقائياً للذكر التالي
+        {'عند إكمال العدد ينتقل التطبيق تلقائياً إلى الذكر التالي.'}
       </p>
     </div>
   )

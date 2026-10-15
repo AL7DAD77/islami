@@ -240,7 +240,7 @@ export function registerAppStateListener(onResume: () => void): () => void {
 export interface ScheduledItem {
   id: number
   at: number // epoch ms
-  kind: 'adhan' | 'reminder'
+  kind: 'adhan' | 'reminder' | 'time' | 'phase'
   prayer: string
   title: string
   body: string

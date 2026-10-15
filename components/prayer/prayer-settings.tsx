@@ -27,6 +27,10 @@ const METHODS: { id: MethodKey; name: string }[] = [
   { id: 'UmmAlQura', name: 'أم القرى (السعودية)' },
   { id: 'Egyptian', name: 'الهيئة المصرية' },
   { id: 'MuslimWorldLeague', name: 'رابطة العالم الإسلامي' },
+  { id: 'JordanAwqaf', name: 'الأردن - وزارة الأوقاف' },
+  { id: 'AlgeriaMinistry', name: 'الجزائر - وزارة الشؤون الدينية' },
+  { id: 'TunisiaMinistry', name: 'تونس - وزارة الشؤون الدينية' },
+  { id: 'MoroccoHabous', name: 'المغرب - وزارة الأوقاف' },
   { id: 'Karachi', name: 'كراتشي (باكستان)' },
   { id: 'Dubai', name: 'دبي' },
   { id: 'Kuwait', name: 'الكويت' },
@@ -42,7 +46,7 @@ export function PrayerSettings() {
   const [openCityPicker, setOpenCityPicker] = useState(false)
   const [openMethodPicker, setOpenMethodPicker] = useState(false)
   const [locating, setLocating] = useState(false)
-  const [notifPermission, setNotifPermission] = useState<string>('prompt')
+  const [notifPermission, setNotifPermission] = useState<string>('checking')
 
   const [exactAlarmOk, setExactAlarmOk] = useState<boolean | null>(null)
   const [nativeSched, setNativeSched] = useState(false)
@@ -390,7 +394,9 @@ export function PrayerSettings() {
                     ? 'مرفوضة ❌ (افتح الإعدادات)'
                     : notifPermission === 'unsupported'
                       ? 'غير مدعومة'
-                      : 'غير مُفعّلة'}
+                      : notifPermission === 'checking'
+                        ? 'جارٍ الفحص…'
+                        : 'غير مُفعّلة'}
               </p>
             </div>
 
@@ -418,7 +424,7 @@ export function PrayerSettings() {
               >
                 إعادة التفعيل
               </button>
-            ) : (
+            ) : notifPermission === 'checking' ? null : (
               <button
                 type="button"
                 onClick={handleEnableNotifications}

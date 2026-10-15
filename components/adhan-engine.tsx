@@ -5,7 +5,7 @@ import { BellRing, X } from 'lucide-react'
 import { getSettings, useSettings } from '@/lib/settings'
 import { PRAYER_NAMES, PRAYER_ORDER, getPrayerTimes } from '@/lib/prayer'
 import { updateAutoLocation } from '@/lib/location'
-import { getAdhanVoice } from '@/lib/adhan-list'
+import { getAdhanVoice, voiceIdFor } from '@/lib/adhan-list'
 import {
   registerAppStateListener,
   showNativeNotification,
@@ -19,19 +19,41 @@ import type { AppSettings } from '@/lib/settings'
 
 // ============ جدولة الأذان على مستوى النظام (أندرويد) ============
 // تُجدول الأذانات والتذكيرات للأيام القادمة، فتعمل والتطبيق مغلق وبدون فتحه.
-const SCHEDULE_DAYS = 25
+const SCHEDULE_DAYS = 15
 
 function buildSchedule(s: AppSettings): ScheduledItem[] {
   const items: ScheduledItem[] = []
   const now = Date.now()
-  for (let d = 0; d < SCHEDULE_DAYS; d++) {
+  const timeline: number[] = []
+
+  // d = -1 (أمس) ليعرف الإشعار الدائم "آخر وقت مضى" قبل الفجر
+  for (let d = -1; d < SCHEDULE_DAYS; d++) {
     const date = new Date()
     date.setDate(date.getDate() + d)
     const times = getPrayerTimes(s, date)
+
+    // منتصف الليل: تحديث التاريخ الهجري في الإشعار
+    const midnight = new Date(date)
+    midnight.setHours(0, 0, 0, 0)
+    if (midnight.getTime() > now) {
+      items.push({ id: 100000 + d + 2, at: midnight.getTime(), kind: 'time', prayer: '', title: '', body: '' })
+    }
+
     PRAYER_ORDER.forEach((key, idx) => {
       const t = times[key].getTime()
-      if (t <= now) return
+      timeline.push(t)
+      const enabled = s.adhanEnabled[key]
       const name = PRAYER_NAMES[key]
+
+      // الأوقات الماضية تُخزَّن فقط (لحساب العداد)، ولا تُجدوَل لها تنبيهات
+      if (!enabled) {
+        items.push({ id: d * 10 + idx * 2 + 2, at: t, kind: 'time', prayer: key, title: '', body: '' })
+        return
+      }
+      if (t <= now) {
+        items.push({ id: d * 10 + idx * 2 + 2, at: t, kind: 'adhan', prayer: key, title: '', body: '' })
+        return
+      }
       if (s.reminderMinutes > 0 && t - s.reminderMinutes * 60000 > now) {
         items.push({
           id: d * 10 + idx * 2 + 1,
@@ -42,21 +64,27 @@ function buildSchedule(s: AppSettings): ScheduledItem[] {
           body: `بعد ${s.reminderMinutes} دقائق - ${s.location.city}`,
         })
       }
-      if (s.adhanEnabled[key]) {
-        const voice = getAdhanVoice(key === 'fajr' ? s.fajrVoice : s.adhanVoice)
-        items.push({
-          id: d * 10 + idx * 2 + 2,
-          at: t,
-          kind: 'adhan',
-          prayer: key,
-          title: `حان الآن موعد أذان ${name}`,
-          body: `حسب التوقيت المحلي لمدينة ${s.location.city}`,
-          file: voice?.file,
-          volume: s.adhanVolume,
-        })
-      }
+      const voice = getAdhanVoice(voiceIdFor(s, key))
+      items.push({
+        id: d * 10 + idx * 2 + 2,
+        at: t,
+        kind: 'adhan',
+        prayer: key,
+        title: `حان الآن موعد أذان ${name}`,
+        body: `حسب التوقيت المحلي لمدينة ${s.location.city}`,
+        file: voice?.file,
+        volume: s.adhanVolume,
+      })
     })
   }
+
+  // نقطة المنتصف بين كل وقتين متتاليين: عندها ينتقل العداد من (+) إلى (-)
+  timeline.sort((a, b) => a - b)
+  for (let i = 0; i < timeline.length - 1; i++) {
+    const mid = Math.round((timeline[i] + timeline[i + 1]) / 2)
+    if (mid > now) items.push({ id: 200000 + i, at: mid, kind: 'phase', prayer: '', title: '', body: '' })
+  }
+
   return items.sort((a, b) => a.at - b.at)
 }
 
@@ -154,6 +182,7 @@ export function AdhanEngine() {
     settings.adhanEnabled,
     settings.adhanVoice,
     settings.fajrVoice,
+    JSON.stringify(settings.prayerVoices),
     settings.adhanVolume,
     settings.reminderMinutes,
     settings.persistentNotification,
@@ -212,7 +241,7 @@ export function AdhanEngine() {
           )
 
           const audio = getGlobalAudio()
-          const voiceId = key === 'fajr' ? s.fajrVoice : s.adhanVoice
+          const voiceId = voiceIdFor(s, key)
           const voice = getAdhanVoice(voiceId)
 
           if (voice) {

@@ -3,15 +3,24 @@ import type { Metadata } from 'next'
 import { ChevronLeft } from 'lucide-react'
 import { PageHeader } from '@/components/page-header'
 import { SectionTitle } from '@/components/ui-kit'
+import { SearchButton } from '@/components/search-button'
 import { ADHKAR, ADHKAR_GROUPS } from '@/lib/adhkar'
 import { toArabicNumber } from '@/lib/quran'
 
 export const metadata: Metadata = { title: 'الأذكار والأدعية | نور' }
 
 export default function AdhkarPage() {
+  const hisn = ADHKAR.filter((c) => c.group === 'hisn')
+  const hisnItems = hisn.reduce((sum, c) => sum + c.items.length, 0)
+  // الرقية الشرعية تُعرض بجوار حصن المسلم في الأعلى، فلا تتكرر ضمن المجموعات أسفلها
+  const ruqyah = ADHKAR.find((c) => c.id === 'ruqyah')
+  // نعرض المجموعات التي فيها أقسام فقط (الأقسام المكرّرة في حصن المسلم حُذفت من هنا)
+  const groups = ADHKAR_GROUPS.filter(
+    (g) => (g.id !== 'ruqyah' || !ruqyah) && ADHKAR.some((c) => c.group === g.id),
+  )
   return (
     <>
-      <PageHeader title="الأذكار والأدعية" subtitle="من القرآن والسنة الصحيحة مع ذكر المصدر" />
+      <PageHeader title="الأذكار والأدعية" subtitle="من القرآن والسنة الصحيحة مع ذكر المصدر" action={<SearchButton />} />
 
       <Link
         href="/tasbih"
@@ -27,8 +36,42 @@ export default function AdhkarPage() {
         <ChevronLeft className="size-4 opacity-70" aria-hidden="true" />
       </Link>
 
+      <div className={`mb-5 grid gap-2.5 ${ruqyah ? 'grid-cols-2' : 'grid-cols-1'}`}>
+        <Link
+          href="/adhkar/hisn"
+          className="flex items-center gap-2.5 rounded-2xl bg-card p-3 shadow-sm ring-1 ring-border transition-colors hover:bg-secondary"
+        >
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-accent text-xl text-accent-foreground">
+            📚
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="line-clamp-2 block text-sm font-bold leading-snug">حصن المسلم كاملاً</span>
+            <span className="line-clamp-2 block text-[11px] leading-snug text-muted-foreground">
+              {toArabicNumber(hisn.length)} باباً - {toArabicNumber(hisnItems)} ذكراً
+            </span>
+          </span>
+        </Link>
+
+        {ruqyah && (
+          <Link
+            href={`/adhkar/${ruqyah.id}`}
+            className="flex items-center gap-2.5 rounded-2xl bg-card p-3 shadow-sm ring-1 ring-border transition-colors hover:bg-secondary"
+          >
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-accent text-xl text-accent-foreground">
+              🛡️
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="line-clamp-2 block text-sm font-bold leading-snug">{ruqyah.title}</span>
+              <span className="line-clamp-2 block text-[11px] leading-snug text-muted-foreground">
+                من القرآن والسنة - {toArabicNumber(ruqyah.items.length)} ذكراً
+              </span>
+            </span>
+          </Link>
+        )}
+      </div>
+
       <div className="flex flex-col gap-5">
-        {ADHKAR_GROUPS.map((g) => (
+        {groups.map((g) => (
           <section key={g.id} aria-labelledby={`g-${g.id}`}>
             <SectionTitle>
               <span id={`g-${g.id}`}>{g.title}</span>

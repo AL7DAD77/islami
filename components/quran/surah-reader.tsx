@@ -1,13 +1,14 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { AlignJustify, BookOpen, Bookmark, ChevronLeft, ChevronRight, Highlighter, Minus, Plus } from 'lucide-react'
+import { AlignJustify, BookOpen, Bookmark, ChevronLeft, ChevronRight, Highlighter, Minus, Play, Plus, Settings2, X } from 'lucide-react'
 import type { Ayah } from '@/lib/quran'
 import { stripBasmala, toArabicNumber } from '@/lib/quran'
 import { useHydrated, useSettings } from '@/lib/settings'
 import { isBookmarked, saveReadingPosition, toggleBookmark, useBookmarkState } from '@/lib/bookmarks'
 import { cn } from '@/lib/utils'
+import { usePinchZoom } from '@/lib/use-pinch-zoom'
 
 const BASMALA = 'بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ'
 
@@ -22,23 +23,26 @@ export function SurahReader({
   ayahs,
   currentAyah,
   initialAyah,
+  onOpenPlayer,
 }: {
   surah: number
   surahName: string
   ayahs: Ayah[]
   currentAyah?: number | null
   initialAyah?: number | null
+  /** فتح مشغّل الصوت (يُعرض زره في شريط وضع صفحات المصحف) */
+  onOpenPlayer?: () => void
 }) {
   const router = useRouter()
   const [settings, update] = useSettings()
   const hydrated = useHydrated()
   const bm = useBookmarkState()
-  const fontSize = hydrated ? settings.quranFontSize : 30
   const view = hydrated ? settings.quranView : 'scroll'
 
   const [selectedAyah, setSelectedAyah] = useState<number | null>(initialAyah || null)
   const [toast, setToast] = useState<string | null>(null)
-  const [spread, setSpread] = useState(false) // عرضي: صفحتان متجاورتان كالمصحف المفتوح
+  // صفحة واحدة تملأ الشاشة في الوضعين الطولي والأفقي (لا صفحتان متجاورتان)
+  const spread = false
   const [pageIndex, setPageIndex] = useState(0)
   const pagerRef = useRef<HTMLDivElement>(null)
 
@@ -58,16 +62,57 @@ export function SurahReader({
     [pages],
   )
 
-  // ====== الوضع العرضي ======
-  useEffect(() => {
-    const mq = window.matchMedia('(orientation: landscape) and (min-width: 700px)')
-    const apply = () => setSpread(mq.matches)
-    apply()
-    mq.addEventListener('change', apply)
-    return () => mq.removeEventListener('change', apply)
-  }, [])
 
   const perView = spread ? 2 : 1
+
+  // ====== حجم الخط: ملاءمة تلقائية للشاشة في وضع الصفحات، أو حجم يدوي ======
+  const [sheet, setSheet] = useState(false)
+  const [fit, setFit] = useState<Record<number, number>>({})
+  const [vh, setVh] = useState(0)
+  useEffect(() => {
+    const f = () => setVh(window.innerHeight)
+    f()
+    window.addEventListener('resize', f)
+    return () => window.removeEventListener('resize', f)
+  }, [])
+  // وضع ملء الشاشة للمصحف: نخفي شريط التنقل السفلي أثناء القراءة فقط
+  useEffect(() => {
+    document.body.classList.toggle('reading-fullscreen', view === 'pages')
+    return () => document.body.classList.remove('reading-fullscreen')
+  }, [view])
+
+  const curPageNo = pages[Math.min(pageIndex, pages.length - 1)]?.page ?? -1
+  const fitting = hydrated && view === 'pages' && settings.quranFitPage
+  const displayFont = fitting ? (fit[curPageNo] ?? 20) : hydrated ? settings.quranFontSize : 30
+
+  // التكبير والتصغير بإصبعين: الحجم المعروض هو الأساس، ويُحفظ يدوياً عند رفع الإصبعين
+  const pinch = usePinchZoom<HTMLDivElement>(
+    displayFont,
+    (v) => update({ quranFontSize: v, quranFitPage: false }),
+    [view],
+  )
+  const fontSize = pinch.size
+
+  // ملاءمة كل صفحة للشاشة: أكبر حجم يجعل النص يملأ الصفحة دون تمرير (بحث ثنائي)
+  useLayoutEffect(() => {
+    if (!fitting || !pagerRef.current) return
+    const next: Record<number, number> = {}
+    pagerRef.current.querySelectorAll<HTMLElement>('[data-fit-box]').forEach((box) => {
+      const text = box.querySelector<HTMLElement>('[data-fit-text]')
+      if (!text) return
+      let lo = 14
+      let hi = 44
+      while (lo < hi) {
+        const mid = Math.ceil((lo + hi) / 2)
+        text.style.fontSize = mid + 'px'
+        if (text.scrollHeight <= box.clientHeight) lo = mid
+        else hi = mid - 1
+      }
+      text.style.fontSize = lo + 'px'
+      next[Number(box.dataset.fitBox)] = lo
+    })
+    setFit((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next))
+  }, [fitting, pages, spread, vh, view, toast, selectedAyah])
 
   const goTo = useCallback(
     (i: number, smooth = true) => {
@@ -257,7 +302,7 @@ export function SurahReader({
           <span className="text-xs text-muted-foreground">{'حجم الخط'}</span>
           <button
             type="button"
-            onClick={() => update((s) => ({ quranFontSize: Math.max(20, s.quranFontSize - 2) }))}
+            onClick={() => update({ quranFontSize: Math.max(16, displayFont - 2), quranFitPage: false })}
             className="flex size-8 items-center justify-center rounded-full bg-muted"
             aria-label="تصغير الخط"
           >
@@ -265,26 +310,40 @@ export function SurahReader({
           </button>
           <button
             type="button"
-            onClick={() => update((s) => ({ quranFontSize: Math.min(48, s.quranFontSize + 2) }))}
+            onClick={() => update({ quranFontSize: Math.min(48, displayFont + 2), quranFitPage: false })}
             className="flex size-8 items-center justify-center rounded-full bg-muted"
             aria-label="تكبير الخط"
           >
             <Plus className="size-4" />
           </button>
+          {view === 'pages' && (
+            <button
+              type="button"
+              onClick={() => update({ quranFitPage: true })}
+              className={cn(
+                'rounded-full px-3 py-1.5 text-xs transition-colors',
+                settings.quranFitPage ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground',
+              )}
+              aria-pressed={settings.quranFitPage}
+            >
+              {'ملاءمة للشاشة'}
+            </button>
+          )}
         </div>
       </div>
     </div>
   )
 
-  // ====================== وضع صفحات المصحف ======================
+  // ====================== وضع صفحات المصحف (ملء الشاشة) ======================
   if (view === 'pages') {
     const cur = pages[Math.min(pageIndex, pages.length - 1)]
     const atStart = pageIndex <= 0
     const atEnd = pageIndex + perView >= pages.length
     const pageFirstAyah = cur?.ayahs[0]?.numberInSurah ?? null
     const pageMarked = pageFirstAyah ? isBookmarked(bm, surah, pageFirstAyah) : false
+    const pageFont = (page: number) => (fitting && pinch.live === null ? (fit[page] ?? 20) : fontSize)
 
-    // السابقة/التالية تعبران إلى السورة المجاورة عند طرفي السورة، فيصير التقليب متصلاً
+    // السابقة/التالية تعبران إلى السورة المجاورة عند طرفي السورة
     const goPrev = () => {
       if (!atStart) goTo(pageIndex - perView)
       else if (surah > 1) router.push(`/quran/${surah - 1}`)
@@ -293,97 +352,162 @@ export function SurahReader({
       if (!atEnd) goTo(pageIndex + perView)
       else if (surah < 114) router.push(`/quran/${surah + 1}`)
     }
+
     return (
-      <div className="w-full">
-        {toolbar}
-
-        <div className="mx-[calc(50%-50vw)] w-[100vw] px-2">
-          {surah !== 1 && surah !== 9 && (
-            <p className="mb-2 text-center font-quran text-2xl text-primary">{BASMALA}</p>
+      <div ref={pinch.ref} dir="rtl" className="fixed inset-0 z-[45] flex flex-col bg-background">
+        <header className="flex items-center gap-2 px-3 pb-2 pt-[calc(env(safe-area-inset-top,0px)+0.5rem)]">
+          <button
+            type="button"
+            onClick={() => router.push('/quran')}
+            aria-label="رجوع"
+            className="flex size-9 shrink-0 items-center justify-center rounded-full bg-card shadow-sm ring-1 ring-border"
+          >
+            <ChevronRight className="size-5" aria-hidden="true" />
+          </button>
+          <div className="min-w-0 flex-1 text-center">
+            <p className="truncate text-sm font-bold">{`سورة ${surahName}`}</p>
+            <p className="text-[11px] text-muted-foreground">
+              {cur
+                ? `صفحة ${toArabicNumber(cur.page)} · ${toArabicNumber(Math.min(pageIndex + 1, pages.length))} من ${toArabicNumber(pages.length)}`
+                : ''}
+            </p>
+          </div>
+          {onOpenPlayer && (
+            <button
+              type="button"
+              onClick={onOpenPlayer}
+              aria-label="تشغيل التلاوة"
+              className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm"
+            >
+              <Play className="size-4 fill-current" aria-hidden="true" />
+            </button>
           )}
+          <button
+            type="button"
+            disabled={!pageFirstAyah}
+            onClick={() => {
+              if (!pageFirstAyah) return
+              const added = toggleBookmark(surah, surahName, pageFirstAyah)
+              flash(added ? 'تمت إضافة علامة لهذه الصفحة' : 'تم حذف علامة الصفحة')
+            }}
+            aria-pressed={pageMarked}
+            aria-label="علامة مرجعية لهذه الصفحة"
+            className={cn(
+              'flex size-9 shrink-0 items-center justify-center rounded-full shadow-sm ring-1 ring-border',
+              pageMarked ? 'bg-primary text-primary-foreground' : 'bg-card',
+            )}
+          >
+            <Bookmark className={cn('size-4', pageMarked && 'fill-current')} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setSheet(true)}
+            aria-label="الأدوات والإعدادات"
+            className="flex size-9 shrink-0 items-center justify-center rounded-full bg-card shadow-sm ring-1 ring-border"
+          >
+            <Settings2 className="size-5" aria-hidden="true" />
+          </button>
+        </header>
 
+        {toast && <p className="px-3 pb-1 text-center text-xs text-primary">{toast}</p>}
+
+        <div className="relative min-h-0 flex-1">
           <div
             ref={pagerRef}
             dir="rtl"
             onScroll={onPagerScroll}
-            className="flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            className="no-scrollbar flex h-full snap-x snap-mandatory overflow-x-auto overscroll-x-contain"
             style={{ touchAction: 'pan-x pan-y', WebkitOverflowScrolling: 'touch' }}
           >
-            {pages.map((p) => (
+            {pages.map((p, idx) => (
               <section
                 key={p.page}
-                className="shrink-0 snap-start px-1.5"
-                style={{ width: spread ? '50%' : '100%' }}
+                className="h-full shrink-0 snap-start px-3 pb-1"
+                style={{ width: '100%' }}
                 aria-label={`صفحة ${p.page}`}
               >
-                <div
-                  className="overflow-y-auto rounded-2xl bg-card p-4 shadow-sm ring-1 ring-border"
-                  style={{ height: spread ? 'calc(100dvh - 9.5rem)' : 'calc(100dvh - 17rem)' }}
-                >
-                  <p className="text-justify font-quran leading-[2.3]" style={{ fontSize }}>
+                <div data-fit-box={p.page} className="h-full overflow-y-auto">
+                  {idx === 0 && surah !== 1 && surah !== 9 && (
+                    <p className="mb-2 text-center font-quran text-xl text-primary">{BASMALA}</p>
+                  )}
+                  <p
+                    data-fit-text
+                    className="text-justify font-quran leading-[2.2]"
+                    style={{ fontSize: pageFont(p.page) }}
+                  >
                     {p.ayahs.map(renderAyah)}
                   </p>
                 </div>
-                <p className="mt-1 text-center font-quran text-sm text-muted-foreground">{toArabicNumber(p.page)}</p>
               </section>
             ))}
           </div>
+        </div>
 
-          <div className="mt-2 flex items-center justify-between gap-2 px-2">
+        {selectedAyah && (
+          <div className="flex justify-center px-3 pb-1">
             <button
               type="button"
-              onClick={goPrev}
-              disabled={atStart && surah <= 1}
-              className="flex items-center gap-1 rounded-full bg-card px-4 py-2 text-sm shadow-sm ring-1 ring-border disabled:opacity-40"
+              onClick={onToggleBookmark}
+              className="flex items-center gap-1 rounded-full bg-primary px-3 py-1.5 text-xs text-primary-foreground shadow-sm"
             >
-              <ChevronRight className="size-4" aria-hidden="true" />
-              {atStart && surah > 1 ? 'السورة السابقة' : 'السابقة'}
-            </button>
-
-            <div className="flex flex-col items-center gap-1">
-              <button
-                type="button"
-                disabled={!pageFirstAyah}
-                onClick={() => {
-                  if (!pageFirstAyah) return
-                  const added = toggleBookmark(surah, surahName, pageFirstAyah)
-                  flash(added ? 'تمت إضافة علامة لهذه الصفحة' : 'تم حذف علامة الصفحة')
-                }}
-                aria-pressed={pageMarked}
-                aria-label="علامة مرجعية لهذه الصفحة"
-                className={cn(
-                  'flex items-center gap-1 rounded-full px-3 py-1.5 text-xs ring-1 ring-border',
-                  pageMarked ? 'bg-primary text-primary-foreground' : 'bg-card',
-                )}
-              >
-                <Bookmark className={cn('size-3.5', pageMarked && 'fill-current')} aria-hidden="true" />
-                {pageMarked ? 'علامة مضافة' : 'علامة للصفحة'}
-              </button>
-              <span className="text-xs text-muted-foreground">
-                {cur
-                  ? `صفحة ${toArabicNumber(cur.page)} · ${toArabicNumber(Math.min(pageIndex + 1, pages.length))} من ${toArabicNumber(pages.length)}`
-                  : ''}
-              </span>
-            </div>
-
-            <button
-              type="button"
-              onClick={goNextPage}
-              disabled={atEnd && surah >= 114}
-              className="flex items-center gap-1 rounded-full bg-card px-4 py-2 text-sm shadow-sm ring-1 ring-border disabled:opacity-40"
-            >
-              {atEnd && surah < 114 ? 'السورة التالية' : 'التالية'}
-              <ChevronLeft className="size-4" aria-hidden="true" />
+              <Bookmark className={cn('size-3', selectedIsBookmarked && 'fill-current')} />
+              {selectedIsBookmarked
+                ? `إزالة علامة الآية ${toArabicNumber(selectedAyah)}`
+                : `علامة عند الآية ${toArabicNumber(selectedAyah)}`}
             </button>
           </div>
-        </div>
+        )}
+
+        <footer className="flex items-center justify-between gap-2 px-3 pb-[calc(env(safe-area-inset-bottom,0px)+0.5rem)] pt-1">
+          <button
+            type="button"
+            onClick={goPrev}
+            disabled={atStart && surah <= 1}
+            className="flex items-center gap-1 rounded-full bg-card px-3 py-2 text-xs shadow-sm ring-1 ring-border disabled:opacity-40"
+          >
+            <ChevronRight className="size-4" aria-hidden="true" />
+            {atStart && surah > 1 ? 'السورة السابقة' : 'السابقة'}
+          </button>
+          <button
+            type="button"
+            onClick={goNextPage}
+            disabled={atEnd && surah >= 114}
+            className="flex items-center gap-1 rounded-full bg-card px-3 py-2 text-xs shadow-sm ring-1 ring-border disabled:opacity-40"
+          >
+            {atEnd && surah < 114 ? 'السورة التالية' : 'التالية'}
+            <ChevronLeft className="size-4" aria-hidden="true" />
+          </button>
+        </footer>
+
+        {sheet && (
+          <div className="fixed inset-0 z-[60] flex items-end bg-black/40" onClick={() => setSheet(false)}>
+            <div
+              dir="rtl"
+              onClick={(e) => e.stopPropagation()}
+              className="max-h-[85dvh] w-full overflow-y-auto rounded-t-3xl bg-background p-4 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] shadow-2xl"
+            >
+              <div className="mb-3 flex items-center justify-between">
+                <p className="font-bold">{'الأدوات والإعدادات'}</p>
+                <button
+                  type="button"
+                  onClick={() => setSheet(false)}
+                  aria-label="إغلاق"
+                  className="flex size-8 items-center justify-center rounded-full bg-muted"
+                >
+                  <X className="size-4" aria-hidden="true" />
+                </button>
+              </div>
+              {toolbar}
+            </div>
+          </div>
+        )}
       </div>
     )
   }
 
   // ====================== وضع التمرير ======================
   return (
-    <article className="w-full touch-pan-y rounded-3xl bg-card p-5 pb-48 shadow-sm ring-1 ring-border sm:p-8">
+    <article ref={pinch.ref} className="w-full touch-pan-y rounded-3xl bg-card p-5 pb-48 shadow-sm ring-1 ring-border sm:p-8">
       {toolbar}
 
       {surah !== 1 && surah !== 9 && <p className="mb-6 text-center font-quran text-3xl text-primary">{BASMALA}</p>}

@@ -42,7 +42,7 @@ export const CITIES: City[] = [
   ...group('قطر', 'QA', 'Qatar', [['الدوحة', 25.2854, 51.531]]),
   ...group('البحرين', 'BH', 'UmmAlQura', [['المنامة', 26.2285, 50.586]]),
   ...group('عمان', 'OM', 'UmmAlQura', [['مسقط', 23.588, 58.3829], ['صلالة', 17.0151, 54.0924], ['صحار', 24.3417, 56.7299]]),
-  ...group('الأردن', 'JO', 'MuslimWorldLeague', [
+  ...group('الأردن', 'JO', 'JordanAwqaf', [
     ['عمّان', 31.9454, 35.9284], ['إربد', 32.5556, 35.85], ['الزرقاء', 32.0728, 36.0877], ['العقبة', 29.5321, 35.0063],
   ]),
   ...group('فلسطين', 'PS', 'MuslimWorldLeague', [
@@ -64,11 +64,11 @@ export const CITIES: City[] = [
   ]),
   ...group('السودان', 'SD', 'Egyptian', [['الخرطوم', 15.5007, 32.5599], ['أم درمان', 15.6445, 32.4777], ['بورتسودان', 19.6158, 37.2164]]),
   ...group('ليبيا', 'LY', 'Egyptian', [['طرابلس', 32.8872, 13.1913], ['بنغازي', 32.1167, 20.0667], ['مصراتة', 32.3754, 15.0925]]),
-  ...group('تونس', 'TN', 'MuslimWorldLeague', [['تونس', 36.8065, 10.1815], ['صفاقس', 34.7406, 10.7603], ['سوسة', 35.8256, 10.6369]]),
-  ...group('الجزائر', 'DZ', 'MuslimWorldLeague', [
+  ...group('تونس', 'TN', 'TunisiaMinistry', [['تونس', 36.8065, 10.1815], ['صفاقس', 34.7406, 10.7603], ['سوسة', 35.8256, 10.6369]]),
+  ...group('الجزائر', 'DZ', 'AlgeriaMinistry', [
     ['الجزائر', 36.7538, 3.0588], ['وهران', 35.6971, -0.6308], ['قسنطينة', 36.365, 6.6147], ['عنابة', 36.9, 7.7667],
   ]),
-  ...group('المغرب', 'MA', 'MuslimWorldLeague', [
+  ...group('المغرب', 'MA', 'MoroccoHabous', [
     ['الرباط', 34.0209, -6.8416], ['الدار البيضاء', 33.5731, -7.5898], ['فاس', 34.0181, -5.0078],
     ['مراكش', 31.6295, -7.9811], ['طنجة', 35.7595, -5.834], ['أكادير', 30.4278, -9.5981],
   ]),
@@ -121,7 +121,7 @@ export const COUNTRY_METHOD: Record<string, MethodKey> = {
   SA: 'UmmAlQura', YE: 'UmmAlQura', BH: 'UmmAlQura', OM: 'UmmAlQura',
   EG: 'Egyptian', SD: 'Egyptian', LY: 'Egyptian', SY: 'Egyptian', IQ: 'Egyptian', LB: 'Egyptian',
   AE: 'Dubai', KW: 'Kuwait', QA: 'Qatar', TR: 'Turkey', PK: 'Karachi', IN: 'Karachi', BD: 'Karachi', AF: 'Karachi',
-  MY: 'Singapore', SG: 'Singapore', ID: 'Singapore', IR: 'Tehran',
+  JO: 'JordanAwqaf', DZ: 'AlgeriaMinistry', TN: 'TunisiaMinistry', MA: 'MoroccoHabous', MY: 'Singapore', SG: 'Singapore', ID: 'Singapore', IR: 'Tehran',
   US: 'NorthAmerica', CA: 'NorthAmerica', GB: 'MoonsightingCommittee',
 }
 

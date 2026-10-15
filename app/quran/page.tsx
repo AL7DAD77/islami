@@ -7,6 +7,7 @@ import { LastPlayedCard } from '@/components/quran/last-played-card'
 import { DownloadAll } from '@/components/quran/download-all'
 import { BookmarksCard } from '@/components/quran/bookmarks-card'
 import { TileLink } from '@/components/ui-kit'
+import { SearchButton } from '@/components/search-button'
 
 export const metadata: Metadata = { title: 'القرآن الكريم | إسلامي' }
 
@@ -14,7 +15,7 @@ export default async function QuranPage() {
   const surahs = await getSurahList()
   return (
     <>
-      <PageHeader title="القرآن الكريم" subtitle="بالرسم العثماني مع تلاوات أشهر القراء" />
+      <PageHeader title="القرآن الكريم" subtitle="بالرسم العثماني مع تلاوات أشهر القراء" action={<SearchButton />} />
 
       {/* متابعة الاستماع والقراءة والعلامات: تظهر فقط عند وجودها */}
       <div className="mb-4 flex flex-col gap-2.5 empty:hidden">

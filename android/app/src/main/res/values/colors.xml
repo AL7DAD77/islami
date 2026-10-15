@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- ألوان التطبيق الأساسية (الأخضر الداكن والذهبي) -->
+    <color name="colorPrimary">#02634D</color>
+    <color name="colorPrimaryDark">#014A39</color>
+    <color name="colorAccent">#D4A84B</color>
+</resources>

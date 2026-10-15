@@ -5,6 +5,7 @@ import { AdhanEngine } from '@/components/adhan-engine'
 import { BottomNav } from '@/components/bottom-nav'
 import { DailyMessageModal } from '@/components/daily-message'
 import { NativeBackHandler } from '@/components/native-back-handler'
+import { FirstRun } from '@/components/setup/first-run'
 import { SplashScreen } from '@/components/splash-screen'
 import { SwipeNavigation } from '@/components/swipe-navigation'
 import { QuranPlayerProvider } from '@/lib/quran-player'
@@ -35,7 +36,7 @@ export const viewport: Viewport = {
   userScalable: true,
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#f7f3ea' },
-    { media: '(prefers-color-scheme: dark)', color: '#10211c' },
+    { media: '(prefers-color-scheme: dark)', color: '#18302a' },
   ],
 }
 
@@ -49,11 +50,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           <DailyMessageModal />
           <SwipeNavigation />
           <NativeBackHandler />
-          <main className="mx-auto max-w-2xl px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))]">
-            {children}
-            <BottomNav />
-            {process.env.NODE_ENV === 'production' && <Analytics />}
-          </main>
+          <FirstRun />
+          <main className="mx-auto min-h-dvh max-w-2xl px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))]">{children}</main>
+          <BottomNav />
+          {process.env.NODE_ENV === 'production' && <Analytics />}
         </QuranPlayerProvider>
       </body>
     </html>

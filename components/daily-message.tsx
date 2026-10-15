@@ -1,87 +1,94 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { X, Sparkles } from 'lucide-react'
+import { X, Share2 } from 'lucide-react'
 import { getRandomMessage, type DailyMessage } from '@/lib/daily-messages'
+import { useHydrated, useSettings } from '@/lib/settings'
 
+const SHOWN_KEY = 'daily-msg-shown-date'
+
+function today() {
+  const d = new Date()
+  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`
+}
+
+/** نافذة مختصرة تظهر مرة واحدة في اليوم، ويمكن إيقافها من صفحة المزيد */
 export function DailyMessageModal() {
+  const hydrated = useHydrated()
+  const [settings] = useSettings()
   const [message, setMessage] = useState<DailyMessage | null>(null)
   const [visible, setVisible] = useState(false)
 
   useEffect(() => {
-  const timer = setTimeout(() => {
-    setMessage(getRandomMessage())
-    setVisible(true)
-  }, 1500)
+    if (!hydrated || !settings.showDailyMessage) return
+    let shownToday = false
+    try {
+      shownToday = localStorage.getItem(SHOWN_KEY) === today()
+    } catch {}
+    if (shownToday) return
+    const timer = setTimeout(() => {
+      setMessage(getRandomMessage())
+      setVisible(true)
+      try {
+        localStorage.setItem(SHOWN_KEY, today())
+      } catch {}
+    }, 1500)
+    return () => clearTimeout(timer)
+  }, [hydrated, settings.showDailyMessage])
 
-  return () => clearTimeout(timer)
-}, [])
+  if (!visible || !message || !settings.showDailyMessage) return null
 
   const close = () => setVisible(false)
 
-  if (!visible || !message) return null
+  const share = async () => {
+    const text = `${message.text}\n${message.source}`
+    try {
+      if (navigator.share) await navigator.share({ text })
+      else await navigator.clipboard.writeText(text)
+    } catch {}
+  }
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 p-6"
       onClick={close}
       role="dialog"
       aria-modal="true"
       aria-labelledby="daily-message-title"
     >
       <div
-        className="relative w-full max-w-md overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-50 to-white shadow-2xl ring-1 ring-emerald-200 dark:from-zinc-900 dark:to-zinc-800 dark:ring-emerald-900"
+        dir="rtl"
         onClick={(e) => e.stopPropagation()}
+        className="relative w-full max-w-sm rounded-2xl bg-background px-5 pb-4 pt-8 text-center shadow-xl ring-1 ring-border"
       >
-        {/* زر الإغلاق */}
         <button
           type="button"
           onClick={close}
           aria-label="إغلاق"
-          className="absolute top-3 left-3 flex size-9 items-center justify-center rounded-full bg-white/80 text-zinc-600 shadow-sm transition hover:bg-white dark:bg-zinc-800/80 dark:text-zinc-300"
+          className="absolute left-2 top-2 flex size-8 items-center justify-center rounded-full text-muted-foreground hover:bg-muted"
         >
-          <X className="size-4" />
+          <X className="size-4" aria-hidden="true" />
         </button>
 
-        {/* الأيقونة */}
-        <div className="flex justify-center pt-8">
-          <div className="flex size-16 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/50">
-            <Sparkles className="size-8 text-emerald-600 dark:text-emerald-400" />
-          </div>
-        </div>
+        <p className="text-xs font-bold text-primary">
+          {message.type === 'ayah' ? 'آية اليوم' : message.type === 'hadith' ? 'حديث اليوم' : 'دعاء اليوم'}
+        </p>
+        <p
+          id="daily-message-title"
+          className={`mt-3 leading-loose ${message.type === 'ayah' ? 'font-quran text-lg' : 'text-base'}`}
+        >
+          {message.text}
+        </p>
+        <p className="mt-3 text-xs text-muted-foreground">{message.source}</p>
 
-        {/* العنوان */}
-        <div className="px-6 pt-4 text-center">
-          <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
-            {message.type === 'ayah' ? 'آية اليوم' : message.type === 'hadith' ? 'حديث اليوم' : 'دعاء اليوم'}
-          </p>
-        </div>
-
-        {/* النص */}
-        <div className="px-6 py-5 text-center">
-          <p
-            id="daily-message-title"
-            className={`text-lg leading-loose text-zinc-800 dark:text-zinc-100 ${
-              message.type === 'ayah' ? 'font-quran text-xl' : 'font-medium'
-            }`}
-          >
-            {message.text}
-          </p>
-          <p className="mt-4 text-xs text-zinc-500 dark:text-zinc-400">
-            {message.source}
-          </p>
-        </div>
-
-        {/* زر الإغلاق السفلي */}
-        <div className="px-6 pb-6">
-          <button
-            type="button"
-            onClick={close}
-            className="w-full rounded-2xl bg-emerald-600 py-3 text-sm font-bold text-white transition hover:bg-emerald-700"
-          >
-            جزاك الله خيراً
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={share}
+          className="mx-auto mt-4 flex items-center gap-1.5 rounded-full bg-muted px-4 py-1.5 text-xs font-medium"
+        >
+          <Share2 className="size-3.5" aria-hidden="true" />
+          {'مشاركة'}
+        </button>
       </div>
     </div>
   )

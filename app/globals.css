@@ -62,23 +62,23 @@
 /* ============ الوضع الداكن (أخضر داكن + ذهبي) ============ */
 .dark {
   color-scheme: dark;
-  --background: oklch(0.15 0.025 170);
+  --background: oklch(0.2 0.024 170);
   --foreground: oklch(0.95 0.02 85);
-  --card: oklch(0.2 0.028 170);
+  --card: oklch(0.25 0.026 170);
   --card-foreground: oklch(0.95 0.02 85);
   --popover: oklch(0.2 0.028 170);
   --popover-foreground: oklch(0.95 0.02 85);
   --primary: oklch(0.78 0.13 82);
   --primary-foreground: oklch(0.15 0.025 170);
-  --secondary: oklch(0.25 0.03 170);
+  --secondary: oklch(0.3 0.03 170);
   --secondary-foreground: oklch(0.92 0.02 160);
-  --muted: oklch(0.23 0.022 170);
+  --muted: oklch(0.28 0.021 170);
   --muted-foreground: oklch(0.72 0.03 85);
   --accent: oklch(0.3 0.05 82);
   --accent-foreground: oklch(0.88 0.1 82);
   --gold: oklch(0.78 0.14 80);
   --destructive: oklch(0.65 0.2 25);
-  --border: oklch(0.28 0.028 170);
+  --border: oklch(0.34 0.026 170);
   --input: oklch(0.28 0.028 170);
   --ring: oklch(0.78 0.13 82);
 }
@@ -115,4 +115,35 @@ html, body {
 
 button, a, [role="button"], summary {
   touch-action: manipulation;
+}
+/* إخفاء شريط التمرير مع بقاء التمرير يعمل (صفحات المصحف) */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* وضع قراءة المصحف بملء الشاشة: نخفي شريط التنقل السفلي وننقل زر التشغيل للأعلى */
+body.reading-fullscreen .app-bottom-nav {
+  display: none;
+}
+/* في وضع الصفحات زر التشغيل داخل الشريط العلوي بجانب العلامة المرجعية، فنخفي العائم */
+body.reading-fullscreen .quran-fab {
+  display: none;
+}
+
+/* منع تحديد النص بالضغط المطوّل (التظليل الأزرق وقائمة النسخ) في واجهة التطبيق.
+   الحقول القابلة للكتابة تبقى قابلة للتحديد. */
+html,
+body {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+input,
+textarea,
+[contenteditable='true'] {
+  -webkit-user-select: text;
+  user-select: text;
 }

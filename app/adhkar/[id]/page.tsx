@@ -20,12 +20,15 @@ export default async function AdhkarCategoryPage({ params }: { params: Promise<{
   if (!category) notFound()
 
   // القسم التالي بحسب ترتيب الأقسام، للانتقال إليه تلقائياً بعد إتمام هذا القسم
+  // ولا ينتقل من الأقسام المنتقاة إلى حصن المسلم ولا العكس: لكل منهما تسلسله
   const index = ADHKAR.findIndex((c) => c.id === category.id)
-  const next = index >= 0 && index < ADHKAR.length - 1 ? ADHKAR[index + 1] : null
+  const candidate = index >= 0 && index < ADHKAR.length - 1 ? ADHKAR[index + 1] : null
+  const isHisn = category.group === 'hisn'
+  const next = candidate && (candidate.group === 'hisn') === isHisn ? candidate : null
 
   return (
     <>
-      <PageHeader title={category.title} subtitle={category.description} backHref="/adhkar" />
+      <PageHeader title={category.title} subtitle={category.description} backHref={isHisn ? '/adhkar/hisn' : '/adhkar'} />
       <DhikrList
         key={category.id}
         items={category.items}
