@@ -35,6 +35,12 @@ type PlayerState = {
   changeReciter: (reciter: Reciter, server: string) => void
 }
 
+type NativeTrack = {
+  id: string
+  title: string
+  url: string
+}
+
 type NativeState = {
   playing: boolean
   loading: boolean
@@ -43,6 +49,8 @@ type NativeState = {
   url: string
   ui: string
   error: string
+  index?: number
+  title?: string
 }
 
 type NativePlugin = {
@@ -53,6 +61,14 @@ type NativePlugin = {
     repeat: boolean
     ui: string
   }): Promise<NativeState>
+
+  playQueue(options: {
+    items: NativeTrack[]
+    startIndex: number
+    repeat: boolean
+    ui: string
+  }): Promise<NativeState>
+
   toggle(): Promise<NativeState>
   stop(): Promise<NativeState>
   setRepeat(options: { enabled: boolean }): Promise<NativeState>
@@ -86,6 +102,27 @@ function nativePlayerAvailable(): boolean {
   }
 }
 
+function buildQueue(
+  startSurah: number,
+  server: string,
+  startSurahName: string,
+): NativeTrack[] {
+  const items: NativeTrack[] = []
+
+  for (let number = startSurah; number <= 114; number++) {
+    items.push({
+      id: String(number),
+      title:
+        number === startSurah
+          ? startSurahName
+          : `السورة رقم ${number}`,
+      url: surahAudioUrl(server, number),
+    })
+  }
+
+  return items
+}
+
 export function QuranPlayerProvider({
   children,
 }: {
@@ -108,6 +145,7 @@ export function QuranPlayerProvider({
   const selectionRef = useRef<Selection | null>(null)
   const lastUiRef = useRef('')
   const lastErrorRef = useRef('')
+  const queueStartRef = useRef(1)
 
   const commandVersionRef = useRef(0)
   const busyRef = useRef(0)
@@ -135,6 +173,32 @@ export function QuranPlayerProvider({
 
       repeatRef.current = state.repeat
       setRepeatState(state.repeat)
+
+      if (
+        typeof state.index === 'number' &&
+        state.index >= 0
+      ) {
+        const currentSurahNumber =
+          queueStartRef.current + state.index
+
+        setSurah(currentSurahNumber)
+
+        if (state.title) {
+          setSurahName(state.title)
+        }
+
+        const current = selectionRef.current
+
+        if (current) {
+          const updated: Selection = {
+            ...current,
+            surah: currentSurahNumber,
+            surahName: state.title || current.surahName,
+          }
+
+          selectionRef.current = updated
+        }
+      }
 
       if (state.ui && state.ui !== lastUiRef.current) {
         try {
@@ -205,7 +269,6 @@ ${state.error}
     [applyNativeState],
   )
 
-  // إنشاء مشغّل الويب فقط للمتصفح أو نسخ التطبيق القديمة.
   useEffect(() => {
     mountedRef.current = true
 
@@ -285,8 +348,6 @@ ${state.error}
     }
   }, [])
 
-  // تحديث واجهة التطبيق من حالة المشغّل الأصلي.
-  // استمرار الصوت لا يعتمد على هذا المؤقت.
   useEffect(() => {
     if (!nativePlayerAvailable()) return
 
@@ -362,7 +423,6 @@ ${state.error}
     setProgress(0)
   }, [runNative])
 
-  // إيقاف القرآن عند إطلاق حدث الأذان من الواجهة.
   useEffect(() => {
     const handler = () => stop()
     const quranWindow = window as QuranWindow
@@ -379,7 +439,6 @@ ${state.error}
     }
   }, [stop])
 
-  // بيانات جلسة الوسائط للمتصفح فقط.
   useEffect(() => {
     if (nativePlayerAvailable()) return
     if (!reciter || !('mediaSession' in navigator)) return
@@ -427,11 +486,13 @@ ${state.error}
       const ui = JSON.stringify(selection)
       lastUiRef.current = ui
 
+      const items = buildQueue(number, server, name)
+      queueStartRef.current = number
+
       void runNative(() =>
-        NativeQuran.play({
-          url,
-          title: name,
-          artist: selectedReciter.name,
+        NativeQuran.playQueue({
+          items,
+          startIndex: 0,
           repeat: repeatRef.current,
           ui,
         }),

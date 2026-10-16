@@ -14,12 +14,18 @@ import androidx.media3.common.util.UnstableApi;
 import androidx.media3.session.MediaController;
 import androidx.media3.session.SessionToken;
 
+import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.google.common.util.concurrent.ListenableFuture;
+
+import org.json.JSONObject;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @UnstableApi
 @CapacitorPlugin(name = "QuranPlayer")
@@ -176,6 +182,118 @@ public class QuranPlayerPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void playQueue(PluginCall call) {
+        JSArray items = call.getArray("items");
+        Integer startIndex = call.getInt("startIndex", 0);
+        String ui = call.getString("ui", "");
+        boolean repeat = Boolean.TRUE.equals(call.getBoolean("repeat", false));
+
+        if (items == null || items.length() == 0) {
+            call.reject("Quran queue is empty");
+            return;
+        }
+
+        List<MediaItem> mediaItems = new ArrayList<>();
+
+        try {
+            for (int i = 0; i < items.length(); i++) {
+                JSONObject raw = items.getJSONObject(i);
+
+                String url = raw.optString("url", "");
+                String title = raw.optString("title", "القرآن الكريم");
+                String id = raw.optString("id", url);
+
+                if (url == null || url.trim().isEmpty()) {
+                    continue;
+                }
+
+                Uri uri = Uri.parse(url);
+                String scheme = uri.getScheme();
+
+                if (!"https".equalsIgnoreCase(scheme)
+                        && !"http".equalsIgnoreCase(scheme)) {
+                    continue;
+                }
+
+                Bundle extras = new Bundle();
+                extras.putString("quran_ui", ui);
+
+                MediaMetadata metadata =
+                        new MediaMetadata.Builder()
+                                .setTitle(title)
+                                .setArtist("القرآن الكريم")
+                                .setAlbumTitle("القرآن الكريم")
+                                .setExtras(extras)
+                                .build();
+
+                MediaItem item =
+                        new MediaItem.Builder()
+                                .setMediaId(id)
+                                .setUri(uri)
+                                .setMediaMetadata(metadata)
+                                .build();
+
+                mediaItems.add(item);
+            }
+        } catch (Exception error) {
+            call.reject(
+                    "Cannot read Quran queue: " + error.getMessage(),
+                    error
+            );
+            return;
+        }
+
+        if (mediaItems.isEmpty()) {
+            call.reject("No valid Quran audio URLs were provided");
+            return;
+        }
+
+        int index = startIndex == null ? 0 : startIndex;
+
+        if (index < 0 || index >= mediaItems.size()) {
+            index = 0;
+        }
+
+        withController(call, controller -> {
+            controller.setRepeatMode(
+                    repeat
+                            ? Player.REPEAT_MODE_ALL
+                            : Player.REPEAT_MODE_OFF
+            );
+
+            controller.setMediaItems(mediaItems, index, 0);
+            controller.prepare();
+            controller.play();
+
+            call.resolve(snapshot(controller));
+        });
+    }
+
+    @PluginMethod
+    public void next(PluginCall call) {
+        withController(call, controller -> {
+            if (controller.hasNextMediaItem()) {
+                controller.seekToNextMediaItem();
+                controller.play();
+            }
+
+            call.resolve(snapshot(controller));
+        });
+    }
+
+    @PluginMethod
+    public void previous(PluginCall call) {
+        withController(call, controller -> {
+            if (controller.hasPreviousMediaItem()) {
+                controller.seekToPreviousMediaItem();
+                controller.play();
+            }
+
+            call.resolve(snapshot(controller));
+        });
+    }
+
+    @PluginMethod
     public void toggle(PluginCall call) {
         withController(call, controller -> {
             if (controller.getCurrentMediaItem() == null) {
@@ -221,11 +339,19 @@ public class QuranPlayerPlugin extends Plugin {
                 Boolean.TRUE.equals(call.getBoolean("enabled", false));
 
         withController(call, controller -> {
-            controller.setRepeatMode(
-                    enabled
-                            ? Player.REPEAT_MODE_ONE
-                            : Player.REPEAT_MODE_OFF
-            );
+            if (controller.getMediaItemCount() > 1) {
+                controller.setRepeatMode(
+                        enabled
+                                ? Player.REPEAT_MODE_ALL
+                                : Player.REPEAT_MODE_OFF
+                );
+            } else {
+                controller.setRepeatMode(
+                        enabled
+                                ? Player.REPEAT_MODE_ONE
+                                : Player.REPEAT_MODE_OFF
+                );
+            }
 
             call.resolve(snapshot(controller));
         });
@@ -262,18 +388,36 @@ public class QuranPlayerPlugin extends Plugin {
                         && controller.getPlaybackState() == Player.STATE_BUFFERING
         );
         result.put("progress", ended ? 0.0 : progress);
-        result.put(
-                "repeat",
+
+        boolean repeatEnabled =
                 controller.getRepeatMode() == Player.REPEAT_MODE_ONE
+                        || controller.getRepeatMode() == Player.REPEAT_MODE_ALL;
+
+        result.put("repeat", repeatEnabled);
+        result.put(
+                "index",
+                controller.getCurrentMediaItemIndex()
         );
 
         MediaItem current = controller.getCurrentMediaItem();
 
         result.put("url", current == null ? "" : current.mediaId);
 
+        String title = "القرآن الكريم";
+
+        if (current != null
+                && current.mediaMetadata != null
+                && current.mediaMetadata.title != null) {
+            title = current.mediaMetadata.title.toString();
+        }
+
+        result.put("title", title);
+
         String ui = "";
 
-        if (current != null && current.mediaMetadata.extras != null) {
+        if (current != null
+                && current.mediaMetadata != null
+                && current.mediaMetadata.extras != null) {
             ui = current.mediaMetadata.extras.getString("quran_ui", "");
         }
 
