@@ -248,11 +248,15 @@ public class QuranPlayerPlugin extends Plugin {
             return;
         }
 
-        int index = startIndex == null ? 0 : startIndex;
+        int selectedStartIndex =
+                startIndex == null ? 0 : startIndex;
 
-        if (index < 0 || index >= mediaItems.size()) {
-            index = 0;
+        if (selectedStartIndex < 0
+                || selectedStartIndex >= mediaItems.size()) {
+            selectedStartIndex = 0;
         }
+
+        final int queueStartIndex = selectedStartIndex;
 
         withController(call, controller -> {
             controller.setRepeatMode(
@@ -261,7 +265,7 @@ public class QuranPlayerPlugin extends Plugin {
                             : Player.REPEAT_MODE_OFF
             );
 
-            controller.setMediaItems(mediaItems, index, 0);
+            controller.setMediaItems(mediaItems, queueStartIndex, 0);
             controller.prepare();
             controller.play();
 

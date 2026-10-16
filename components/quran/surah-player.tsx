@@ -44,12 +44,9 @@ export function SurahPlayer({
         : 'paused'
     : 'idle'
 
-  // === تصحيح الخطأ الإملائي هنا (حذف حرف s الزائد) ===
   useEffect(() => {
     if (isCurrent && player.progress > 0 && onAyahChange) {
-      // حسبة رياضية: نقسم التقدم على 100 ونضربه في عدد الآيات
       const estimatedAyah = Math.round((player.progress / 100) * totalAyahs)
-      // نتأكد أن الرقم لا يتجاوز عدد الآيات
       const safeAyah = Math.min(Math.max(estimatedAyah, 1), totalAyahs)
 
       if (safeAyah !== lastAyahRef.current) {
@@ -62,7 +59,6 @@ export function SurahPlayer({
     }
   }, [isCurrent, player.progress, totalAyahs, onAyahChange])
 
-  // إيقاف القرآن عند الأذان
   useEffect(() => {
     const handler = () => {
       player.stop()
@@ -72,6 +68,7 @@ export function SurahPlayer({
   }, [player])
 
   const toggle = () => {
+    // تم إزالة window.alert لتجنب تعليق التطبيق
     if (isCurrent) {
       player.toggle()
     } else if (reciter && moshaf) {
