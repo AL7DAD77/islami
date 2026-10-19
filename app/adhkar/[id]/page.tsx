@@ -11,7 +11,7 @@ export function generateStaticParams() {
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params
   const c = getCategory(id)
-  return c ? { title: `${c.title} | نور` } : {}
+  return c ? { title: `${c.title} | إسلامي` } : {}
 }
 
 export default async function AdhkarCategoryPage({ params }: { params: Promise<{ id: string }> }) {

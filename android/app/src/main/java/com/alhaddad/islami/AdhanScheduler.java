@@ -6,11 +6,13 @@ import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
+import android.util.Log;
 
 import java.util.ArrayList;
 import java.util.List;
 
 final class AdhanScheduler {
+    private static final String TAG = "AdhanScheduler";
     static final String ACTION_ALARM = "com.alhaddad.islami.ACTION_ADHAN_ALARM";
 
     private AdhanScheduler() {}
@@ -21,12 +23,6 @@ final class AdhanScheduler {
         return am != null && am.canScheduleExactAlarms();
     }
 
-    /**
-     * يضبط المنبّه بأعلى دقة ممكنة:
-     * 1) إن كانت صلاحية «المنبهات والتذكيرات» مفعّلة: منبّه دقيق يعمل حتى في وضع توفير الطاقة.
-     * 2) وإلا (الوضع الافتراضي في أندرويد 14): setAlarmClock، وهو لا يحتاج صلاحية ويُطلق في وقته بدقة،
-     *    لكنه يُظهر أيقونة المنبّه في شريط الحالة. هذا أفضل من منبّه غير دقيق قد يتأخر دقائق.
-     */
     private static void setAlarm(Context c, AlarmManager am, long at, PendingIntent pi) {
         try {
             if (canExact(c)) {
@@ -46,7 +42,7 @@ final class AdhanScheduler {
     private static Intent alarmIntent(Context c, int id) {
         Intent i = new Intent(c, AdhanReceiver.class);
         i.setAction(ACTION_ALARM);
-        i.setData(Uri.parse("adhan://alarm/" + id)); // يجعل كل تنبيه مميزاً
+        i.setData(Uri.parse("adhan://alarm/" + id)); 
         return i;
     }
 
@@ -93,7 +89,48 @@ final class AdhanScheduler {
         return ids.size();
     }
 
-    /** تنبيه تجريبي مستقل عن الجدول (id ثابت) ليتأكد المستخدم أن الأذان يعمل والتطبيق مغلق. */
+    /** 
+     * ⚠️ الدالة الجديدة: تقوم بجدولة الصلاة القادمة فقط. 
+     * نستخدمها في AdhanReceiver و AdhanService بعد انتهاء أو إيقاف الأذان.
+     */
+    static void scheduleNextAdhan(Context c) {
+        AlarmManager am = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
+        if (am == null) return;
+
+        long now = System.currentTimeMillis();
+        long nextTime = Long.MAX_VALUE;
+        AdhanStore.Item nextItem = null;
+
+        // البحث عن أقرب صلاة قادمة
+        for (AdhanStore.Item it : AdhanStore.load(c)) {
+            if (it.at > now && it.at < nextTime) {
+                nextTime = it.at;
+                nextItem = it;
+            }
+        }
+
+        // إذا وجدنا صلاة قادمة، نقوم بجدولتها
+        if (nextItem != null) {
+            Intent i = alarmIntent(c, nextItem.id);
+            i.putExtra("id", nextItem.id);
+            i.putExtra("kind", nextItem.kind);
+            i.putExtra("prayer", nextItem.prayer);
+            i.putExtra("title", nextItem.title);
+            i.putExtra("body", nextItem.body);
+            i.putExtra("file", nextItem.file);
+            i.putExtra("volume", nextItem.volume);
+            
+            PendingIntent pi = PendingIntent.getBroadcast(
+                    c, nextItem.id, i, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            try {
+                setAlarm(c, am, nextItem.at, pi);
+                Log.d(TAG, "تمت جدولة الصلاة القادمة بنجاح: " + nextItem.prayer);
+            } catch (Exception e) {
+                Log.e(TAG, "فشل في جدولة الصلاة القادمة", e);
+            }
+        }
+    }
+
     static void scheduleTest(Context c, int seconds, String file, float volume) {
         AlarmManager am = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
         if (am == null) return;

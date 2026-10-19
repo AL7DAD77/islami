@@ -3,7 +3,6 @@ import type { Metadata } from 'next'
 import { PageHeader } from '@/components/page-header'
 import { SurahList } from '@/components/quran/surah-list'
 import { getSurahList } from '@/lib/quran'
-import { LastPlayedCard } from '@/components/quran/last-played-card'
 import { DownloadAll } from '@/components/quran/download-all'
 import { BookmarksCard } from '@/components/quran/bookmarks-card'
 import { TileLink } from '@/components/ui-kit'
@@ -13,17 +12,20 @@ export const metadata: Metadata = { title: 'القرآن الكريم | إسلا
 
 export default async function QuranPage() {
   const surahs = await getSurahList()
+  
   return (
-    <>
-      <PageHeader title="القرآن الكريم" subtitle="بالرسم العثماني مع تلاوات أشهر القراء" action={<SearchButton />} />
+    <div className="container mx-auto px-3 py-2 max-w-4xl space-y-4" dir="rtl">
+      <PageHeader 
+        title="القرآن الكريم" 
+        subtitle="بالرسم العثماني مع تلاوات أشهر القراء" 
+        action={<SearchButton />} 
+      />
 
-      {/* متابعة الاستماع والقراءة والعلامات: تظهر فقط عند وجودها */}
-      <div className="mb-4 flex flex-col gap-2.5 empty:hidden">
-        <LastPlayedCard />
+      <div className="empty:hidden">
         <BookmarksCard />
       </div>
 
-      <div className="mb-4 grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3">
         <TileLink
           tone="primary"
           href="/quran/wird"
@@ -39,24 +41,25 @@ export default async function QuranPage() {
         />
       </div>
 
-      {/* التنزيل للاستخدام دون إنترنت: مطوي حتى لا يزاحم القائمة */}
-      <details className="group mb-5 rounded-2xl bg-card shadow-sm ring-1 ring-border">
-        <summary className="flex cursor-pointer list-none items-center gap-3 p-3.5 [&::-webkit-details-marker]:hidden">
-          <span className="flex size-9 items-center justify-center rounded-xl bg-accent text-accent-foreground">
+      <details className="group rounded-2xl bg-card shadow-sm ring-1 ring-border overflow-hidden transition-all">
+        <summary className="flex cursor-pointer list-none items-center gap-3 p-3.5 hover:bg-accent/50 [&::-webkit-details-marker]:hidden">
+          <span className="flex size-9 items-center justify-center rounded-xl bg-accent text-accent-foreground shrink-0">
             <Download className="size-4" aria-hidden="true" />
           </span>
-          <span className="flex-1 text-sm font-bold">{'حفظ القرآن للقراءة دون إنترنت'}</span>
+          <span className="flex-1 text-sm font-bold">حفظ القرآن للقراءة دون إنترنت</span>
           <ChevronDown
-            className="size-4 text-muted-foreground transition-transform group-open:rotate-180"
+            className="size-4 text-muted-foreground transition-transform group-open:rotate-180 shrink-0"
             aria-hidden="true"
           />
         </summary>
-        <div className="px-3.5 pb-3.5">
+        <div className="px-3.5 pb-3.5 pt-1 border-t border-border/50">
           <DownloadAll />
         </div>
       </details>
 
-      <SurahList surahs={surahs} />
-    </>
+      <div className="pt-2">
+        <SurahList surahs={surahs} />
+      </div>
+    </div>
   )
 }

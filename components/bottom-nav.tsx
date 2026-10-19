@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import { BookOpen, Clock, Compass, LayoutGrid, Sparkles, Baby } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-// also: صفحات فرعية تتبع هذا القسم (لتبقى أيقونته مضيئة)
+// صفحات فرعية تتبع هذا القسم (لتبقى أيقونته مضيئة)
 const ITEMS = [
   { href: '/prayer', label: 'الصلاة', icon: Clock, also: ['/calendar'] },
   { href: '/quran', label: 'القرآن', icon: BookOpen, also: [] as string[] },
@@ -32,9 +32,16 @@ export function BottomNav() {
             <li key={href} className="flex-1">
               <Link
                 href={href}
+                scroll={false}
+                onClick={(e) => {
+                  // إذا كان المستخدم يضغط على أيقونة الصفحة التي يقف عليها بالفعل، يمنع إعادة التحميل لضمان استمرار الصوت
+                  if (pathname === href) {
+                    e.preventDefault()
+                  }
+                }}
                 aria-current={active ? 'page' : undefined}
                 className={cn(
-                  'flex flex-col items-center gap-0.5 py-2 text-[10px] transition-all duration-200',
+                  'flex flex-col items-center gap-0.5 py-2 text-[10px] transition-all duration-200 select-none',
                   active ? 'text-gold' : 'text-muted-foreground hover:text-foreground',
                 )}
               >

@@ -14,6 +14,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.IBinder;
 import android.os.PowerManager;
+import android.util.Log;
 
 import androidx.annotation.Nullable;
 import androidx.core.app.ServiceCompat;
@@ -23,6 +24,7 @@ import androidx.core.app.ServiceCompat;
  * فيعمل الأذان كاملاً حتى لو كان التطبيق مغلقاً.
  */
 public class AdhanService extends Service {
+    private static final String TAG = "AdhanService";
     static final String ACTION_STOP = "com.alhaddad.islami.ACTION_STOP_ADHAN";
     private static final String ASSET_DIR = "public/audio/adhans/";
 
@@ -41,7 +43,10 @@ public class AdhanService extends Service {
         String title = intent != null ? intent.getStringExtra("title") : null;
         String body = intent != null ? intent.getStringExtra("body") : null;
         String file = intent != null ? intent.getStringExtra("file") : null;
+        
+        // استقبال مستوى الصوت من الـ React (القيمة الافتراضية 0.9)
         float volume = intent != null ? intent.getFloatExtra("volume", 0.9f) : 0.9f;
+        
         if (title == null) title = "حان وقت الأذان";
         if (body == null) body = "";
 
@@ -94,7 +99,12 @@ public class AdhanService extends Service {
                 mp.setDataSource(getApplicationContext(), fallback);
             }
 
+            // ضبط مستوى الصوت بناءً على القيمة القادمة من التطبيق
             mp.setVolume(volume, volume);
+            
+            // ⚠️ هذا السطر الهام يسمح لأزرار الصوت الجانبية في الهاتف بالتحكم في صوت الأذان
+           // setVolumeControlStream(AudioManager.STREAM_ALARM);
+
             mp.setOnCompletionListener(m -> finishPlayback());
             mp.setOnErrorListener((m, what, extra) -> {
                 finishPlayback();
@@ -153,8 +163,17 @@ public class AdhanService extends Service {
         abandonFocus();
         stopForeground(STOP_FOREGROUND_REMOVE);
         stopSelf();
+        
         // بعد انتهاء الأذان يُحدَّث الإشعار الدائم إلى الصلاة التالية
         NotificationHelper.updatePersistent(getApplicationContext());
+        
+        // ⚠️ الأهم: إعادة جدولة الصلاة القادمة بعد انتهاء الأذان تلقائياً أو إيقافه
+        try {
+            // تأكد من أن هذا الكلاس موجود في مشروعك ويحتوي على هذه الدالة
+            AdhanScheduler.scheduleNextAdhan(getApplicationContext());
+        } catch (Exception e) {
+            Log.e(TAG, "خطأ في إعادة جدولة الأذان القادم", e);
+        }
     }
 
     @Override

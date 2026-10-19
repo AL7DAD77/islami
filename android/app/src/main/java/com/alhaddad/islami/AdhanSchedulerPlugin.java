@@ -50,7 +50,10 @@ public class AdhanSchedulerPlugin extends Plugin {
             }
         }
 
-        AdhanStore.save(c, items, persistent == null || persistent, city);
+        // تصحيح الخطأ هنا (استخدام ? بدلاً من ||)
+        boolean isPersistent = persistent == null ? true : persistent;
+        AdhanStore.save(c, items, isPersistent, city);
+
         NotificationHelper.ensureChannels(c);
         int n = AdhanScheduler.scheduleAll(c);
         NotificationHelper.updatePersistent(c);
@@ -90,7 +93,8 @@ public class AdhanSchedulerPlugin extends Plugin {
     public void setPersistent(PluginCall call) {
         Context c = getContext();
         Boolean enabled = call.getBoolean("enabled", true);
-        AdhanStore.setPersistent(c, enabled == null || enabled);
+        boolean isEnabled = enabled == null ? true : enabled;
+        AdhanStore.setPersistent(c, isEnabled);
         NotificationHelper.updatePersistent(c);
         call.resolve();
     }
@@ -117,6 +121,41 @@ public class AdhanSchedulerPlugin extends Plugin {
                 file,
                 volume == null ? 0.9f : volume.floatValue());
         call.resolve();
+    }
+
+    @PluginMethod
+    public void requestIgnoreBatteryOptimizations(PluginCall call) {
+        Context c = getContext();
+        try {
+            android.os.PowerManager pm = (android.os.PowerManager) c.getSystemService(Context.POWER_SERVICE);
+            if (pm != null && !pm.isIgnoringBatteryOptimizations(c.getPackageName())) {
+                Intent intent = new Intent();
+                intent.setAction(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+                intent.setData(Uri.parse("package:" + c.getPackageName()));
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                c.startActivity(intent);
+            }
+        } catch (Exception e) {
+            // في حال رفض النظام أو حدوث خطأ
+        }
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void checkBatteryOptimization(PluginCall call) {
+        Context c = getContext();
+        boolean isIgnored = false;
+        try {
+            android.os.PowerManager pm = (android.os.PowerManager) c.getSystemService(Context.POWER_SERVICE);
+            if (pm != null) {
+                isIgnored = pm.isIgnoringBatteryOptimizations(c.getPackageName());
+            }
+        } catch (Exception e) {
+            // تجاهل
+        }
+        JSObject ret = new JSObject();
+        ret.put("isIgnored", isIgnored);
+        call.resolve(ret);
     }
 
     @PluginMethod

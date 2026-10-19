@@ -17,6 +17,9 @@ const BUZZ_DONE = [30, 50, 30]
 const BUZZ_NEXT = [120]
 const BUZZ_CATEGORY = [150, 100, 150, 100, 150]
 
+// النص الذي سنبحث عنه لفصل السور
+const BASMALA_TEXT = 'بسم الله الرحمن الرحيم'
+
 function vibrate(pattern: number | number[]) {
   try {
     if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
@@ -37,6 +40,37 @@ function moveToElement(element: HTMLElement | null) {
   } catch {
     element.scrollIntoView(true)
   }
+}
+
+// دالة جديدة لتنسيق النص وفصل المعوذات
+function formatDhikrText(text: string, fontSize: number) {
+  // التحقق مما إذا كان النص يحتوي على البسملة مكررة (أكثر من مرة)
+  if (text.includes(BASMALA_TEXT) && text.split(BASMALA_TEXT).length > 2) {
+    // تقسيم النص بناءً على البسملة
+    const parts = text.split(BASMALA_TEXT).filter((p) => p.trim() !== '');
+    
+    return (
+      <div className="flex flex-col gap-3">
+        {parts.map((part, idx) => (
+          <div key={idx} className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-4 dark:border-emerald-900/30 dark:bg-emerald-950/20">
+            <p className="mb-2 text-center font-quran text-emerald-700 dark:text-emerald-400" style={{ fontSize: fontSize - 2 }}>
+              {BASMALA_TEXT}
+            </p>
+            <p className="font-quran leading-loose" style={{ fontSize }}>
+              {part.trim()}
+            </p>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // العرض الافتراضي إذا لم تكن معوذات
+  return (
+    <p className="font-quran leading-loose" style={{ fontSize }}>
+      {text}
+    </p>
+  );
 }
 
 export function DhikrList({
@@ -83,7 +117,6 @@ export function DhikrList({
     return timer
   }, [])
 
-  // تحميل الإعدادات قبل السماح بحفظها.
   useEffect(() => {
     try {
       const savedFont = Number(localStorage.getItem(FONT_KEY))
@@ -162,7 +195,6 @@ export function DhikrList({
 
     const toolbarHeight = toolbarRef.current?.getBoundingClientRect().height ?? 100
 
-    // مسافة أعلى البطاقة حتى لا يغطيها شريط التحكم.
     element.style.scrollMarginTop = `${Math.ceil(toolbarHeight + 24)}px`
 
     moveToElement(element)
@@ -183,7 +215,6 @@ export function DhikrList({
         : (current[itemIndex] ?? 0),
     )
 
-    // تحديث المرجع فورًا حتى لا تعتمد الضغطات السريعة على قيمة قديمة.
     countsRef.current = next
     setCounts(next)
 
@@ -204,10 +235,8 @@ export function DhikrList({
     if (!autoScrollRef.current) return
 
     later(() => {
-      // احترام إلغاء الخيار أثناء فترة الانتظار.
       if (!autoScrollRef.current) return
 
-      // إعادة حساب الهدف من أحدث قيم العدادات.
       const target = nextIncomplete(index, countsRef.current)
 
       if (target >= 0) {
@@ -237,7 +266,6 @@ export function DhikrList({
     setAutoScroll(enabled)
   }
 
-  // الانتقال إلى القسم التالي.
   const goNext = useCallback(() => {
     if (!nextHref) return
 
@@ -245,7 +273,6 @@ export function DhikrList({
     router.push(nextHref)
   }, [nextHref, router])
 
-  // إبقاء مؤقت القسم مستقلاً عن تغير مرجع دالة التنقل.
   const goNextRef = useRef(goNext)
 
   useEffect(() => {
@@ -286,9 +313,7 @@ export function DhikrList({
   ])
 
   const share = async (dhikr: Dhikr) => {
-    const text = `${dhikr.text}
-
-${dhikr.source}`
+    const text = `${dhikr.text}\n\n${dhikr.source}`
 
     try {
       if (navigator.share) {
@@ -375,12 +400,8 @@ ${dhikr.source}`
               className="block w-full p-5 text-right"
               aria-label={`اضغط للعد: ${toArabicNumber(count)} من ${toArabicNumber(dhikr.count)}`}
             >
-              <p
-                className="font-quran leading-loose"
-                style={{ fontSize: pinch.size }}
-              >
-                {dhikr.text}
-              </p>
+              {/* استدعاء دالة التنسيق الجديدة هنا بدلاً من <p> المباشر */}
+              {formatDhikrText(dhikr.text, pinch.size)}
 
               {dhikr.note && (
                 <p className="mt-3 rounded-xl bg-accent/60 p-3 text-sm leading-relaxed text-accent-foreground">
@@ -445,7 +466,7 @@ ${dhikr.source}`
                 {autoScroll && !cancelledNext
                   ? `الانتقال إلى «${nextTitle}» بعد ${toArabicNumber(secondsLeft)} ثوانٍ`
                   : `القسم التالي: ${nextTitle}`}
-              </p>
+                </p>
 
               <div className="flex w-full gap-2">
                 <button

@@ -1,19 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-import useSWR from 'swr'
-import { CheckCircle2, ChevronLeft, ChevronRight, Flame, Loader2 } from 'lucide-react'
-import type { Ayah } from '@/lib/quran'
-import { stripBasmala, toArabicNumber } from '@/lib/quran'
+import { CheckCircle2, ChevronLeft, ChevronRight, Flame } from 'lucide-react'
+import { MushafPageView } from '@/components/mushaf/mushaf-page'
+import { toArabicNumber } from '@/lib/quran'
 import { useHydrated, useSettings } from '@/lib/settings'
 import { cn } from '@/lib/utils'
 
 const TOTAL_PAGES = 604
-const fetcher = (url: string) =>
-  fetch(url)
-    .then((r) => r.json())
-    .then((j) => j.data.ayahs as Ayah[])
-
 const todayKey = () => new Date().toISOString().slice(0, 10)
 
 export function DailyWird() {
@@ -22,11 +16,8 @@ export function DailyWird() {
   const { wird } = settings
   const [viewPage, setViewPage] = useState<number | null>(null)
   const page = viewPage ?? wird.currentPage
-  const { data, isLoading, error } = useSWR(
-    hydrated ? `https://api.alquran.cloud/v1/page/${page}/quran-uthmani` : null,
-    fetcher,
-    { revalidateOnFocus: false },
-  )
+  // اسم سورة الصفحة المعروضة (يأتي من مكوّن المصحف بعد تحميلها)
+  const [surahName, setSurahName] = useState<string | null>(null)
 
   if (!hydrated) return <div className="h-96 animate-pulse rounded-3xl bg-card" aria-hidden="true" />
 
@@ -84,7 +75,7 @@ export function DailyWird() {
         </div>
       </section>
 
-      <article className="rounded-3xl bg-card p-5 shadow-sm ring-1 ring-border sm:p-8">
+      <article className="rounded-3xl bg-card p-3 shadow-sm ring-1 ring-border sm:p-8">
         <div className="mb-4 flex items-center justify-between">
           <button
             type="button"
@@ -97,7 +88,7 @@ export function DailyWird() {
           </button>
           <p className="text-sm font-medium text-muted-foreground">
             {`صفحة ${toArabicNumber(page)}`}
-            {data?.[0]?.surah && ` · ${data[0].surah.name}`}
+            {surahName && ` · سورة ${surahName}`}
           </p>
           <button
             type="button"
@@ -109,30 +100,8 @@ export function DailyWird() {
             <ChevronLeft className="size-4" />
           </button>
         </div>
-        {isLoading ? (
-          <div className="flex justify-center py-16">
-            <Loader2 className="size-6 animate-spin text-primary" aria-label="جارِ التحميل" />
-          </div>
-        ) : error || !data ? (
-          <p className="py-10 text-center text-sm text-muted-foreground">{'تعذر تحميل الصفحة، تحقق من الاتصال بالإنترنت.'}</p>
-        ) : (
-          <p className="text-justify font-quran leading-[2.3]" style={{ fontSize: settings.quranFontSize }}>
-            {data.map((a) => (
-              <span key={a.number}>
-                {a.numberInSurah === 1 && a.surah && (
-                  <span className="my-4 block text-center text-2xl text-primary">
-                    {a.surah.name}
-                    {a.surah.number !== 1 && a.surah.number !== 9 && (
-                      <span className="mt-2 block">{'بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ'}</span>
-                    )}
-                  </span>
-                )}
-                {stripBasmala(a.text.replace('\ufeff', ''), a.surah?.number ?? 0, a.numberInSurah)}
-                <span className="ayah-marker mx-1 whitespace-nowrap">{`﴿${toArabicNumber(a.numberInSurah)}﴾`}</span>{' '}
-              </span>
-            ))}
-          </p>
-        )}
+        {/* صفحة المصحف بنص QPC Hafs وخط KFGQPC: الضبط نفسه الذي في المصحف الأساسي */}
+        <MushafPageView page={page} onSurah={setSurahName} />
       </article>
 
       <button

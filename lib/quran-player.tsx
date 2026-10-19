@@ -129,6 +129,7 @@ export function QuranPlayerProvider({
   children: ReactNode
 }) {
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const currentUrlRef = useRef<string>('')
 
   const [surah, setSurah] = useState<number | null>(null)
   const [surahName, setSurahName] = useState('')
@@ -221,13 +222,6 @@ export function QuranPlayerProvider({
 
       if (state.error && state.error !== lastErrorRef.current) {
         console.error('Quran native playback error:', state.error)
-
-        window.alert(
-          `تعذر استمرار تشغيل القرآن.
-${state.error}
-` +
-          'احتفظ بصورة لهذه الرسالة للمساعدة في التشخيص.',
-        )
       }
 
       lastErrorRef.current = state.error || ''
@@ -248,20 +242,6 @@ ${state.error}
         }
       } catch (error) {
         console.error('Quran native command failed:', error)
-
-        if (
-          mountedRef.current &&
-          version === commandVersionRef.current
-        ) {
-          setLoading(false)
-          setPlaying(false)
-
-          window.alert(
-            'تعذر الاتصال بمشغّل القرآن الأصلي. ' +
-            'تأكد من تثبيت نسخة التطبيق الجديدة، ' +
-            'وأرسل رسالة الخطأ الظاهرة في سجل البناء إن وجدت.',
-          )
-        }
       } finally {
         busyRef.current -= 1
       }
@@ -272,79 +252,47 @@ ${state.error}
   useEffect(() => {
     mountedRef.current = true
 
-    if (nativePlayerAvailable()) {
-      console.info('Quran playback engine: Android Media3')
+    if (!audioRef.current) {
+      const audio = new Audio()
+      audio.preload = 'auto'
+      audio.dataset.quran = 'true'
+      audio.loop = repeatRef.current
 
-      return () => {
-        mountedRef.current = false
+      audio.onplaying = () => {
+        if (!mountedRef.current) return
+        setPlaying(true)
+        setLoading(false)
       }
-    }
 
-    console.info('Quran playback engine: HTML Audio')
-
-    const audio = new Audio()
-    audio.preload = 'none'
-    audio.dataset.quran = 'true'
-    audio.loop = repeatRef.current
-
-    audio.onplaying = () => {
-      if (!mountedRef.current) return
-
-      setPlaying(true)
-      setLoading(false)
-    }
-
-    audio.onpause = () => {
-      if (!mountedRef.current) return
-
-      setPlaying(false)
-      setLoading(false)
-    }
-
-    audio.onwaiting = () => {
-      if (mountedRef.current) setLoading(true)
-    }
-
-    audio.onended = () => {
-      if (!mountedRef.current) return
-
-      setPlaying(false)
-      setLoading(false)
-      setProgress(0)
-    }
-
-    audio.onerror = () => {
-      if (!mountedRef.current) return
-
-      setPlaying(false)
-      setLoading(false)
-      console.error('Quran web audio failed:', audio.error)
-    }
-
-    audio.ontimeupdate = () => {
-      if (!mountedRef.current) return
-
-      if (Number.isFinite(audio.duration) && audio.duration > 0) {
-        setProgress((audio.currentTime / audio.duration) * 100)
+      audio.onpause = () => {
+        if (!mountedRef.current) return
       }
-    }
 
-    audioRef.current = audio
+      audio.onended = () => {
+        if (!mountedRef.current) return
+        setPlaying(false)
+        setLoading(false)
+        setProgress(0)
+      }
+
+      audio.onerror = () => {
+        if (!mountedRef.current) return
+        setPlaying(false)
+        setLoading(false)
+      }
+
+      audio.ontimeupdate = () => {
+        if (!mountedRef.current) return
+        if (Number.isFinite(audio.duration) && audio.duration > 0) {
+          setProgress((audio.currentTime / audio.duration) * 100)
+        }
+      }
+
+      audioRef.current = audio
+    }
 
     return () => {
       mountedRef.current = false
-      audioRef.current = null
-
-      audio.onplaying = null
-      audio.onpause = null
-      audio.onwaiting = null
-      audio.onended = null
-      audio.onerror = null
-      audio.ontimeupdate = null
-
-      audio.pause()
-      audio.removeAttribute('src')
-      audio.load()
     }
   }, [])
 
@@ -388,7 +336,7 @@ ${state.error}
 
     const interval = window.setInterval(() => {
       void sync()
-    }, 1000)
+    }, 2000)
 
     document.addEventListener('visibilitychange', onVisible)
 
@@ -400,6 +348,9 @@ ${state.error}
   }, [applyNativeState])
 
   const stop = useCallback(() => {
+    // تتبع مصدر إيقاف المشغل لمعرفة ما إذا كانت أيقونة أخرى هي من تستدعيه
+    console.warn('Quran stop() called from:', new Error().stack)
+
     if (nativePlayerAvailable()) {
       setPlaying(false)
       setLoading(false)
@@ -464,6 +415,11 @@ ${state.error}
     selectedReciter: Reciter,
     server: string,
   ) => {
+    // فحص بيئة التشغيل للتحقق من المسار الفعلي (كما اقترح صديقك)
+    console.log('platform:', Capacitor.getPlatform())
+    console.log('plugin available:', Capacitor.isPluginAvailable('QuranPlayer'))
+    console.log('native branch:', nativePlayerAvailable())
+
     const selection: Selection = {
       surah: number,
       surahName: name,
@@ -510,11 +466,16 @@ ${state.error}
 
     const resolvedUrl = new URL(url, window.location.href).href
 
-    if (audio.src !== resolvedUrl) {
+    // المقارنة الدقيقة باستخدام الـ Ref لتجنب إعادة ضبط الـ src بالخطأ
+    if (currentUrlRef.current !== resolvedUrl) {
+      currentUrlRef.current = resolvedUrl
       audio.src = url
       setProgress(0)
-    } else if (audio.ended) {
-      audio.currentTime = 0
+      audio.load()
+    } else if (audio.paused) {
+      setLoading(false)
+      void audio.play().catch(() => {})
+      return
     }
 
     audio.loop = repeatRef.current
@@ -551,6 +512,7 @@ ${state.error}
       })
     } else {
       audio.pause()
+      setPlaying(false)
     }
   }
 

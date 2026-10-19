@@ -6,6 +6,8 @@ export interface SurahMeta {
   revelationType: 'Meccan' | 'Medinan'
 }
 
+export type Surah = SurahMeta;
+
 export interface Ayah {
   number: number
   text: string

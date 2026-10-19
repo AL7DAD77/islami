@@ -3,7 +3,7 @@ import { PageHeader } from '@/components/page-header'
 import { LessonList } from '@/components/learn/lesson-list'
 import { MUSLIM_GUIDE } from '@/lib/learn'
 
-export const metadata: Metadata = { title: 'دليل المسلم | نور' }
+export const metadata: Metadata = { title: 'دليل المسلم | إسلامي' }
 
 export default function GuidePage() {
   return (

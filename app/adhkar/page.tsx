@@ -7,7 +7,7 @@ import { SearchButton } from '@/components/search-button'
 import { ADHKAR, ADHKAR_GROUPS } from '@/lib/adhkar'
 import { toArabicNumber } from '@/lib/quran'
 
-export const metadata: Metadata = { title: 'الأذكار والأدعية | نور' }
+export const metadata: Metadata = { title: 'الأذكار والأدعية | إسلامي' }
 
 export default function AdhkarPage() {
   const hisn = ADHKAR.filter((c) => c.group === 'hisn')

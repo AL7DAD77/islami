@@ -48,6 +48,25 @@ export default function AboutPage() {
           </div>
 
 
+          <div className="rounded-2xl border border-zinc-200 p-5 dark:border-zinc-800">
+            <h2 className="mb-2 font-semibold text-zinc-800 dark:text-zinc-100">
+              📚 مصادر المحتوى
+            </h2>
+            <p>
+              <strong>المصحف بصفحاته:</strong> الخط KFGQPC HAFS Uthmanic Script (الإصدار 2.2) من مجمع
+              الملك فهد لطباعة المصحف الشريف بالمدينة المنورة، وحقوقه محفوظة للمجمع، ويُستخدم دون أي
+              تعديل وفق ترخيصه المجاني المرفق مع الخط. ونص المصحف وتخطيط صفحاته (١٥ سطراً) من مكتبة
+              Quranic Universal Library (QUL) من Tarteel.
+            </p>
+            <p className="mt-2">
+              <strong>حصن المسلم:</strong> نصوصه من كتاب «حصن المسلم من أذكار الكتاب والسنة» لسعيد بن علي
+              بن وهف القحطاني، عبر ملف JSON منشور على GitHub بواسطة rn0x (مستودع Adhkar-json)، وصاحب
+              الملف يتيح استخدامه مجاناً. حقوق الكتاب لمؤلفه. ولم يتضمن المصدر تخريج الأحاديث، ونوصي
+              بمراجعة الأذكار مع أهل العلم.
+            </p>
+            <p className="mt-2">وإن لاحظت خطأً في أي نص فنرجو إبلاغنا.</p>
+          </div>
+
           <div>
             <h2 className="mb-2 text-lg font-semibold text-zinc-800 dark:text-zinc-100">
               📬 تواصل معنا

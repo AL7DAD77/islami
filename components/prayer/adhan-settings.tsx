@@ -1,12 +1,15 @@
 'use client'
 
-import { useState } from 'react'
-import { Volume2, Check, Play, Square } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Volume2, Check, Play, Square, BatteryWarning, ShieldCheck } from 'lucide-react'
 import { useSettings, type PrayerKey } from '@/lib/settings'
 import { ADHAN_VOICES, getAdhanVoice, voiceIdFor } from '@/lib/adhan-list'
 import { PRAYER_NAMES, PRAYER_ORDER } from '@/lib/prayer'
+import { registerPlugin } from '@capacitor/core'
 
-// ⚠️ صوت معاينة واحد فقط في كل الصفحة (يبقى عبر تغيير الصفحات)
+// تعريف الإضافة للتواصل مع الجافا
+const AdhanScheduler = registerPlugin<any>('AdhanScheduler')
+
 let previewAudio: HTMLAudioElement | null = null
 let previewId: string | null = null
 
@@ -22,13 +25,52 @@ function stopPreview() {
 export function AdhanSettings() {
   const [settings, update] = useSettings()
   const [playingId, setPlayingId] = useState<string | null>(previewId)
+  const [volume, setVolume] = useState<number>(70)
+  const [batteryIgnored, setBatteryIgnored] = useState<boolean>(true) // افتراضي true حتى نتأكد
+
+  // استرجاع مستوى الصوت وحالة البطارية
+  useEffect(() => {
+    const savedVolume = localStorage.getItem('adhan_volume')
+    if (savedVolume !== null) {
+      setVolume(Number(savedVolume))
+    }
+
+    // فحص حالة البطارية من الأندرويد
+    const checkBattery = async () => {
+      try {
+        const res = await AdhanScheduler.checkBatteryOptimization()
+        setBatteryIgnored(res.isIgnored)
+      } catch (e) {
+        console.log("ليست في بيئة أندرويد", e)
+      }
+    }
+    checkBattery()
+  }, [])
+
+  const handleVolumeChange = (newVolume: number) => {
+    setVolume(newVolume)
+    localStorage.setItem('adhan_volume', String(newVolume))
+    if (previewAudio) previewAudio.volume = newVolume / 100
+  }
+
+  const requestBatteryPermission = async () => {
+    try {
+      await AdhanScheduler.requestIgnoreBatteryOptimizations()
+      // سنقوم بتحديث الحالة بعد ثانية (لأن المستخدم قد يستغرق وقتاً في الشاشة)
+      setTimeout(async () => {
+        const res = await AdhanScheduler.checkBatteryOptimization()
+        setBatteryIgnored(res.isIgnored)
+      }, 1000)
+    } catch (e) {
+      console.log(e)
+    }
+  }
 
   const setPlaying = (id: string | null) => setPlayingId(id)
 
   const preview = (id: string) => {
     const voice = getAdhanVoice(id)
     if (!voice) return
-    // نفس الصوت يعمل ثم يتوقف عند الضغط عليه مجدداً
     if (previewId === id) {
       stopPreview()
       setPlaying(null)
@@ -36,25 +78,21 @@ export function AdhanSettings() {
     }
     stopPreview()
     const audio = new Audio(`/audio/adhans/${voice.file}`)
-    audio.volume = 0.5
+    audio.volume = volume / 100
     audio.onended = () => {
       previewAudio = null
       previewId = null
       setPlaying(null)
     }
-    audio
-      .play()
-      .then(() => {
-        previewAudio = audio
-        previewId = id
-        setPlaying(id)
-      })
-      .catch(() => {
-        // الملف غير موجود (مثل تنبيه التكبيرتين قبل وضعه) أو تعذّر التشغيل
-        previewAudio = null
-        previewId = null
-        setPlaying(null)
-      })
+    audio.play().then(() => {
+      previewAudio = audio
+      previewId = id
+      setPlaying(id)
+    }).catch(() => {
+      previewAudio = null
+      previewId = null
+      setPlaying(null)
+    })
   }
 
   const setPrayerVoice = (prayer: PrayerKey, id: string) => {
@@ -73,6 +111,63 @@ export function AdhanSettings() {
 
   return (
     <div className="flex flex-col gap-6">
+      
+      {/* ============ إذن البطارية (جديد) ============ */}
+      {!batteryIgnored && (
+        <section className="rounded-2xl border-2 border-amber-200 bg-amber-50 p-4 dark:border-amber-900/50 dark:bg-amber-950/30">
+          <div className="flex items-start gap-3">
+            <BatteryWarning className="mt-0.5 size-6 shrink-0 text-amber-600 dark:text-amber-500" />
+            <div className="flex-1">
+              <h3 className="font-bold text-amber-900 dark:text-amber-100">تفعيل العمل في الخلفية</h3>
+              <p className="mt-1 text-xs text-amber-800 dark:text-amber-200">
+                لكي يعمل الأذان في وقته تماماً ولا يتوقف عند إغلاق الشاشة، يرجى السماح للتطبيق بالعمل في الخلفية (تجاهل تحسين البطارية).
+              </p>
+              <button
+                type="button"
+                onClick={requestBatteryPermission}
+                className="mt-3 rounded-lg bg-amber-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-amber-700"
+              >
+                السماح بالعمل في الخلفية
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {batteryIgnored && (
+        <div className="flex items-center gap-2 rounded-xl bg-emerald-50 px-4 py-2 text-xs text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">
+          <ShieldCheck className="size-4" />
+          <span>التطبيق يعمل في الخلفية بشكل مثالي (الأذان مضمون).</span>
+        </div>
+      )}
+
+      {/* ============ مستوى الصوت ============ */}
+      <section aria-labelledby="volume-setting">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 id="volume-setting" className="text-sm font-bold text-muted-foreground flex items-center gap-2">
+            <Volume2 className="size-4" />
+            {'مستوى صوت الأذان'}
+          </h3>
+          <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+            {volume}%
+          </span>
+        </div>
+        <div className="rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+          <input 
+            type="range" 
+            min="0" 
+            max="100" 
+            value={volume} 
+            onChange={(e) => handleVolumeChange(Number(e.target.value))}
+            className="w-full accent-emerald-600 h-2 bg-zinc-200 rounded-lg appearance-none cursor-pointer dark:bg-zinc-700"
+          />
+          <div className="flex justify-between text-xs text-zinc-400 mt-2">
+            <span>صامت</span>
+            <span>عالي</span>
+          </div>
+        </div>
+      </section>
+
       {/* ============ أذان كل صلاة ============ */}
       <section aria-labelledby="per-prayer">
         <h3 id="per-prayer" className="mb-1 text-sm font-bold text-muted-foreground">
@@ -141,7 +236,7 @@ export function AdhanSettings() {
 
       {/* ============ الصوت الافتراضي ============ */}
       <section aria-labelledby="default-voice">
-        <div className="mb-3 rounded-2xl bg-gradient-to-l from-emerald-600 to-emerald-700 p-4 text-white shadow-md">
+        <div className="mb-3 rounded-2xl bg-linear-to-l from-emerald-600 to-emerald-700 p-4 text-white shadow-md">
           <div className="flex items-center gap-3">
             <div className="flex size-11 items-center justify-center rounded-full bg-white/20">
               <Volume2 className="size-5" aria-hidden="true" />

@@ -1,91 +1,96 @@
-'use client'
+'use client';
 
-import { useMemo, useState } from 'react'
-import { Check, Search, Star } from 'lucide-react'
-import type { Reciter } from '@/lib/quran'
-import { toArabicNumber } from '@/lib/quran'
-import { useHydrated, useSettings } from '@/lib/settings'
-import { cn } from '@/lib/utils'
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
-export function RecitersBrowser({ reciters }: { reciters: Reciter[] }) {
-  const [settings, update] = useSettings()
-  const hydrated = useHydrated()
-  const [query, setQuery] = useState('')
-  const [open, setOpen] = useState<number | null>(null)
+export function RecitersBrowser({ reciters }: { reciters: any[] }) {
+  const router = useRouter();
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const filtered = useMemo(() => {
-    const q = query.trim()
-    return q ? reciters.filter((r) => r.name.includes(q)) : reciters
-  }, [query, reciters])
+  // تصفية القراء بناءً على اسم القارئ أو الرواية
+  const filteredReciters = (reciters || []).filter((reciter) => {
+    const name = reciter?.name || reciter?.reciter_name || '';
+    const rewaya = reciter?.rewaya || reciter?.rewaya_name || '';
+    return (
+      name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      rewaya.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  });
 
-  const selectedId = hydrated ? (settings.reciterId ?? 123) : null
+  // دالة اختيار المقرئ وحفظه والتوجيه المباشر
+  const handleSelectReciter = (reciter: any) => {
+    // استخراج رابط السيرفر بأي صيغة متوفرة في API
+    const serverUrl =
+      reciter?.Server ||
+      reciter?.server ||
+      reciter?.moshaf?.[0]?.server ||
+      reciter?.server_url ||
+      'https://server8.mp3quran.net/afs/';
+
+    const reciterName = reciter?.name || reciter?.reciter_name || 'قارئ مختار';
+
+    // حفظ القارئ المختار في الذاكرة المحلية
+    localStorage.setItem('selected_reciter_server', serverUrl);
+    localStorage.setItem('selected_reciter_name', reciterName);
+
+    // الرجوع المباشر لصفحة المصحف والتلاوة
+    router.back();
+  };
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="relative">
-        <Search className="pointer-events-none absolute right-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-        <label htmlFor="reciter-search" className="sr-only">
-          {'ابحث عن قارئ'}
-        </label>
+    <div className="w-full flex flex-col gap-4" dir="rtl">
+      {/* شريط البحث */}
+      <div className="relative w-full">
         <input
-          id="reciter-search"
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder={`ابحث بين ${toArabicNumber(reciters.length)} قارئ`}
-          className="w-full rounded-2xl border bg-card py-3 pl-4 pr-11 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          type="text"
+          placeholder="ابحث باسم القارئ أو الرواية (مثل: العفاسي، المعيقلي...)..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full px-4 py-3 bg-[#241b16] border border-[#c5a059]/40 rounded-xl text-[#fbf8f0] placeholder-stone-400 focus:outline-none focus:border-[#c5a059] shadow-inner text-sm md:text-base text-right"
         />
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#c5a059]">🔍</span>
       </div>
-      <ul className="flex flex-col gap-2">
-        {filtered.map((r) => {
-          const selected = selectedId === r.id
-          const expanded = open === r.id
-          return (
-            <li key={r.id} className={cn('rounded-2xl bg-card shadow-sm ring-1 ring-border', selected && 'ring-2 ring-primary')}>
+
+      {/* قائمة القراء - بطاقات قابلة للنقر مباشرة */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[70vh] overflow-y-auto p-1">
+        {filteredReciters.length > 0 ? (
+          filteredReciters.map((reciter, index) => {
+            const name = reciter?.name || reciter?.reciter_name || 'قارئ';
+            const rewaya = reciter?.rewaya || reciter?.moshaf?.[0]?.name || 'حفص عن عاصم';
+
+            return (
               <button
                 type="button"
-                onClick={() => setOpen(expanded ? null : r.id)}
-                aria-expanded={expanded}
-                className="flex w-full items-center gap-3 p-4 text-right"
+                key={reciter?.id || index}
+                onClick={() => handleSelectReciter(reciter)}
+                className="w-full bg-[#241b16] border border-[#c5a059]/30 hover:border-[#c5a059] p-4 rounded-xl shadow-md cursor-pointer transition-all duration-200 hover:bg-[#2d221c] active:scale-[0.98] flex items-center justify-between text-right"
               >
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-secondary font-bold text-primary">
-                  {r.name.replace(/^(الشيخ|شيخ)\s*/, '').charAt(0)}
-                </span>
-                <span className="flex-1">
-                  <span className="flex items-center gap-1.5 font-medium">
-                    {r.name}
-                    {r.featured && <Star className="size-3.5 fill-gold text-gold" aria-label="من أشهر القراء" />}
+                <div className="flex flex-col gap-1 pointer-events-none">
+                  <h3 className="text-[#fbf8f0] font-bold text-base hover:text-amber-200 transition-colors">
+                    {name}
+                  </h3>
+                  <span className="text-xs text-[#c5a059] bg-[#1a1410] px-2 py-0.5 rounded-md w-fit border border-[#c5a059]/20">
+                    {rewaya}
                   </span>
-                  <span className="text-xs text-muted-foreground">{`${toArabicNumber(r.moshaf.length)} تلاوة`}</span>
-                </span>
-                {selected && <Check className="size-5 text-primary" aria-label="القارئ المختار" />}
+                </div>
+
+                <div className="flex items-center gap-2 pointer-events-none">
+                  <span className="text-xs text-stone-400 bg-black/30 px-2 py-1 rounded">
+                    مصحف مرتل
+                  </span>
+                  <span className="w-10 h-10 rounded-full bg-[#3a5a40] text-[#fbf8f0] flex items-center justify-center text-base shadow-sm">
+                    ▶
+                  </span>
+                </div>
               </button>
-              {expanded && (
-                <ul className="flex flex-col gap-1.5 border-t p-3">
-                  {r.moshaf.map((m) => {
-                    const active = selected && settings.reciterServer === m.server
-                    return (
-                      <li key={m.id}>
-                        <button
-                          type="button"
-                          onClick={() => update({ reciterId: r.id, reciterServer: m.server })}
-                          className={cn(
-                            'flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-right text-sm',
-                            active ? 'bg-primary text-primary-foreground' : 'bg-muted/60 hover:bg-muted',
-                          )}
-                        >
-                          <span>{m.name}</span>
-                          <span className="text-xs opacity-75">{`${toArabicNumber(m.surahs.length)} سورة`}</span>
-                        </button>
-                      </li>
-                    )
-                  })}
-                </ul>
-              )}
-            </li>
-          )
-        })}
-      </ul>
+            );
+          })
+        ) : (
+          <div className="col-span-full text-center py-12 text-stone-400">
+            لا توجد نتائج مطابقة لبحثك.
+          </div>
+        )}
+      </div>
     </div>
-  )
+  );
 }

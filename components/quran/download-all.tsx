@@ -1,54 +1,84 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Download, CheckCircle2, Loader2, AlertCircle } from 'lucide-react'
-import { getSurah } from '@/lib/quran'
+import { Download, CheckCircle2, Loader2 } from 'lucide-react'
+import { MUSHAF_CACHE, MUSHAF_FONT_URL, MUSHAF_PAGES, pageUrl } from '@/lib/mushaf'
 
-const SURAH_CACHE_PREFIX = 'quran-surah-'
-const TOTAL_SURAHS = 114
+// ما يحتاجه القارئ ليعمل: بيانات وصفية + فهرس الآيات + الخط + صفحات المصحف الـ٦٠٤
+const SUPPORT_FILES = ['/mushaf/meta.json', '/mushaf/ayah-index.json', MUSHAF_FONT_URL]
+const TOTAL_SURAHS = MUSHAF_PAGES // تُعرض كعدّاد صفحات
+
+/** عدد صفحات المصحف المحفوظة فعلاً في ذاكرة الجهاز. */
+async function countCachedPages(): Promise<number> {
+  if (typeof caches === 'undefined') return 0
+  const cache = await caches.open(MUSHAF_CACHE)
+  const keys = await cache.keys()
+  return keys.filter((r) => r.url.includes('/mushaf/pages/')).length
+}
 
 export function DownloadAll() {
   const [status, setStatus] = useState<'idle' | 'downloading' | 'done'>('idle')
   const [progress, setProgress] = useState(0)
   const [count, setCount] = useState(0)
 
-  // احسب عدد السور المحفوظة عند الفتح
+  const [supported, setSupported] = useState(true)
+
+  // احسب عدد الصفحات المحفوظة عند الفتح
   useEffect(() => {
-    let n = 0
-    for (let i = 1; i <= TOTAL_SURAHS; i++) {
-      if (localStorage.getItem(`${SURAH_CACHE_PREFIX}${i}`)) n++
+    if (typeof caches === 'undefined') {
+      setSupported(false)
+      return
     }
-    setCount(n)
-    if (n === TOTAL_SURAHS) setStatus('done')
+    countCachedPages()
+      .then((n) => {
+        setCount(n)
+        if (n === TOTAL_SURAHS) setStatus('done')
+      })
+      .catch(() => setSupported(false))
   }, [])
 
   const handleDownload = async () => {
     if (status === 'downloading') return
     setStatus('downloading')
     setProgress(0)
-    setCount(0)
 
-    let done = 0
-    for (let i = 1; i <= TOTAL_SURAHS; i++) {
-      if (localStorage.getItem(`${SURAH_CACHE_PREFIX}${i}`)) {
-        done++
-        setProgress(Math.round((done / TOTAL_SURAHS) * 100))
+    try {
+      const cache = await caches.open(MUSHAF_CACHE)
+
+      const save = async (url: string) => {
+        if (await cache.match(url)) return
+        try {
+          await cache.add(url)
+        } catch (e) {
+          console.warn(`فشل حفظ ${url}`, e)
+        }
+      }
+
+      for (const url of SUPPORT_FILES) await save(url)
+
+      // نحفظ الصفحات على دفعات صغيرة حتى لا نُثقل الشبكة
+      const BATCH = 8
+      for (let start = 1; start <= MUSHAF_PAGES; start += BATCH) {
+        const batch: Promise<void>[] = []
+        for (let p = start; p < start + BATCH && p <= MUSHAF_PAGES; p++) batch.push(save(pageUrl(p)))
+        await Promise.all(batch)
+
+        const done = Math.min(start + BATCH - 1, MUSHAF_PAGES)
+        setProgress(Math.round((done / MUSHAF_PAGES) * 100))
         setCount(done)
-        continue
       }
-      try {
-        const data = await getSurah(i)
-        localStorage.setItem(`${SURAH_CACHE_PREFIX}${i}`, JSON.stringify(data))
-      } catch (e) {
-        console.warn(`فشل تحميل السورة ${i}`, e)
-      }
-      done++
-      setProgress(Math.round((done / TOTAL_SURAHS) * 100))
-      setCount(done)
-    }
 
-    setStatus('done')
+      // لا نُعلن الاكتمال إلا بعد التأكد من حفظ كل الصفحات فعلاً
+      const saved = await countCachedPages()
+      setCount(saved)
+      setStatus(saved === MUSHAF_PAGES ? 'done' : 'idle')
+    } catch (e) {
+      console.warn('تعذر حفظ المصحف', e)
+      setStatus('idle')
+    }
   }
+
+  if (!supported) return null
 
   // ============ إذا مكتمل ============
   if (status === 'done') {
@@ -58,10 +88,10 @@ export function DownloadAll() {
           <CheckCircle2 className="size-6 text-emerald-600 dark:text-emerald-400" />
           <div className="flex-1">
             <p className="font-bold text-emerald-800 dark:text-emerald-300">
-              القرآن محفوظ بالكامل
+              صفحات المصحف محفوظة على جهازك
             </p>
             <p className="text-xs text-emerald-700 dark:text-emerald-400">
-              يعمل الآن بدون إنترنت ✅
+              تُقرأ الصفحات دون إنترنت ✅ (التلاوة الصوتية تحتاج إنترنت)
             </p>
           </div>
         </div>
@@ -101,10 +131,10 @@ export function DownloadAll() {
       <Download className="size-6 text-emerald-600 dark:text-emerald-400" />
       <div className="flex-1">
         <p className="font-bold text-zinc-800 dark:text-zinc-100">
-          تحميل القرآن كاملاً
+          تحميل المصحف كاملاً
         </p>
         <p className="text-xs text-zinc-500 dark:text-zinc-400">
-          يعمل بدون إنترنت · حجم صغير · {count}/{TOTAL_SURAHS} محفوظة
+          للقراءة دون إنترنت · نحو ٢ ميجابايت · {count}/{TOTAL_SURAHS} صفحة محفوظة
         </p>
       </div>
       <span className="text-xs text-zinc-400">←</span>
