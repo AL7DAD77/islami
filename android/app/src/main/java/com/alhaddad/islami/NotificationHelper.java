@@ -17,41 +17,31 @@ import java.util.Locale;
 
 public class NotificationHelper {
 
-    // معرفات إشعار الأذان
     public static final String CHANNEL_ID = "adhan_channel_id";
     public static final String CHANNEL_NAME = "أذان الصلاة";
     public static final int NOTIFICATION_ID = 1001;
     public static final int ID_PLAYING = 1002;
 
-    // معرفات الإشعار الدائم (الصلاة القادمة)
     public static final String PERSISTENT_CHANNEL_ID = "persistent_channel_id";
-    public static final String PERSISTENT_CHANNEL_NAME = "الصلاة القادمة";
+    public static final String PERSISTENT_CHANNEL_NAME = "مواقيت الصلاة";
     public static final int PERSISTENT_NOTIFICATION_ID = 9999;
 
-    // 1. إنشاء قنوات الإشعارات
     public static void createNotificationChannel(Context context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationManager manager = context.getSystemService(NotificationManager.class);
             if (manager == null) return;
 
-            // قناة الأذان (بصوت عالي)
             NotificationChannel adhanChannel = new NotificationChannel(
-                    CHANNEL_ID,
-                    CHANNEL_NAME,
-                    NotificationManager.IMPORTANCE_HIGH
+                    CHANNEL_ID, CHANNEL_NAME, NotificationManager.IMPORTANCE_HIGH
             );
-            adhanChannel.setDescription("إشعارات مواقيت الأذان");
             adhanChannel.setSound(null, null);
             adhanChannel.enableVibration(true);
             manager.createNotificationChannel(adhanChannel);
 
-            // قناة الإشعار الدائم (هادئة جداً ولا تصدر صوتاً)
             NotificationChannel persistentChannel = new NotificationChannel(
-                    PERSISTENT_CHANNEL_ID,
-                    PERSISTENT_CHANNEL_NAME,
-                    NotificationManager.IMPORTANCE_LOW
+                    PERSISTENT_CHANNEL_ID, PERSISTENT_CHANNEL_NAME, NotificationManager.IMPORTANCE_LOW
             );
-            persistentChannel.setDescription("يعرض الوقت المتبقي للصلاة القادمة");
+            persistentChannel.setDescription("يعرض الوقت المتبقي للصلاة القادمة والتاريخ الهجري");
             persistentChannel.setSound(null, null);
             persistentChannel.enableVibration(false);
             persistentChannel.setShowBadge(false);
@@ -63,30 +53,44 @@ public class NotificationHelper {
         createNotificationChannel(context);
     }
 
-    // 2. دالة تحديث الإشعار الدائم (الصلاة القادمة)
     public static void updatePersistent(Context context) {
         try {
             long now = System.currentTimeMillis();
             long nextTime = Long.MAX_VALUE;
             String nextPrayerName = "";
-
-            // البحث عن الصلاة القادمة من قاعدة البيانات
+            
+            // جلب الصلاة القادمة من المخزن
             for (AdhanStore.Item it : AdhanStore.load(context)) {
                 if (it.at > now && it.at < nextTime) {
                     nextTime = it.at;
-                    // نستخدم اسم الصلاة، وإذا لم يوجد نستخدم العنوان
                     nextPrayerName = it.prayer != null && !it.prayer.isEmpty() ? it.prayer : it.title;
                 }
             }
 
-            // إذا لم يتم العثور على صلاة قادمة، لا نعرض شيئاً
-            if (nextTime == Long.MAX_VALUE) return;
+            if (nextTime == Long.MAX_VALUE) return; // لا توجد صلاة قادمة
 
-            // تنسيق الوقت (مثال: 03:15 م)
+            // 1. التاريخ الهجري
+            android.icu.util.IslamicCalendar hijriCal = new android.icu.util.IslamicCalendar();
+            hijriCal.setTimeInMillis(now);
+            SimpleDateFormat hijriFormat = new SimpleDateFormat("d MMMM yyyy", new Locale("ar"));
+            hijriFormat.setCalendar(hijriCal);
+            String hijriDate = hijriFormat.format(new Date());
+
+            // 2. حساب العداد (موجب أو سالب)
+            long diff = nextTime - now;
+            boolean isUpcoming = diff > 0; // إذا كان الوقت لم يأت بعد (موجب)
+            
+            long hours = Math.abs(diff) / (1000 * 60 * 60);
+            long minutes = (Math.abs(diff) / (1000 * 60)) % 60;
+            long seconds = (Math.abs(diff) / 1000) % 60;
+            
+            String countdownText = String.format(Locale.getDefault(), "%02d:%02d:%02d", hours, minutes, seconds);
+            String sign = isUpcoming ? "+" : "-"; // موجب للصلاة القادمة، سالب للوقت المنقضي
+
+            // تنسيق وقت الصلاة
             SimpleDateFormat sdf = new SimpleDateFormat("hh:mm a", new Locale("ar"));
-            String timeString = sdf.format(new Date(nextTime));
+            String prayerTime = sdf.format(new Date(nextTime));
 
-            // Intent لفتح التطبيق عند الضغط على الإشعار
             Intent intent = new Intent(context, MainActivity.class);
             int flags = PendingIntent.FLAG_UPDATE_CURRENT;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -94,13 +98,18 @@ public class NotificationHelper {
             }
             PendingIntent pendingIntent = PendingIntent.getActivity(context, 0, intent, flags);
 
-            // بناء الإشعار الدائم
+            // بناء نص الإشعار
+            String titleText = "الصلاة القادمة: " + nextPrayerName;
+            String bodyText = "الوقت المتبقي: " + sign + countdownText + " | " + hijriDate;
+
             NotificationCompat.Builder builder = new NotificationCompat.Builder(context, PERSISTENT_CHANNEL_ID)
-                    .setContentTitle("الصلاة القادمة: " + nextPrayerName)
-                    .setContentText("موعد الأذان: " + timeString)
-                    .setSmallIcon(android.R.drawable.ic_lock_idle_alarm) // يمكنك تغييرها بأيقونة تطبيقك
-                    .setOngoing(true) // يمنع سحب الإشعار أو إخفاءه
+                    .setContentTitle(titleText)
+                    .setContentText(bodyText)
+                    .setStyle(new NotificationCompat.BigTextStyle().bigText(bodyText + "\nموعد الأذان: " + prayerTime))
+                    .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+                    .setOngoing(true) // يجعله ثابتاً لا يمكن سحبه
                     .setAutoCancel(false)
+                    .setOnlyAlertOnce(true) // لا يصدر صوتاً عند التحديث
                     .setPriority(NotificationCompat.PRIORITY_LOW)
                     .setContentIntent(pendingIntent);
 
@@ -114,15 +123,11 @@ public class NotificationHelper {
         }
     }
 
-    // 3. بناء إشعار الأذان العادي
     public static Notification buildPlaying(Context context, String title, String body) {
         Intent stopIntent = new Intent(context, AdhanReceiver.class);
         stopIntent.setAction("STOP_ADHAN_ACTION");
-        
         int flags = PendingIntent.FLAG_UPDATE_CURRENT;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            flags |= PendingIntent.FLAG_IMMUTABLE;
-        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) flags |= PendingIntent.FLAG_IMMUTABLE;
         PendingIntent stopPendingIntent = PendingIntent.getBroadcast(context, 0, stopIntent, flags);
 
         Intent openAppIntent = new Intent(context, MainActivity.class);
@@ -130,40 +135,32 @@ public class NotificationHelper {
         PendingIntent openAppPendingIntent = PendingIntent.getActivity(context, 0, openAppIntent, flags);
 
         return new NotificationCompat.Builder(context, CHANNEL_ID)
-                .setContentTitle(title)
-                .setContentText(body)
+                .setContentTitle(title).setContentText(body)
                 .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
                 .setPriority(NotificationCompat.PRIORITY_MAX)
                 .setCategory(NotificationCompat.CATEGORY_ALARM)
-                .setOngoing(true)
-                .setAutoCancel(false)
+                .setOngoing(true).setAutoCancel(false)
                 .setContentIntent(openAppPendingIntent)
                 .addAction(android.R.drawable.ic_media_pause, "إيقاف الأذان", stopPendingIntent)
                 .build();
     }
 
-    // 4. دالة التذكير
     public static void showReminder(Context context, int id, String title, String body) {
         Intent intent = new Intent(context, MainActivity.class);
         int flags = PendingIntent.FLAG_UPDATE_CURRENT;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            flags |= PendingIntent.FLAG_IMMUTABLE;
-        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) flags |= PendingIntent.FLAG_IMMUTABLE;
         PendingIntent pendingIntent = PendingIntent.getActivity(context, id, intent, flags);
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
-                .setContentTitle(title)
-                .setContentText(body)
+                .setContentTitle(title).setContentText(body)
                 .setSmallIcon(android.R.drawable.ic_dialog_info)
                 .setContentIntent(pendingIntent)
-                .setAutoCancel(true)
-                .setPriority(NotificationCompat.PRIORITY_HIGH);
+                .setAutoCancel(true).setPriority(NotificationCompat.PRIORITY_HIGH);
 
         NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
         if (manager != null) manager.notify(id, builder.build());
     }
 
-    // 5. إلغاء إشعار الأذان
     public static void cancelAdhanNotification(Context context) {
         NotificationManager notificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
         if (notificationManager != null) {
@@ -172,13 +169,10 @@ public class NotificationHelper {
         }
     }
 
-    // 6. دالة فتح التطبيق
     public static PendingIntent openApp(Context context) {
         Intent intent = new Intent(context, MainActivity.class);
         int flags = PendingIntent.FLAG_UPDATE_CURRENT;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            flags |= PendingIntent.FLAG_IMMUTABLE;
-        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) flags |= PendingIntent.FLAG_IMMUTABLE;
         return PendingIntent.getActivity(context, 0, intent, flags);
     }
 }

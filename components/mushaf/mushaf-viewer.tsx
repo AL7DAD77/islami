@@ -94,6 +94,8 @@ export function MushafViewer({ initialSurah = 1, initialAyah, onHomeClick }: Mus
 
   const touchStartX = useRef(0);
   const touchEndX = useRef(0);
+  const [initialPinchDistance, setInitialPinchDistance] = useState<number | null>(null);
+  const [initialFontSizeForPinch, setInitialFontSizeForPinch] = useState<number>(24);
 
   useEffect(() => {
     const savedFontSize = localStorage.getItem('mushaf_font_size');
@@ -105,13 +107,6 @@ export function MushafViewer({ initialSurah = 1, initialAyah, onHomeClick }: Mus
     if (savedName) setReciterName(savedName);
   }, []);
 
-  const handleZoomIn = () => {
-    setFontSize(prev => { const n = Math.min(prev + 2, 40); localStorage.setItem('mushaf_font_size', String(n)); return n; });
-  };
-  const handleZoomOut = () => {
-    setFontSize(prev => { const n = Math.max(prev - 2, 16); localStorage.setItem('mushaf_font_size', String(n)); return n; });
-  };
-
   useEffect(() => {
     async function getSurahInfo() {
       try {
@@ -121,8 +116,8 @@ export function MushafViewer({ initialSurah = 1, initialAyah, onHomeClick }: Mus
         setCurrentPage(meta.surahStartPage[initialSurah - 1] || 1);
       } catch (error) { console.error("خطأ في جلب meta", error); }
     }
-    getSurahInfo();
-  }, [initialSurah]);
+    if (!metaData) getSurahInfo();
+  }, [initialSurah, metaData]);
 
   useEffect(() => {
     if (!currentPage) return;
@@ -164,6 +159,13 @@ export function MushafViewer({ initialSurah = 1, initialAyah, onHomeClick }: Mus
     toggleBookmark(currentSurahNum, surahName, currentPage);
   };
 
+  const handleZoomIn = () => {
+    setFontSize(prev => { const n = Math.min(prev + 2, 50); localStorage.setItem('mushaf_font_size', String(n)); return n; });
+  };
+  const handleZoomOut = () => {
+    setFontSize(prev => { const n = Math.max(prev - 2, 16); localStorage.setItem('mushaf_font_size', String(n)); return n; });
+  };
+
   const toggleAudio = async () => {
     const currentSurah = getCurrentSurahNum();
     const padded = String(currentSurah).padStart(3, '0');
@@ -190,55 +192,64 @@ export function MushafViewer({ initialSurah = 1, initialAyah, onHomeClick }: Mus
         if (surahNum > 114) { setIsPlaying(false); return; }
         const p = String(surahNum).padStart(3, '0');
         const url = `${audioServer}${p}.mp3`;
-        
-        if (!webAudioRef.current) {
-          webAudioRef.current = new Audio(url);
-        } else {
-          webAudioRef.current.src = url;
-        }
-        
+        if (!webAudioRef.current) { webAudioRef.current = new Audio(url); } else { webAudioRef.current.src = url; }
         webAudioRef.current.play();
-        webAudioRef.current.onended = () => {
-          playSurahInBrowser(surahNum + 1);
-        };
+        webAudioRef.current.onended = () => { playSurahInBrowser(surahNum + 1); };
       };
-
-      if (isPlaying) {
-        webAudioRef.current?.pause();
-        setIsPlaying(false);
-      } else {
-        playSurahInBrowser(currentSurah);
-        setIsPlaying(true);
-      }
+      if (isPlaying) { webAudioRef.current?.pause(); setIsPlaying(false); } else { playSurahInBrowser(currentSurah); setIsPlaying(true); }
     }
   };
 
   const selectReciter = (reciter: { name: string; server: string }) => {
-    setReciterName(reciter.name);
-    setAudioServer(reciter.server);
+    setReciterName(reciter.name); setAudioServer(reciter.server);
     localStorage.setItem('selected_reciter_server', reciter.server);
     localStorage.setItem('selected_reciter_name', reciter.name);
     setShowReciterModal(false);
   };
 
   const goToSurah = (index: number) => {
-    if (metaData) {
-      setCurrentPage(metaData.surahStartPage[index]);
-      setIsIndexOpen(false);
-    }
+    if (metaData) { setCurrentPage(metaData.surahStartPage[index]); setIsIndexOpen(false); }
   };
 
   const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartX.current = e.changedTouches[0].screenX;
+    if (e.touches.length === 2) {
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      const distance = Math.hypot(touch1.clientX - touch2.clientX, touch1.clientY - touch2.clientY);
+      setInitialPinchDistance(distance);
+      setInitialFontSizeForPinch(fontSize);
+      touchStartX.current = 0; 
+    } else if (e.touches.length === 1) {
+      touchStartX.current = e.changedTouches[0].screenX;
+    }
   };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2 && initialPinchDistance !== null) {
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      const distance = Math.hypot(touch1.clientX - touch2.clientX, touch1.clientY - touch2.clientY);
+      const scale = distance / initialPinchDistance;
+      const newSize = Math.max(16, Math.min(50, initialFontSizeForPinch * scale));
+      setFontSize(Math.round(newSize));
+    }
+  };
+
   const handleTouchEnd = (e: React.TouchEvent) => {
+    if (initialPinchDistance !== null) {
+      setInitialPinchDistance(null);
+      localStorage.setItem('mushaf_font_size', String(fontSize)); 
+      return; 
+    }
+
+    if (!touchStartX.current) return;
     touchEndX.current = e.changedTouches[0].screenX;
     const diff = touchStartX.current - touchEndX.current;
-    
-    if (diff > 60) {
-      setCurrentPage(p => Math.min(604, p + 1));
-    } else if (diff < -60) {
-      setCurrentPage(p => Math.max(1, p - 1));
+
+    if (diff > 60) { 
+      setCurrentPage(p => Math.min(604, p + 1)); 
+    } else if (diff < -60) { 
+      setCurrentPage(p => Math.max(1, p - 1)); 
     }
   };
 
@@ -252,10 +263,10 @@ export function MushafViewer({ initialSurah = 1, initialAyah, onHomeClick }: Mus
       className="h-dvh w-full bg-[#FDFBF7] flex flex-col relative overflow-hidden select-none" 
       dir="rtl"
       onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
       
-      {/* الشريط العلوي */}
       <div className="flex justify-between items-center px-4 py-2 bg-[#F7F2E8] border-b border-[#E5DCB8] shrink-0 z-10">
         <div className="flex items-center gap-2">
           <button onClick={() => setIsIndexOpen(true)} className="p-2 bg-white rounded-full shadow-sm hover:bg-gray-50">
@@ -285,12 +296,9 @@ export function MushafViewer({ initialSurah = 1, initialAyah, onHomeClick }: Mus
         </div>
       </div>
 
-      {/* منطقة عرض صفحة المصحف */}
       <div className="flex-1 overflow-y-auto px-2 py-4 flex flex-col items-center no-scrollbar">
         <div className="w-full max-w-3xl flex flex-col justify-start items-center">
           {pageData.l.map((line, idx) => {
-            
-            // ترويسة السورة (تم إعادة التصميم الاحترافي)
             if (line.t === 's') {
               const surahNum = line.n || 1;
               const surahName = metaData.surahNames[surahNum - 1];
@@ -314,7 +322,6 @@ export function MushafViewer({ initialSurah = 1, initialAyah, onHomeClick }: Mus
                 </div>
               );
             } 
-            // البسملة
             else if (line.t === 'b') {
               return (
                 <div key={idx} className="w-full text-center my-3">
@@ -322,7 +329,6 @@ export function MushafViewer({ initialSurah = 1, initialAyah, onHomeClick }: Mus
                 </div>
               );
             } 
-            // نص الآيات
             else if (line.t === 'a' && line.w) {
               const lineText = line.w.join(' ');
               return (
@@ -340,7 +346,6 @@ export function MushafViewer({ initialSurah = 1, initialAyah, onHomeClick }: Mus
         </div>
       </div>
 
-      {/* الشريط السفلي */}
       <div className="flex justify-center items-center gap-6 px-4 py-2 bg-[#F7F2E8] border-t border-[#E5DCB8] shrink-0">
         <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-1.5 bg-white border border-[#E5DCB8] text-[#2C5E3B] rounded-lg shadow-sm disabled:opacity-30">
           <ArrowRight className="size-4" />
@@ -351,7 +356,6 @@ export function MushafViewer({ initialSurah = 1, initialAyah, onHomeClick }: Mus
         </button>
       </div>
 
-      {/* فهرس السور */}
       {isIndexOpen && (
         <div className="fixed inset-0 z-50 flex">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setIsIndexOpen(false)} />
@@ -380,7 +384,6 @@ export function MushafViewer({ initialSurah = 1, initialAyah, onHomeClick }: Mus
                   >
                     <div className="flex flex-col">
                       <span className={`font-bold text-lg font-mushaf mb-1 ${isCurrent ? 'text-white' : 'text-[#1A120B]'}`}>{name}</span>
-                      {/* تكبير وتغميق بيانات السورة في الفهرس */}
                       <span className={`text-xs font-sans font-semibold ${isCurrent ? 'text-gray-200' : 'text-[#6B7280]'}`}>
                         {details?.type} • {details?.count} آية
                       </span>
@@ -396,7 +399,6 @@ export function MushafViewer({ initialSurah = 1, initialAyah, onHomeClick }: Mus
         </div>
       )}
 
-      {/* نافذة اختيار القارئ */}
       {showReciterModal && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-[#FDFBF7] w-full max-w-sm rounded-2xl p-4 border border-[#C5A059] shadow-2xl animate-in zoom-in-95 duration-200">

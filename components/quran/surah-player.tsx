@@ -12,12 +12,16 @@ interface SurahPlayerProps {
 }
 
 export function SurahPlayer(props: SurahPlayerProps) {
+  // ⚠️ تم إيقاف هذا الشريط العائم بناءً على طلبك (لأنه يغطي على أزرار التنقل)
+  // الصوت سيعمل في الخلفية عبر الخدمة، ولن يظهر هذا الشريط في أي صفحة.
+  return null;
+
+  /* الكود القديم تم تعطيله */
+  /*
   let quranPlayerContext: any = null;
   try {
     quranPlayerContext = useQuranPlayer();
-  } catch (e) {
-    // لتجنب أي خطأ في حال تم استدعاؤه خارج المزود
-  }
+  } catch (e) {}
 
   const [currentReciter, setCurrentReciter] = useState<string>('مشاري العفاسي');
 
@@ -28,13 +32,12 @@ export function SurahPlayer(props: SurahPlayerProps) {
     }
   }, []);
 
-  // المتغيرات المتوافقة مع الحالات الفعلية للمشغل
   const isPlaying = quranPlayerContext?.playing || quranPlayerContext?.isPlaying || false;
   const currentSurah = quranPlayerContext?.surahName || props.surahName || '';
   const activeReciter = quranPlayerContext?.reciter?.name || props.reciterName || currentReciter;
 
   if (!isPlaying && !currentSurah) {
-    return null; // عدم إظهار الشريط إلا عند تشغيل التلاوة
+    return null; 
   }
 
   return (
@@ -79,4 +82,5 @@ export function SurahPlayer(props: SurahPlayerProps) {
       </div>
     </div>
   );
+  */
 }
