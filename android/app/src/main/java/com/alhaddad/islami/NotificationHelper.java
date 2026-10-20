@@ -53,6 +53,19 @@ public class NotificationHelper {
         createNotificationChannel(context);
     }
 
+    private static String translatePrayer(String englishName) {
+        if (englishName == null) return "";
+        switch (englishName.toLowerCase()) {
+            case "fajr": return "الفجر";
+            case "sunrise": return "الشروق";
+            case "dhuhr": return "الظهر";
+            case "asr": return "العصر";
+            case "maghrib": return "المغرب";
+            case "isha": return "العشاء";
+            default: return englishName;
+        }
+    }
+
     public static void updatePersistent(Context context) {
         try {
             long now = System.currentTimeMillis();
@@ -62,15 +75,14 @@ public class NotificationHelper {
             String nextPrayerName = "";
             String prevPrayerName = "";
 
-            // نبحث عن الصلاة القادمة وأقرب صلاة مضت
             for (AdhanStore.Item it : AdhanStore.load(context)) {
-                String prayerName = it.prayer != null && !it.prayer.isEmpty() ? it.prayer : it.title;
+                String prayer = translatePrayer(it.prayer != null && !it.prayer.isEmpty() ? it.prayer : it.title);
                 if (it.at > now && it.at < nextTime) {
                     nextTime = it.at;
-                    nextPrayerName = prayerName;
+                    nextPrayerName = prayer;
                 } else if (it.at <= now && it.at > prevTime) {
                     prevTime = it.at;
-                    prevPrayerName = prayerName;
+                    prevPrayerName = prayer;
                 }
             }
 
@@ -78,35 +90,49 @@ public class NotificationHelper {
             String timeText = "";
             String sign = "";
 
-            // إذا كانت الصلاة القادمة أقرب من الوقت الذي مضى على الصلاة السابقة، نعرض العداد التنازلي (سالب)
-            // أو إذا لم تكن هناك صلاة سابقة
+            // منطق العداد
             if (nextTime != Long.MAX_VALUE && (prevTime == Long.MIN_VALUE || (nextTime - now) < (now - prevTime))) {
                 long diff = nextTime - now;
                 long hours = diff / (1000 * 60 * 60);
                 long minutes = (diff / (1000 * 60)) % 60;
-                long seconds = (diff / 1000) % 60;
-                timeText = String.format(Locale.getDefault(), "%02d:%02d:%02d", hours, minutes, seconds);
+                
+                if (hours > 0) {
+                    timeText = String.format(Locale.getDefault(), "%d ساعة و %d دقيقة", hours, minutes);
+                } else {
+                    timeText = String.format(Locale.getDefault(), "%d دقيقة", minutes);
+                }
                 sign = "-";
                 titleText = "متبقي على " + nextPrayerName;
             } 
-            // إذا كان الوقت الذي مضى على الصلاة الحالية أقل، نعرض العداد التصاعدي (موجب)
             else if (prevTime != Long.MIN_VALUE) {
                 long diff = now - prevTime;
                 long hours = diff / (1000 * 60 * 60);
                 long minutes = (diff / (1000 * 60)) % 60;
-                long seconds = (diff / 1000) % 60;
-                timeText = String.format(Locale.getDefault(), "%02d:%02d:%02d", hours, minutes, seconds);
+                
+                if (hours > 0) {
+                    timeText = String.format(Locale.getDefault(), "%d ساعة و %d دقيقة", hours, minutes);
+                } else {
+                    timeText = String.format(Locale.getDefault(), "%d دقيقة", minutes);
+                }
                 sign = "+";
                 titleText = "مضى على " + prevPrayerName;
             } else {
-                return; // لا توجد بيانات
+                return;
             }
 
-            // 1. التاريخ الهجري (بتقويم أم القرى)
-            java.util.Calendar hijriCal = java.util.Calendar.getInstance(new Locale("ar-SA-u-ca-islamic-umalqura"));
-            String hijriDate = new SimpleDateFormat("d MMMM yyyy", new Locale("ar-SA-u-ca-islamic-umalqura")).format(hijriCal.getTime());
+            // ⚠️ التاريخ الهجري الصحيح 100%
+            String hijriDate = "";
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                android.icu.util.IslamicCalendar hijriCal = new android.icu.util.IslamicCalendar();
+                hijriCal.setTimeInMillis(now);
+                android.icu.text.SimpleDateFormat formatter = new android.icu.text.SimpleDateFormat("d MMMM yyyy", new android.icu.util.ULocale("ar"));
+                formatter.setCalendar(hijriCal);
+                hijriDate = formatter.format(new Date()) + " هـ";
+            } else {
+                java.util.Calendar cal = java.util.Calendar.getInstance();
+                hijriDate = new SimpleDateFormat("dd/MM/yyyy", new Locale("ar")).format(cal.getTime());
+            }
 
-            // وقت الصلاة القادمة
             SimpleDateFormat sdf = new SimpleDateFormat("hh:mm a", new Locale("ar"));
             String prayerTimeStr = nextTime != Long.MAX_VALUE ? sdf.format(new Date(nextTime)) : "";
 
@@ -117,8 +143,8 @@ public class NotificationHelper {
             }
             PendingIntent pendingIntent = PendingIntent.getActivity(context, 0, intent, flags);
 
-            String bodyText = "الوقت: " + sign + timeText + " | " + hijriDate;
-            String bigText = bodyText + (nextTime != Long.MAX_VALUE ? "\nموعد الأذان القادم: " + prayerTimeStr : "");
+            String bodyText = "الوقت: " + sign + timeText;
+            String bigText = bodyText + "\n" + hijriDate + (nextTime != Long.MAX_VALUE ? "\nموعد الأذان: " + prayerTimeStr : "");
 
             NotificationCompat.Builder builder = new NotificationCompat.Builder(context, PERSISTENT_CHANNEL_ID)
                     .setContentTitle(titleText)

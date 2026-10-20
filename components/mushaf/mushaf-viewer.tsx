@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { registerPlugin } from '@capacitor/core';
-import { Menu, X, ArrowRight, ArrowLeft, Bookmark, Play, Pause, ZoomIn, ZoomOut, Volume2 } from 'lucide-react';
+import { Menu, X, ArrowRight, ArrowLeft, Bookmark, Play, Pause, Volume2 } from 'lucide-react';
 import { saveReadingPosition, toggleBookmark, isBookmarked, useBookmarkState } from '@/lib/bookmarks';
 
 interface LineItem { t: 's' | 'b' | 'a'; n?: number; c?: number; w?: string[]; }
@@ -92,14 +92,8 @@ export function MushafViewer({ initialSurah = 1, initialAyah, onHomeClick }: Mus
   
   const webAudioRef = useRef<HTMLAudioElement | null>(null); 
 
-  // متغيرات السحب فقط (بدون تكبير)
-  const touchStartX = useRef(0);
-  const touchEndX = useRef(0);
-
   useEffect(() => {
-    // إخفاء شريط التنقل السفلي عند دخول المصحف (وضع ملء الشاشة)
     document.body.classList.add('reading-fullscreen');
-
     const savedFontSize = localStorage.getItem('mushaf_font_size');
     if (savedFontSize) setFontSize(Number(savedFontSize));
 
@@ -108,7 +102,6 @@ export function MushafViewer({ initialSurah = 1, initialAyah, onHomeClick }: Mus
     if (savedServer) setAudioServer(savedServer);
     if (savedName) setReciterName(savedName);
 
-    // إعادة الشريط عند الخروج
     return () => {
       document.body.classList.remove('reading-fullscreen');
     };
@@ -218,24 +211,6 @@ export function MushafViewer({ initialSurah = 1, initialAyah, onHomeClick }: Mus
     if (metaData) { setCurrentPage(metaData.surahStartPage[index]); setIsIndexOpen(false); }
   };
 
-  // دالة السحب فقط (بدون تكبير)
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartX.current = e.changedTouches[0].screenX;
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (!touchStartX.current) return;
-    touchEndX.current = e.changedTouches[0].screenX;
-    const diff = touchStartX.current - touchEndX.current;
-
-    // السحب لليسار (diff > 0) يعني الانتقال للصفحة التالية في اللغة العربية
-    if (diff > 50) { 
-      setCurrentPage(p => Math.min(604, p + 1)); 
-    } else if (diff < -50) { 
-      setCurrentPage(p => Math.max(1, p - 1)); 
-    }
-  };
-
   const currentSurahNum = getCurrentSurahNum();
   const isBookmarkedCurrent = isBookmarked(bookmarkState, currentSurahNum, currentPage);
 
@@ -245,8 +220,7 @@ export function MushafViewer({ initialSurah = 1, initialAyah, onHomeClick }: Mus
     <div 
       className="h-[100dvh] w-full bg-[#FDFBF7] flex flex-col relative overflow-hidden select-none" 
       dir="rtl"
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
+      style={{ touchAction: 'pan-y' }}
     >
       
       <div className="flex justify-between items-center px-4 py-2 bg-[#F7F2E8] border-b border-[#E5DCB8] shrink-0 z-10">
@@ -259,10 +233,11 @@ export function MushafViewer({ initialSurah = 1, initialAyah, onHomeClick }: Mus
           </button>
         </div>
 
-        <div className="flex items-center gap-2 bg-white rounded-full px-3 py-1 shadow-sm border border-[#E5DCB8]">
-          <button onClick={handleZoomOut} className="p-1 text-[#2C5E3B]"><ZoomOut className="size-4" /></button>
-          <span className="text-xs font-bold text-gray-500 w-8 text-center">{fontSize}</span>
-          <button onClick={handleZoomIn} className="p-1 text-[#2C5E3B]"><ZoomIn className="size-4" /></button>
+        {/* أزرار التكبير والتصغير بالكلمات */}
+        <div className="flex items-center gap-2 bg-white rounded-full px-2 py-1 shadow-sm border border-[#E5DCB8]">
+          <button onClick={handleZoomOut} className="px-2 py-1 text-xs font-bold text-[#2C5E3B] hover:bg-gray-100 rounded-md transition-colors">تصغير</button>
+          <span className="text-xs font-bold text-gray-500 w-6 text-center">{fontSize}</span>
+          <button onClick={handleZoomIn} className="px-2 py-1 text-xs font-bold text-[#2C5E3B] hover:bg-gray-100 rounded-md transition-colors">تكبير</button>
         </div>
 
         <div className="flex items-center gap-2">
@@ -328,13 +303,14 @@ export function MushafViewer({ initialSurah = 1, initialAyah, onHomeClick }: Mus
         </div>
       </div>
 
+      {/* الشريط السفلي للتنقل فقط */}
       <div className="flex justify-center items-center gap-6 px-4 py-2 bg-[#F7F2E8] border-t border-[#E5DCB8] shrink-0">
-        <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-1.5 bg-white border border-[#E5DCB8] text-[#2C5E3B] rounded-lg shadow-sm disabled:opacity-30">
-          <ArrowRight className="size-4" />
+        <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="px-4 py-2 bg-white border border-[#E5DCB8] text-[#2C5E3B] rounded-lg shadow-sm disabled:opacity-30 font-bold text-sm">
+          السابق
         </button>
         <span className="font-bold text-[#2C5E3B] text-sm select-none">{currentPage} / 604</span>
-        <button onClick={() => setCurrentPage(p => Math.min(604, p + 1))} disabled={currentPage === 604} className="p-1.5 bg-white border border-[#E5DCB8] text-[#2C5E3B] rounded-lg shadow-sm disabled:opacity-30">
-          <ArrowLeft className="size-4" />
+        <button onClick={() => setCurrentPage(p => Math.min(604, p + 1))} disabled={currentPage === 604} className="px-4 py-2 bg-white border border-[#E5DCB8] text-[#2C5E3B] rounded-lg shadow-sm disabled:opacity-30 font-bold text-sm">
+          التالي
         </button>
       </div>
 
