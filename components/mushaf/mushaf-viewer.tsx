@@ -92,12 +92,14 @@ export function MushafViewer({ initialSurah = 1, initialAyah, onHomeClick }: Mus
   
   const webAudioRef = useRef<HTMLAudioElement | null>(null); 
 
+  // متغيرات السحب فقط (بدون تكبير)
   const touchStartX = useRef(0);
   const touchEndX = useRef(0);
-  const [initialPinchDistance, setInitialPinchDistance] = useState<number | null>(null);
-  const [initialFontSizeForPinch, setInitialFontSizeForPinch] = useState<number>(24);
 
   useEffect(() => {
+    // إخفاء شريط التنقل السفلي عند دخول المصحف (وضع ملء الشاشة)
+    document.body.classList.add('reading-fullscreen');
+
     const savedFontSize = localStorage.getItem('mushaf_font_size');
     if (savedFontSize) setFontSize(Number(savedFontSize));
 
@@ -105,6 +107,11 @@ export function MushafViewer({ initialSurah = 1, initialAyah, onHomeClick }: Mus
     const savedName = localStorage.getItem('selected_reciter_name');
     if (savedServer) setAudioServer(savedServer);
     if (savedName) setReciterName(savedName);
+
+    // إعادة الشريط عند الخروج
+    return () => {
+      document.body.classList.remove('reading-fullscreen');
+    };
   }, []);
 
   useEffect(() => {
@@ -160,10 +167,10 @@ export function MushafViewer({ initialSurah = 1, initialAyah, onHomeClick }: Mus
   };
 
   const handleZoomIn = () => {
-    setFontSize(prev => { const n = Math.min(prev + 2, 50); localStorage.setItem('mushaf_font_size', String(n)); return n; });
+    setFontSize(prev => { const n = Math.min(prev + 2, 40); localStorage.setItem('mushaf_font_size', String(n)); return n; });
   };
   const handleZoomOut = () => {
-    setFontSize(prev => { const n = Math.max(prev - 2, 16); localStorage.setItem('mushaf_font_size', String(n)); return n; });
+    setFontSize(prev => { const n = Math.max(prev - 2, 18); localStorage.setItem('mushaf_font_size', String(n)); return n; });
   };
 
   const toggleAudio = async () => {
@@ -211,44 +218,20 @@ export function MushafViewer({ initialSurah = 1, initialAyah, onHomeClick }: Mus
     if (metaData) { setCurrentPage(metaData.surahStartPage[index]); setIsIndexOpen(false); }
   };
 
+  // دالة السحب فقط (بدون تكبير)
   const handleTouchStart = (e: React.TouchEvent) => {
-    if (e.touches.length === 2) {
-      const touch1 = e.touches[0];
-      const touch2 = e.touches[1];
-      const distance = Math.hypot(touch1.clientX - touch2.clientX, touch1.clientY - touch2.clientY);
-      setInitialPinchDistance(distance);
-      setInitialFontSizeForPinch(fontSize);
-      touchStartX.current = 0; 
-    } else if (e.touches.length === 1) {
-      touchStartX.current = e.changedTouches[0].screenX;
-    }
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (e.touches.length === 2 && initialPinchDistance !== null) {
-      const touch1 = e.touches[0];
-      const touch2 = e.touches[1];
-      const distance = Math.hypot(touch1.clientX - touch2.clientX, touch1.clientY - touch2.clientY);
-      const scale = distance / initialPinchDistance;
-      const newSize = Math.max(16, Math.min(50, initialFontSizeForPinch * scale));
-      setFontSize(Math.round(newSize));
-    }
+    touchStartX.current = e.changedTouches[0].screenX;
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
-    if (initialPinchDistance !== null) {
-      setInitialPinchDistance(null);
-      localStorage.setItem('mushaf_font_size', String(fontSize)); 
-      return; 
-    }
-
     if (!touchStartX.current) return;
     touchEndX.current = e.changedTouches[0].screenX;
     const diff = touchStartX.current - touchEndX.current;
 
-    if (diff > 60) { 
+    // السحب لليسار (diff > 0) يعني الانتقال للصفحة التالية في اللغة العربية
+    if (diff > 50) { 
       setCurrentPage(p => Math.min(604, p + 1)); 
-    } else if (diff < -60) { 
+    } else if (diff < -50) { 
       setCurrentPage(p => Math.max(1, p - 1)); 
     }
   };
@@ -260,10 +243,9 @@ export function MushafViewer({ initialSurah = 1, initialAyah, onHomeClick }: Mus
   if (!pageData || !metaData) return <div className="h-screen flex items-center justify-center text-red-400">حدث خطأ في جلب البيانات.</div>;
   return (
     <div 
-      className="h-dvh w-full bg-[#FDFBF7] flex flex-col relative overflow-hidden select-none" 
+      className="h-[100dvh] w-full bg-[#FDFBF7] flex flex-col relative overflow-hidden select-none" 
       dir="rtl"
       onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
       

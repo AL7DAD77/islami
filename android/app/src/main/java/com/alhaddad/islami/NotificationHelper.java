@@ -41,7 +41,7 @@ public class NotificationHelper {
             NotificationChannel persistentChannel = new NotificationChannel(
                     PERSISTENT_CHANNEL_ID, PERSISTENT_CHANNEL_NAME, NotificationManager.IMPORTANCE_LOW
             );
-            persistentChannel.setDescription("يعرض الوقت المتبقي للصلاة القادمة والتاريخ الهجري");
+            persistentChannel.setDescription("يعرض الوقت المتبقي أو المنقضي للصلاة والتاريخ الهجري");
             persistentChannel.setSound(null, null);
             persistentChannel.enableVibration(false);
             persistentChannel.setShowBadge(false);
@@ -56,40 +56,59 @@ public class NotificationHelper {
     public static void updatePersistent(Context context) {
         try {
             long now = System.currentTimeMillis();
-            long nextTime = Long.MAX_VALUE;
-            String nextPrayerName = "";
             
-            // جلب الصلاة القادمة من المخزن
+            long nextTime = Long.MAX_VALUE;
+            long prevTime = Long.MIN_VALUE;
+            String nextPrayerName = "";
+            String prevPrayerName = "";
+
+            // نبحث عن الصلاة القادمة وأقرب صلاة مضت
             for (AdhanStore.Item it : AdhanStore.load(context)) {
+                String prayerName = it.prayer != null && !it.prayer.isEmpty() ? it.prayer : it.title;
                 if (it.at > now && it.at < nextTime) {
                     nextTime = it.at;
-                    nextPrayerName = it.prayer != null && !it.prayer.isEmpty() ? it.prayer : it.title;
+                    nextPrayerName = prayerName;
+                } else if (it.at <= now && it.at > prevTime) {
+                    prevTime = it.at;
+                    prevPrayerName = prayerName;
                 }
             }
 
-            if (nextTime == Long.MAX_VALUE) return; // لا توجد صلاة قادمة
+            String titleText = "";
+            String timeText = "";
+            String sign = "";
 
-            // 1. التاريخ الهجري
-            android.icu.util.IslamicCalendar hijriCal = new android.icu.util.IslamicCalendar();
-            hijriCal.setTimeInMillis(now);
-            SimpleDateFormat hijriFormat = new SimpleDateFormat("d MMMM yyyy", new Locale("ar"));
-            hijriFormat.setCalendar(hijriCal);
-            String hijriDate = hijriFormat.format(new Date());
+            // إذا كانت الصلاة القادمة أقرب من الوقت الذي مضى على الصلاة السابقة، نعرض العداد التنازلي (سالب)
+            // أو إذا لم تكن هناك صلاة سابقة
+            if (nextTime != Long.MAX_VALUE && (prevTime == Long.MIN_VALUE || (nextTime - now) < (now - prevTime))) {
+                long diff = nextTime - now;
+                long hours = diff / (1000 * 60 * 60);
+                long minutes = (diff / (1000 * 60)) % 60;
+                long seconds = (diff / 1000) % 60;
+                timeText = String.format(Locale.getDefault(), "%02d:%02d:%02d", hours, minutes, seconds);
+                sign = "-";
+                titleText = "متبقي على " + nextPrayerName;
+            } 
+            // إذا كان الوقت الذي مضى على الصلاة الحالية أقل، نعرض العداد التصاعدي (موجب)
+            else if (prevTime != Long.MIN_VALUE) {
+                long diff = now - prevTime;
+                long hours = diff / (1000 * 60 * 60);
+                long minutes = (diff / (1000 * 60)) % 60;
+                long seconds = (diff / 1000) % 60;
+                timeText = String.format(Locale.getDefault(), "%02d:%02d:%02d", hours, minutes, seconds);
+                sign = "+";
+                titleText = "مضى على " + prevPrayerName;
+            } else {
+                return; // لا توجد بيانات
+            }
 
-            // 2. حساب العداد (موجب أو سالب)
-            long diff = nextTime - now;
-            boolean isUpcoming = diff > 0; // إذا كان الوقت لم يأت بعد (موجب)
-            
-            long hours = Math.abs(diff) / (1000 * 60 * 60);
-            long minutes = (Math.abs(diff) / (1000 * 60)) % 60;
-            long seconds = (Math.abs(diff) / 1000) % 60;
-            
-            String countdownText = String.format(Locale.getDefault(), "%02d:%02d:%02d", hours, minutes, seconds);
-            String sign = isUpcoming ? "+" : "-"; // موجب للصلاة القادمة، سالب للوقت المنقضي
+            // 1. التاريخ الهجري (بتقويم أم القرى)
+            java.util.Calendar hijriCal = java.util.Calendar.getInstance(new Locale("ar-SA-u-ca-islamic-umalqura"));
+            String hijriDate = new SimpleDateFormat("d MMMM yyyy", new Locale("ar-SA-u-ca-islamic-umalqura")).format(hijriCal.getTime());
 
-            // تنسيق وقت الصلاة
+            // وقت الصلاة القادمة
             SimpleDateFormat sdf = new SimpleDateFormat("hh:mm a", new Locale("ar"));
-            String prayerTime = sdf.format(new Date(nextTime));
+            String prayerTimeStr = nextTime != Long.MAX_VALUE ? sdf.format(new Date(nextTime)) : "";
 
             Intent intent = new Intent(context, MainActivity.class);
             int flags = PendingIntent.FLAG_UPDATE_CURRENT;
@@ -98,18 +117,17 @@ public class NotificationHelper {
             }
             PendingIntent pendingIntent = PendingIntent.getActivity(context, 0, intent, flags);
 
-            // بناء نص الإشعار
-            String titleText = "الصلاة القادمة: " + nextPrayerName;
-            String bodyText = "الوقت المتبقي: " + sign + countdownText + " | " + hijriDate;
+            String bodyText = "الوقت: " + sign + timeText + " | " + hijriDate;
+            String bigText = bodyText + (nextTime != Long.MAX_VALUE ? "\nموعد الأذان القادم: " + prayerTimeStr : "");
 
             NotificationCompat.Builder builder = new NotificationCompat.Builder(context, PERSISTENT_CHANNEL_ID)
                     .setContentTitle(titleText)
                     .setContentText(bodyText)
-                    .setStyle(new NotificationCompat.BigTextStyle().bigText(bodyText + "\nموعد الأذان: " + prayerTime))
+                    .setStyle(new NotificationCompat.BigTextStyle().bigText(bigText))
                     .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-                    .setOngoing(true) // يجعله ثابتاً لا يمكن سحبه
+                    .setOngoing(true)
                     .setAutoCancel(false)
-                    .setOnlyAlertOnce(true) // لا يصدر صوتاً عند التحديث
+                    .setOnlyAlertOnce(true)
                     .setPriority(NotificationCompat.PRIORITY_LOW)
                     .setContentIntent(pendingIntent);
 
