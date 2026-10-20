@@ -31,6 +31,15 @@ const RECITERS = [
   { name: 'عبد الباسط عبد الصمد', server: 'https://server7.mp3quran.net/basit/' },
   { name: 'محمود خليل الحصري', server: 'https://server13.mp3quran.net/husr/' },
   { name: 'ماهر المعيقلي', server: 'https://server12.mp3quran.net/maher/' },
+  { name: 'عبد الرحمن السديس', server: 'https://server11.mp3quran.net/sds/' },
+  { name: 'ياسر الدوسري', server: 'https://server11.mp3quran.net/yasser/' },
+  { name: 'محمد صديق المنشاوي', server: 'https://server10.mp3quran.net/minsh/' },
+  { name: 'أحمد العجمي', server: 'https://server10.mp3quran.net/ajm/' },
+  { name: 'سعد الغامدي', server: 'https://server7.mp3quran.net/s_gmd/' },
+  { name: 'فارس عباد', server: 'https://server8.mp3quran.net/frs_a/' },
+  { name: 'خالد الجليل', server: 'https://server10.mp3quran.net/jleel/' },
+  { name: 'علي الحذيفي', server: 'https://server9.mp3quran.net/hthfi/' },
+  { name: 'ماجد الزامل', server: 'https://server9.mp3quran.net/zaml/' }
 ];
 
 const SURAH_DETAILS: { [key: number]: { count: number; type: 'مكية' | 'مدنية' } } = {
@@ -91,6 +100,7 @@ export function MushafViewer({ initialSurah = 1, initialAyah, onHomeClick }: Mus
   const [showReciterModal, setShowReciterModal] = useState<boolean>(false);
   
   const webAudioRef = useRef<HTMLAudioElement | null>(null); 
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     document.body.classList.add('reading-fullscreen');
@@ -129,6 +139,10 @@ export function MushafViewer({ initialSurah = 1, initialAyah, onHomeClick }: Mus
         if (!response.ok) throw new Error("الصفحة غير موجودة");
         const data: PageData = await response.json();
         setPageData(data);
+        
+        if (scrollRef.current) {
+          scrollRef.current.scrollTop = 0;
+        }
       } catch (error) { console.error("خطأ في تحميل الصفحة", error); } finally { setLoading(false); }
     }
     loadPage();
@@ -188,23 +202,78 @@ export function MushafViewer({ initialSurah = 1, initialAyah, onHomeClick }: Mus
         setIsPlaying(true);
       }
     } catch (err) {
-      const playSurahInBrowser = (surahNum: number) => {
-        if (surahNum > 114) { setIsPlaying(false); return; }
-        const p = String(surahNum).padStart(3, '0');
-        const url = `${audioServer}${p}.mp3`;
-        if (!webAudioRef.current) { webAudioRef.current = new Audio(url); } else { webAudioRef.current.src = url; }
-        webAudioRef.current.play();
-        webAudioRef.current.onended = () => { playSurahInBrowser(surahNum + 1); };
+      let audio = webAudioRef.current;
+      if (!audio) {
+        audio = new Audio(audioUrl);
+        webAudioRef.current = audio;
+      } else {
+        audio.src = audioUrl;
+      }
+
+      audio.onended = () => {
+        if (currentSurah < 114) {
+          const nextSurah = currentSurah + 1;
+          const nextPadded = String(nextSurah).padStart(3, '0');
+          const nextUrl = `${audioServer}${nextPadded}.mp3`;
+          audio!.src = nextUrl;
+          audio!.play();
+        } else {
+          setIsPlaying(false);
+        }
       };
-      if (isPlaying) { webAudioRef.current?.pause(); setIsPlaying(false); } else { playSurahInBrowser(currentSurah); setIsPlaying(true); }
+
+      if (isPlaying) {
+        audio.pause();
+        setIsPlaying(false);
+      } else {
+        audio.play();
+        setIsPlaying(true);
+      }
     }
   };
 
-  const selectReciter = (reciter: { name: string; server: string }) => {
-    setReciterName(reciter.name); setAudioServer(reciter.server);
+  const selectReciter = async (reciter: { name: string; server: string }) => {
+    const wasPlaying = isPlaying;
+    
+    if (webAudioRef.current) {
+      webAudioRef.current.pause();
+    }
+    try { await QuranPlayer.stop(); } catch (e) {}
+    setIsPlaying(false);
+
+    setReciterName(reciter.name);
+    setAudioServer(reciter.server);
     localStorage.setItem('selected_reciter_server', reciter.server);
     localStorage.setItem('selected_reciter_name', reciter.name);
     setShowReciterModal(false);
+
+    if (wasPlaying) {
+      const currentSurah = getCurrentSurahNum();
+      const p = String(currentSurah).padStart(3, '0');
+      const url = `${reciter.server}${p}.mp3`;
+
+      try {
+        const queueItems = [];
+        for (let i = currentSurah; i <= 114; i++) {
+          const pi = String(i).padStart(3, '0');
+          const ui = `${reciter.server}${pi}.mp3`;
+          const name = metaData?.surahNames[i - 1] || '';
+          queueItems.push({ url: ui, title: `سورة ${name}`, id: ui });
+        }
+        await QuranPlayer.playQueue({ items: queueItems, startIndex: 0 });
+        setIsPlaying(true);
+      } catch (err) {
+        let audio = webAudioRef.current;
+        if (!audio) {
+          audio = new Audio(url);
+          webAudioRef.current = audio;
+        } else {
+          audio.src = url;
+        }
+        audio.play();
+        setIsPlaying(true);
+      }
+    }
   };
 
   const goToSurah = (index: number) => {
@@ -218,7 +287,7 @@ export function MushafViewer({ initialSurah = 1, initialAyah, onHomeClick }: Mus
   if (!pageData || !metaData) return <div className="h-screen flex items-center justify-center text-red-400">حدث خطأ في جلب البيانات.</div>;
   return (
     <div 
-      className="h-[100dvh] w-full bg-[#FDFBF7] flex flex-col relative overflow-hidden select-none" 
+      className="fixed inset-0 z-50 w-full bg-[#FDFBF7] flex flex-col overflow-hidden select-none" 
       dir="rtl"
       style={{ touchAction: 'pan-y' }}
     >
@@ -233,7 +302,6 @@ export function MushafViewer({ initialSurah = 1, initialAyah, onHomeClick }: Mus
           </button>
         </div>
 
-        {/* أزرار التكبير والتصغير بالكلمات */}
         <div className="flex items-center gap-2 bg-white rounded-full px-2 py-1 shadow-sm border border-[#E5DCB8]">
           <button onClick={handleZoomOut} className="px-2 py-1 text-xs font-bold text-[#2C5E3B] hover:bg-gray-100 rounded-md transition-colors">تصغير</button>
           <span className="text-xs font-bold text-gray-500 w-6 text-center">{fontSize}</span>
@@ -253,7 +321,10 @@ export function MushafViewer({ initialSurah = 1, initialAyah, onHomeClick }: Mus
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-2 py-4 flex flex-col items-center no-scrollbar">
+      <div 
+        ref={scrollRef} 
+        className="flex-1 overflow-y-auto px-2 py-4 flex flex-col items-center no-scrollbar w-full"
+      >
         <div className="w-full max-w-3xl flex flex-col justify-start items-center">
           {pageData.l.map((line, idx) => {
             if (line.t === 's') {
@@ -303,13 +374,12 @@ export function MushafViewer({ initialSurah = 1, initialAyah, onHomeClick }: Mus
         </div>
       </div>
 
-      {/* الشريط السفلي للتنقل فقط */}
-      <div className="flex justify-center items-center gap-6 px-4 py-2 bg-[#F7F2E8] border-t border-[#E5DCB8] shrink-0">
-        <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="px-4 py-2 bg-white border border-[#E5DCB8] text-[#2C5E3B] rounded-lg shadow-sm disabled:opacity-30 font-bold text-sm">
+      <div className="flex justify-center items-center gap-6 px-4 py-3 bg-[#F7F2E8] border-t border-[#E5DCB8] shrink-0 w-full">
+        <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="px-6 py-2 bg-white border border-[#E5DCB8] text-[#2C5E3B] rounded-lg shadow-sm disabled:opacity-30 font-bold text-sm">
           السابق
         </button>
         <span className="font-bold text-[#2C5E3B] text-sm select-none">{currentPage} / 604</span>
-        <button onClick={() => setCurrentPage(p => Math.min(604, p + 1))} disabled={currentPage === 604} className="px-4 py-2 bg-white border border-[#E5DCB8] text-[#2C5E3B] rounded-lg shadow-sm disabled:opacity-30 font-bold text-sm">
+        <button onClick={() => setCurrentPage(p => Math.min(604, p + 1))} disabled={currentPage === 604} className="px-6 py-2 bg-white border border-[#E5DCB8] text-[#2C5E3B] rounded-lg shadow-sm disabled:opacity-30 font-bold text-sm">
           التالي
         </button>
       </div>
@@ -359,14 +429,14 @@ export function MushafViewer({ initialSurah = 1, initialAyah, onHomeClick }: Mus
 
       {showReciterModal && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-[#FDFBF7] w-full max-w-sm rounded-2xl p-4 border border-[#C5A059] shadow-2xl animate-in zoom-in-95 duration-200">
-            <h3 className="text-base font-bold text-[#2C5E3B] mb-3 text-center border-b pb-2">اختر القارئ</h3>
-            <div className="flex flex-col gap-2 max-h-60 overflow-y-auto no-scrollbar">
+          <div className="bg-[#FDFBF7] w-full max-w-sm rounded-2xl p-4 border border-[#C5A059] shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[80vh]">
+            <h3 className="text-base font-bold text-[#2C5E3B] mb-3 text-center border-b pb-2 shrink-0">اختر القارئ</h3>
+            <div className="flex flex-col gap-2 overflow-y-auto no-scrollbar">
               {RECITERS.map((r, idx) => (
                 <button
                   key={idx}
                   onClick={() => selectReciter(r)}
-                  className={`p-3 rounded-xl text-sm font-bold text-right transition-all flex justify-between items-center ${
+                  className={`p-3 rounded-xl text-sm font-bold text-right transition-all flex justify-between items-center shrink-0 ${
                     reciterName === r.name ? 'bg-[#2C5E3B] text-white' : 'bg-white text-[#1A120B] border border-[#E5DCB8] hover:bg-[#F7F2E8]'
                   }`}
                 >
@@ -375,7 +445,7 @@ export function MushafViewer({ initialSurah = 1, initialAyah, onHomeClick }: Mus
                 </button>
               ))}
             </div>
-            <button onClick={() => setShowReciterModal(false)} className="mt-4 w-full py-2.5 bg-[#2C5E3B] text-white rounded-xl text-sm font-bold">
+            <button onClick={() => setShowReciterModal(false)} className="mt-4 w-full py-2.5 bg-[#2C5E3B] text-white rounded-xl text-sm font-bold shrink-0">
               إغلاق
             </button>
           </div>

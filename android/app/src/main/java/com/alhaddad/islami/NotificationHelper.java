@@ -90,7 +90,6 @@ public class NotificationHelper {
             String timeText = "";
             String sign = "";
 
-            // منطق العداد
             if (nextTime != Long.MAX_VALUE && (prevTime == Long.MIN_VALUE || (nextTime - now) < (now - prevTime))) {
                 long diff = nextTime - now;
                 long hours = diff / (1000 * 60 * 60);
@@ -120,17 +119,19 @@ public class NotificationHelper {
                 return;
             }
 
-            // ⚠️ التاريخ الهجري الصحيح 100%
+            // ⚠️ الحل الجذري للتاريخ الهجري (يدوي لضمان عدم ظهور أي كلمات إنجليزية)
             String hijriDate = "";
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 android.icu.util.IslamicCalendar hijriCal = new android.icu.util.IslamicCalendar();
                 hijriCal.setTimeInMillis(now);
-                android.icu.text.SimpleDateFormat formatter = new android.icu.text.SimpleDateFormat("d MMMM yyyy", new android.icu.util.ULocale("ar"));
-                formatter.setCalendar(hijriCal);
-                hijriDate = formatter.format(new Date()) + " هـ";
+                int day = hijriCal.get(android.icu.util.Calendar.DAY_OF_MONTH);
+                int month = hijriCal.get(android.icu.util.Calendar.MONTH);
+                int year = hijriCal.get(android.icu.util.Calendar.YEAR);
+                
+                String[] hijriMonths = {"محرم", "صفر", "ربيع الأول", "ربيع الآخر", "جمادى الأولى", "جمادى الآخرة", "رجب", "شعبان", "رمضان", "شوال", "ذو القعدة", "ذو الحجة"};
+                hijriDate = day + " " + hijriMonths[month] + " " + year + " هـ";
             } else {
-                java.util.Calendar cal = java.util.Calendar.getInstance();
-                hijriDate = new SimpleDateFormat("dd/MM/yyyy", new Locale("ar")).format(cal.getTime());
+                hijriDate = new SimpleDateFormat("dd/MM/yyyy", new Locale("ar")).format(new Date(now));
             }
 
             SimpleDateFormat sdf = new SimpleDateFormat("hh:mm a", new Locale("ar"));
