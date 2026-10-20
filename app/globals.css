@@ -4,9 +4,21 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ============ تعريف الخطوط ============ */
+@font-face {
+  font-family: 'UthmanicHafs';
+  src: url('/fonts/UthmanicHafs_V22.woff2') format('woff2'),
+       url('/fonts/UthmanicHafs_V22.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 @theme inline {
   --font-sans: var(--font-plex), system-ui, sans-serif;
   --font-quran: var(--font-amiri), serif;
+  --font-mushaf: 'UthmanicHafs', serif; /* إضافة خط المصحف هنا ليعمل كـ كلاس */
+  
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -92,8 +104,17 @@
   }
 }
 
+/* ============ كلاسات مخصصة للخطوط ============ */
 .font-quran {
   font-family: var(--font-amiri), serif;
+}
+
+/* تم دمج الكلاس هنا ليعمل بشكل أفضل مع إعداداتك */
+.font-mushaf {
+  font-family: 'UthmanicHafs', serif;
+  line-height: 2.2; /* تقليل قليل من التباعد ليناسب شاشات الهواتف */
+  text-align: center;
+  direction: rtl;
 }
 
 .ayah-marker {
@@ -106,8 +127,6 @@ html, body {
   overflow-y: auto !important;
   height: 100%;
   -webkit-overflow-scrolling: touch;
-  /* ⚠️ لا نقيّد touch-action هنا: كان pan-y يمنع التمرير الأفقي داخل صفحات المصحف.
-     manipulation يبقي التمرير والتكبير ويزيل تأخير النقر المزدوج. */
   touch-action: manipulation;
   overscroll-behavior-x: none;
   -webkit-tap-highlight-color: transparent;
@@ -116,6 +135,7 @@ html, body {
 button, a, [role="button"], summary {
   touch-action: manipulation;
 }
+
 /* إخفاء شريط التمرير مع بقاء التمرير يعمل (صفحات المصحف) */
 .no-scrollbar {
   scrollbar-width: none;
@@ -135,26 +155,16 @@ body.reading-fullscreen .quran-fab {
 
 /* منع تحديد النص بالضغط المطوّل (التظليل الأزرق وقائمة النسخ) في واجهة التطبيق.
    الحقول القابلة للكتابة تبقى قابلة للتحديد. */
-html,
-body {
+html, body {
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
 }
-input,
-textarea,
-[contenteditable='true'] {
+input, textarea, [contenteditable='true'] {
   -webkit-user-select: text;
   user-select: text;
 }
-@font-face {
-  font-family: 'UthmanicHafs';
-  src: url('/fonts/UthmanicHafs_V22.woff2') format('woff2');
-}
-
-.font-mushaf {
-  font-family: 'UthmanicHafs', sans-serif;
-  line-height: 2.5;
-  text-align: center;
-  direction: rtl;
+/* إخفاء المشغل الصوتي العائم نهائياً من كل الصفحات */
+.quran-fab {
+  display: none !important;
 }

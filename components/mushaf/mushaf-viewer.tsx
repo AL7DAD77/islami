@@ -1,28 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { registerPlugin } from '@capacitor/core';
+import { Menu, X, ArrowRight, ArrowLeft, Bookmark, Play, Pause, ZoomIn, ZoomOut, Volume2 } from 'lucide-react';
 import { saveReadingPosition, toggleBookmark, isBookmarked, useBookmarkState } from '@/lib/bookmarks';
 
-interface LineItem {
-  t: 's' | 'b' | 'a';
-  n?: number;
-  c?: number;
-  w?: string[];
-}
-
-interface PageData {
-  p: number;
-  j: number;
-  l: LineItem[];
-}
-
-interface MetaData {
-  surahNames: string[];
-  basmalah: string;
-  surahStartPage: number[];
-}
+interface LineItem { t: 's' | 'b' | 'a'; n?: number; c?: number; w?: string[]; }
+interface PageData { p: number; j: number; l: LineItem[]; }
+interface MetaData { surahNames: string[]; basmalah: string; surahStartPage: number[]; }
 
 type MushafViewerProps = {
   initialSurah: number;
@@ -31,7 +17,6 @@ type MushafViewerProps = {
 };
 
 interface QuranPlayerPluginInterface {
-  play(options: { url: string; title: string; artist: string; ui?: string; repeat?: boolean }): Promise<any>;
   playQueue(options: { items: Array<{ url: string; title: string; id?: string }>; startIndex?: number; repeat?: boolean; ui?: string }): Promise<any>;
   toggle(options?: {}): Promise<any>;
   stop(options?: {}): Promise<any>;
@@ -89,47 +74,26 @@ const SURAH_DETAILS: { [key: number]: { count: number; type: 'مكية' | 'مد�
   112: { count: 4, type: 'مكية' }, 113: { count: 5, type: 'مكية' }, 114: { count: 6, type: 'مكية' }
 };
 
-function SurahHeaderDecoration({ surahNum, surahName, details }: { surahNum: number; surahName: string; details: { count: number | string; type: string } }) {
-  return (
-    <div className="w-full relative flex items-center justify-center my-1.5 shrink-0 select-none" dir="rtl">
-      <div className="w-full border border-[#C5A059] bg-[#F7F2E8] py-1.5 px-3 rounded-lg shadow-sm flex items-center justify-between relative">
-        <div className="text-right font-sans text-[11px] font-bold text-[#2C5E3B]">
-          <div>{details.type}</div>
-          <div className="text-[9px] text-[#8C6B2B]">ترتيبها: {surahNum}</div>
-        </div>
-        <div className="text-center font-mushaf text-lg md:text-xl font-bold text-[#1A120B]">
-          سُورَةُ {surahName}
-        </div>
-        <div className="text-left font-sans text-[11px] font-bold text-[#2C5E3B]">
-          <div>آيَاتُهَا</div>
-          <div className="text-[9px] text-[#8C6B2B]">{details.count} آية</div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export function MushafViewer({ initialSurah = 1, initialAyah, onHomeClick }: MushafViewerProps) {
   const router = useRouter();
   const bookmarkState = useBookmarkState();
+  
   const [pageData, setPageData] = useState<PageData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [metaData, setMetaData] = useState<MetaData | null>(null);
-
+  const [isIndexOpen, setIsIndexOpen] = useState<boolean>(false);
   const [fontSize, setFontSize] = useState<number>(24);
-
+  
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [audioServer, setAudioServer] = useState<string>('https://server8.mp3quran.net/afs/');
   const [reciterName, setReciterName] = useState<string>('مشاري العفاسي');
   const [showReciterModal, setShowReciterModal] = useState<boolean>(false);
+  
+  const webAudioRef = useRef<HTMLAudioElement | null>(null); 
 
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 2000);
-  };
+  const touchStartX = useRef(0);
+  const touchEndX = useRef(0);
 
   useEffect(() => {
     const savedFontSize = localStorage.getItem('mushaf_font_size');
@@ -142,28 +106,10 @@ export function MushafViewer({ initialSurah = 1, initialAyah, onHomeClick }: Mus
   }, []);
 
   const handleZoomIn = () => {
-    setFontSize(prev => {
-      const newSize = Math.min(prev + 2, 50);
-      localStorage.setItem('mushaf_font_size', String(newSize));
-      return newSize;
-    });
+    setFontSize(prev => { const n = Math.min(prev + 2, 40); localStorage.setItem('mushaf_font_size', String(n)); return n; });
   };
-
   const handleZoomOut = () => {
-    setFontSize(prev => {
-      const newSize = Math.max(prev - 2, 16);
-      localStorage.setItem('mushaf_font_size', String(newSize));
-      return newSize;
-    });
-  };
-
-  const selectReciter = (reciter: { name: string; server: string }) => {
-    setReciterName(reciter.name);
-    setAudioServer(reciter.server);
-    localStorage.setItem('selected_reciter_server', reciter.server);
-    localStorage.setItem('selected_reciter_name', reciter.name);
-    setShowReciterModal(false);
-    showToast(`تم اختيار القارئ: ${reciter.name}`);
+    setFontSize(prev => { const n = Math.max(prev - 2, 16); localStorage.setItem('mushaf_font_size', String(n)); return n; });
   };
 
   useEffect(() => {
@@ -172,11 +118,8 @@ export function MushafViewer({ initialSurah = 1, initialAyah, onHomeClick }: Mus
         const response = await fetch('/mushaf/meta.json');
         const meta: MetaData = await response.json();
         setMetaData(meta);
-        const startPage = meta.surahStartPage[initialSurah - 1] || 1;
-        setCurrentPage(startPage);
-      } catch (error) {
-        console.error("خطأ في جلب meta", error);
-      }
+        setCurrentPage(meta.surahStartPage[initialSurah - 1] || 1);
+      } catch (error) { console.error("خطأ في جلب meta", error); }
     }
     getSurahInfo();
   }, [initialSurah]);
@@ -191,11 +134,7 @@ export function MushafViewer({ initialSurah = 1, initialAyah, onHomeClick }: Mus
         if (!response.ok) throw new Error("الصفحة غير موجودة");
         const data: PageData = await response.json();
         setPageData(data);
-      } catch (error) {
-        console.error("خطأ في تحميل الصفحة", error);
-      } finally {
-        setLoading(false);
-      }
+      } catch (error) { console.error("خطأ في تحميل الصفحة", error); } finally { setLoading(false); }
     }
     loadPage();
   }, [currentPage]);
@@ -214,194 +153,185 @@ export function MushafViewer({ initialSurah = 1, initialAyah, onHomeClick }: Mus
     if (currentPage && metaData && pageData) {
       const currentSurahNum = getCurrentSurahNum();
       const surahName = metaData.surahNames[currentSurahNum - 1] || '';
-      saveReadingPosition(currentSurahNum, surahName, initialAyah || 1);
+      saveReadingPosition(currentSurahNum, surahName, currentPage);
     }
-  }, [currentPage, metaData, pageData, initialAyah]);
+  }, [currentPage, metaData, pageData]);
 
   const handleBookmarkToggle = () => {
     if (!metaData) return;
     const currentSurahNum = getCurrentSurahNum();
     const surahName = metaData.surahNames[currentSurahNum - 1] || '';
-    const added = toggleBookmark(currentSurahNum, surahName, initialAyah || 1);
-    showToast(added ? 'تم حفظ العلامة المرجعية بنجاح 🔖' : 'تم حذف العلامة المرجعية 🗑️');
-  };
-
-  const playSurahAudio = async (surahNum: number) => {
-    if (!metaData) return;
-    const queueItems = [];
-    for (let i = surahNum; i <= 114; i++) {
-      const padded = String(i).padStart(3, '0');
-      const url = `${audioServer}${padded}.mp3`;
-      const name = metaData.surahNames[i - 1] || '';
-      queueItems.push({ url, title: `سورة ${name}`, id: url });
-    }
-    try {
-      const res = await QuranPlayer.playQueue({ items: queueItems, startIndex: 0 });
-      if (res && typeof res.playing !== 'undefined') setIsPlaying(res.playing);
-      else setIsPlaying(true);
-    } catch (err) {
-      try {
-        const paddedSurah = String(surahNum).padStart(3, '0');
-        const audioUrl = `${audioServer}${paddedSurah}.mp3`;
-        const audio = (window as any).__fallbackAudio || new Audio();
-        (window as any).__fallbackAudio = audio;
-        audio.src = audioUrl;
-        audio.onended = () => {
-          if (surahNum < 114) playSurahAudio(surahNum + 1);
-          else setIsPlaying(false);
-        };
-        await audio.play();
-        setIsPlaying(true);
-      } catch (webErr) {
-        setIsPlaying(false);
-      }
-    }
+    toggleBookmark(currentSurahNum, surahName, currentPage);
   };
 
   const toggleAudio = async () => {
     const currentSurah = getCurrentSurahNum();
+    const padded = String(currentSurah).padStart(3, '0');
+    const audioUrl = `${audioServer}${padded}.mp3`;
+
     try {
       const state = await QuranPlayer.getState();
       if (state && (state.playing || state.url)) {
         const res = await QuranPlayer.toggle();
         if (res) setIsPlaying(res.playing);
       } else {
-        await playSurahAudio(currentSurah);
+        const queueItems = [];
+        for (let i = currentSurah; i <= 114; i++) {
+          const p = String(i).padStart(3, '0');
+          const url = `${audioServer}${p}.mp3`;
+          const name = metaData?.surahNames[i - 1] || '';
+          queueItems.push({ url, title: `سورة ${name}`, id: url });
+        }
+        await QuranPlayer.playQueue({ items: queueItems, startIndex: 0 });
+        setIsPlaying(true);
       }
     } catch (err) {
-      const audio = (window as any).__fallbackAudio;
-      if (audio && !audio.paused) {
-        audio.pause();
+      const playSurahInBrowser = (surahNum: number) => {
+        if (surahNum > 114) { setIsPlaying(false); return; }
+        const p = String(surahNum).padStart(3, '0');
+        const url = `${audioServer}${p}.mp3`;
+        
+        if (!webAudioRef.current) {
+          webAudioRef.current = new Audio(url);
+        } else {
+          webAudioRef.current.src = url;
+        }
+        
+        webAudioRef.current.play();
+        webAudioRef.current.onended = () => {
+          playSurahInBrowser(surahNum + 1);
+        };
+      };
+
+      if (isPlaying) {
+        webAudioRef.current?.pause();
         setIsPlaying(false);
       } else {
-        await playSurahAudio(currentSurah);
+        playSurahInBrowser(currentSurah);
+        setIsPlaying(true);
       }
     }
   };
 
-  const handlePrev = () => { if (currentPage > 1) setCurrentPage(currentPage - 1); };
-  const handleNext = () => { if (currentPage < 604) setCurrentPage(currentPage + 1); };
+  const selectReciter = (reciter: { name: string; server: string }) => {
+    setReciterName(reciter.name);
+    setAudioServer(reciter.server);
+    localStorage.setItem('selected_reciter_server', reciter.server);
+    localStorage.setItem('selected_reciter_name', reciter.name);
+    setShowReciterModal(false);
+  };
 
-  if (loading) return <div className="h-dvh flex items-center justify-center font-mushaf text-xl bg-[#121A15] text-[#FDFBF7]">جاري تحميل المصحف...</div>;
-  if (!pageData || !metaData) return <div className="h-dvh flex items-center justify-center text-red-400">حدث خطأ في جلب البيانات.</div>;
+  const goToSurah = (index: number) => {
+    if (metaData) {
+      setCurrentPage(metaData.surahStartPage[index]);
+      setIsIndexOpen(false);
+    }
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.changedTouches[0].screenX;
+  };
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    touchEndX.current = e.changedTouches[0].screenX;
+    const diff = touchStartX.current - touchEndX.current;
+    
+    if (diff > 60) {
+      setCurrentPage(p => Math.min(604, p + 1));
+    } else if (diff < -60) {
+      setCurrentPage(p => Math.max(1, p - 1));
+    }
+  };
 
   const currentSurahNum = getCurrentSurahNum();
-  const isBookmarkedCurrent = isBookmarked(bookmarkState, currentSurahNum, initialAyah || 1);
+  const isBookmarkedCurrent = isBookmarked(bookmarkState, currentSurahNum, currentPage);
 
+  if (loading) return <div className="h-screen flex items-center justify-center font-mushaf text-xl bg-[#FDFBF7] text-[#1A120B]">جاري تحميل المصحف...</div>;
+  if (!pageData || !metaData) return <div className="h-screen flex items-center justify-center text-red-400">حدث خطأ في جلب البيانات.</div>;
   return (
-    <div className="h-dvh w-full bg-[#121A15] p-2 flex flex-col items-center justify-between overflow-hidden" dir="rtl">
+    <div 
+      className="h-dvh w-full bg-[#FDFBF7] flex flex-col relative overflow-hidden select-none" 
+      dir="rtl"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
       
-      {toastMessage && (
-        <div className="fixed top-10 z-50 bg-[#2C5E3B] text-white px-4 py-2 rounded-xl shadow-2xl text-xs font-bold animate-bounce">
-          {toastMessage}
-        </div>
-      )}
-
-      {showReciterModal && (
-        <div className="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-4">
-          <div className="bg-[#FDFBF7] w-full max-w-sm rounded-2xl p-4 border-2 border-[#C5A059] shadow-2xl">
-            <h3 className="text-base font-bold text-[#2C5E3B] mb-3 text-center border-b border-[#C5A059]/30 pb-2">اختر القارئ</h3>
-            <div className="flex flex-col gap-2 max-h-60 overflow-y-auto">
-              {RECITERS.map((r, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => selectReciter(r)}
-                  className={`p-2.5 rounded-xl text-xs font-bold text-right transition-all flex justify-between items-center ${
-                    reciterName === r.name ? 'bg-[#2C5E3B] text-white' : 'bg-white text-[#1A120B] border border-[#C5A059]/30 hover:bg-[#F7F2E8]'
-                  }`}
-                >
-                  <span>{r.name}</span>
-                  {reciterName === r.name && <span>✓</span>}
-                </button>
-              ))}
-            </div>
-            <button onClick={() => setShowReciterModal(false)} className="mt-4 w-full py-2 bg-[#2C5E3B] text-white rounded-xl text-xs font-bold">
-              إغلاق
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* الشريط العلوي */}
-      <div className="w-full max-w-3xl bg-[#F7F2E8] p-2 rounded-xl border border-[#C5A059] flex justify-between items-center shrink-0 mb-1 gap-1 flex-wrap sm:flex-nowrap">
-        <button onClick={() => onHomeClick ? onHomeClick() : router.push('/quran')} className="px-2 py-1.5 bg-[#2C5E3B] text-white rounded-lg text-xs font-bold shrink-0">
-          ← الرئيسية
-        </button>
-
-        <div className="flex items-center gap-1">
-          {/* أزرار التكبير والتصغير (Zoom) */}
-          <div className="flex items-center bg-[#EFE8D8] border border-[#C5A059]/60 rounded-lg overflow-hidden shrink-0">
-            <button onClick={handleZoomOut} className="px-2 py-1.5 text-[#2C5E3B] font-bold hover:bg-[#E5DCB8]" title="تصغير النص">-</button>
-            <span className="px-1 text-[10px] font-bold text-[#8C6B2B]">حجم</span>
-            <button onClick={handleZoomIn} className="px-2 py-1.5 text-[#2C5E3B] font-bold hover:bg-[#E5DCB8]" title="تكبير النص">+</button>
-          </div>
-
-          <button 
-            onClick={toggleAudio}
-            className={`px-2 py-1.5 rounded-lg text-xs font-bold shadow-sm transition-all shrink-0 ${
-              isPlaying ? 'bg-emerald-700 text-white animate-pulse' : 'bg-[#2C5E3B] text-white hover:bg-[#1E4329]'
-            }`}
-          >
-            {isPlaying ? '⏸' : '▶ استماع'}
+      <div className="flex justify-between items-center px-4 py-2 bg-[#F7F2E8] border-b border-[#E5DCB8] shrink-0 z-10">
+        <div className="flex items-center gap-2">
+          <button onClick={() => setIsIndexOpen(true)} className="p-2 bg-white rounded-full shadow-sm hover:bg-gray-50">
+            <Menu className="size-5 text-[#2C5E3B]" />
           </button>
-
-          {/* تم إعادة زر القارئ هنا ليكون ظاهراً دائماً */}
-          <button
-            onClick={() => setShowReciterModal(true)}
-            className="px-2 py-1.5 bg-[#EFE8D8] text-[#2C5E3B] border border-[#C5A059]/60 rounded-lg text-xs font-bold shrink-0 hover:bg-[#E5DCB8]"
-          >
-            🎙️ {reciterName.split(' ')[0]}
-          </button>
-
-          <button 
-            onClick={handleBookmarkToggle} 
-            className={`px-2 py-1.5 rounded-lg text-xs font-bold border border-[#C5A059]/60 transition-all shrink-0 ${
-              isBookmarkedCurrent ? 'bg-[#C5A059] text-white' : 'bg-[#EFE8D8] text-[#2C5E3B]'
-            }`}
-          >
-            {isBookmarkedCurrent ? '🔖' : '🔖 حفظ'}
+          <button onClick={handleBookmarkToggle} className={`p-2 rounded-full shadow-sm ${isBookmarkedCurrent ? 'bg-[#C5A059] text-white' : 'bg-white text-[#2C5E3B] hover:bg-gray-50'}`} title="حفظ العلامة المرجعية">
+            <Bookmark className="size-5" />
           </button>
         </div>
 
-        <div className="text-[#2C5E3B] font-bold text-xs bg-[#EFE8D8] px-2 py-1.5 rounded-lg shrink-0 border border-[#C5A059]/40">
-          ص {currentPage}
+        <div className="flex items-center gap-2 bg-white rounded-full px-3 py-1 shadow-sm border border-[#E5DCB8]">
+          <button onClick={handleZoomOut} className="p-1 text-[#2C5E3B]"><ZoomOut className="size-4" /></button>
+          <span className="text-xs font-bold text-gray-500 w-8 text-center">{fontSize}</span>
+          <button onClick={handleZoomIn} className="p-1 text-[#2C5E3B]"><ZoomIn className="size-4" /></button>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button onClick={toggleAudio} className="p-2 bg-[#2C5E3B] text-white rounded-full shadow-sm hover:bg-[#1E4329]">
+            {isPlaying ? <Pause className="size-5" /> : <Play className="size-5" />}
+          </button>
+          <button onClick={() => setShowReciterModal(true)} className="p-2 bg-white rounded-full shadow-sm hover:bg-gray-50" title="تغيير القارئ">
+            <Volume2 className="size-5 text-[#2C5E3B]" />
+          </button>
+          <button onClick={() => onHomeClick ? onHomeClick() : router.push('/quran')} className="p-2 bg-white rounded-full shadow-sm hover:bg-gray-50">
+            <ArrowRight className="size-5 text-[#2C5E3B]" />
+          </button>
         </div>
       </div>
 
-      {/* عارض الصفحة */}
-      <div className="w-full max-w-3xl grow bg-[#FDFBF7] px-2 sm:px-4 py-2 sm:py-3 rounded-2xl border-2 border-[#C5A059] shadow-2xl flex flex-col justify-between overflow-hidden" dir="rtl">
-        <div className="w-full h-full flex flex-col justify-between items-center overflow-y-auto">
+      {/* منطقة عرض صفحة المصحف */}
+      <div className="flex-1 overflow-y-auto px-2 py-4 flex flex-col items-center no-scrollbar">
+        <div className="w-full max-w-3xl flex flex-col justify-start items-center">
           {pageData.l.map((line, idx) => {
+            
+            // ترويسة السورة (تم إعادة التصميم الاحترافي)
             if (line.t === 's') {
               const surahNum = line.n || 1;
               const surahName = metaData.surahNames[surahNum - 1];
               const details = SURAH_DETAILS[surahNum] || { count: '', type: '' };
-              return <SurahHeaderDecoration key={idx} surahNum={surahNum} surahName={surahName} details={details} />;
-            } 
-            else if (line.t === 'b') {
+
               return (
-                <div key={idx} className="w-full text-center font-mushaf text-[#1A120B] my-0.5">
-                  <span className="text-base md:text-xl font-semibold">{metaData.basmalah}</span>
+                <div key={idx} className="w-full my-6 shrink-0 select-none">
+                  <div className="w-full border border-[#C5A059] bg-[#F7F2E8] py-2 px-3 rounded-xl shadow-sm flex items-center justify-between relative">
+                    <div className="text-right font-sans text-xs font-bold text-[#2C5E3B] w-1/3">
+                      <div>{details.type}</div>
+                      <div className="text-[10px] text-[#8C6B2B]">ترتيبها: {surahNum}</div>
+                    </div>
+                    <div className="text-center font-mushaf text-xl md:text-2xl font-bold text-[#1A120B] w-1/3">
+                      سُورَةُ {surahName}
+                    </div>
+                    <div className="text-left font-sans text-xs font-bold text-[#2C5E3B] w-1/3">
+                      <div>آيَاتُهَا</div>
+                      <div className="text-[10px] text-[#8C6B2B]">{details.count} آية</div>
+                    </div>
+                  </div>
                 </div>
               );
             } 
+            // البسملة
+            else if (line.t === 'b') {
+              return (
+                <div key={idx} className="w-full text-center my-3">
+                  <span className="font-mushaf text-2xl text-[#1A120B]">{metaData.basmalah}</span>
+                </div>
+              );
+            } 
+            // نص الآيات
             else if (line.t === 'a' && line.w) {
               const lineText = line.w.join(' ');
-              const isCentered = line.c === 1;
-
               return (
                 <div 
                   key={idx} 
-                  className="font-mushaf text-[#1A120B] w-full flex justify-center"
-                  style={{
-                    fontSize: `${fontSize}px`, 
-                    textAlign: isCentered ? 'center' : 'justify',
-                    textAlignLast: isCentered ? 'center' : 'justify',
-                    lineHeight: '1.8',
-                    wordSpacing: '0.1em', 
-                  }}
+                  className="font-mushaf w-full text-center text-[#1A120B]"
+                  style={{ fontSize: `${fontSize}px`, wordSpacing: '0.1em', textAlignLast: 'center' }}
                 >
-                  <span className="w-full">{lineText}</span>
+                  {lineText}
                 </div>
               );
             }
@@ -411,15 +341,86 @@ export function MushafViewer({ initialSurah = 1, initialAyah, onHomeClick }: Mus
       </div>
 
       {/* الشريط السفلي */}
-      <div className="w-full max-w-3xl bg-[#F7F2E8] p-2 rounded-xl border border-[#C5A059] flex justify-between items-center shrink-0 mt-1">
-        <button onClick={handlePrev} disabled={currentPage === 1} className="px-4 py-1.5 bg-[#2C5E3B] text-white rounded-lg disabled:opacity-40 text-xs font-bold">
-          السابق
+      <div className="flex justify-center items-center gap-6 px-4 py-2 bg-[#F7F2E8] border-t border-[#E5DCB8] shrink-0">
+        <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-1.5 bg-white border border-[#E5DCB8] text-[#2C5E3B] rounded-lg shadow-sm disabled:opacity-30">
+          <ArrowRight className="size-4" />
         </button>
-        <div className="text-[#2C5E3B] font-bold text-xs">صفحة {currentPage} من 604</div>
-        <button onClick={handleNext} disabled={currentPage === 604} className="px-4 py-1.5 bg-[#2C5E3B] text-white rounded-lg disabled:opacity-40 text-xs font-bold">
-          التالي
+        <span className="font-bold text-[#2C5E3B] text-sm select-none">{currentPage} / 604</span>
+        <button onClick={() => setCurrentPage(p => Math.min(604, p + 1))} disabled={currentPage === 604} className="p-1.5 bg-white border border-[#E5DCB8] text-[#2C5E3B] rounded-lg shadow-sm disabled:opacity-30">
+          <ArrowLeft className="size-4" />
         </button>
       </div>
+
+      {/* فهرس السور */}
+      {isIndexOpen && (
+        <div className="fixed inset-0 z-50 flex">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setIsIndexOpen(false)} />
+          <div className="relative w-[85%] max-w-sm h-full bg-[#FDFBF7] shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
+            <div className="flex justify-between items-center p-4 border-b bg-[#F7F2E8]">
+              <h3 className="font-bold text-lg text-[#2C5E3B]">فهرس السور</h3>
+              <button onClick={() => setIsIndexOpen(false)} className="p-1 rounded-full bg-white shadow-sm">
+                <X className="size-5 text-red-500" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-3 no-scrollbar">
+              {metaData.surahNames.map((name, index) => {
+                const surahNum = index + 1;
+                const details = SURAH_DETAILS[surahNum];
+                const isCurrent = surahNum === currentSurahNum;
+                
+                return (
+                  <button
+                    key={index}
+                    onClick={() => goToSurah(index)}
+                    className={`w-full text-right p-3 mb-2 rounded-xl border transition-all flex justify-between items-center ${
+                      isCurrent 
+                        ? 'bg-[#2C5E3B] border-[#2C5E3B] text-white shadow-md' 
+                        : 'bg-white border-[#E5DCB8] text-[#1A120B] hover:bg-[#F7F2E8]'
+                    }`}
+                  >
+                    <div className="flex flex-col">
+                      <span className={`font-bold text-lg font-mushaf mb-1 ${isCurrent ? 'text-white' : 'text-[#1A120B]'}`}>{name}</span>
+                      {/* تكبير وتغميق بيانات السورة في الفهرس */}
+                      <span className={`text-xs font-sans font-semibold ${isCurrent ? 'text-gray-200' : 'text-[#6B7280]'}`}>
+                        {details?.type} • {details?.count} آية
+                      </span>
+                    </div>
+                    <span className={`text-sm px-3 py-1.5 rounded-full font-bold ${isCurrent ? 'bg-white/20 text-white' : 'bg-[#F7F2E8] text-[#2C5E3B]'}`}>
+                      {surahNum}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* نافذة اختيار القارئ */}
+      {showReciterModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-[#FDFBF7] w-full max-w-sm rounded-2xl p-4 border border-[#C5A059] shadow-2xl animate-in zoom-in-95 duration-200">
+            <h3 className="text-base font-bold text-[#2C5E3B] mb-3 text-center border-b pb-2">اختر القارئ</h3>
+            <div className="flex flex-col gap-2 max-h-60 overflow-y-auto no-scrollbar">
+              {RECITERS.map((r, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => selectReciter(r)}
+                  className={`p-3 rounded-xl text-sm font-bold text-right transition-all flex justify-between items-center ${
+                    reciterName === r.name ? 'bg-[#2C5E3B] text-white' : 'bg-white text-[#1A120B] border border-[#E5DCB8] hover:bg-[#F7F2E8]'
+                  }`}
+                >
+                  <span>{r.name}</span>
+                  {reciterName === r.name && <span>✓</span>}
+                </button>
+              ))}
+            </div>
+            <button onClick={() => setShowReciterModal(false)} className="mt-4 w-full py-2.5 bg-[#2C5E3B] text-white rounded-xl text-sm font-bold">
+              إغلاق
+            </button>
+          </div>
+        </div>
+      )}
 
     </div>
   );

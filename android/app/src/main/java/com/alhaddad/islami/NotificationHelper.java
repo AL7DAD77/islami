@@ -7,45 +7,118 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
+import android.util.Log;
 
 import androidx.core.app.NotificationCompat;
 
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
+
 public class NotificationHelper {
 
+    // معرفات إشعار الأذان
     public static final String CHANNEL_ID = "adhan_channel_id";
     public static final String CHANNEL_NAME = "أذان الصلاة";
     public static final int NOTIFICATION_ID = 1001;
     public static final int ID_PLAYING = 1002;
 
-    // 1. الدالة التي يطلبها AdhanSchedulerPlugin
-    public static void ensureChannels(Context context) {
-        createNotificationChannel(context);
-    }
+    // معرفات الإشعار الدائم (الصلاة القادمة)
+    public static final String PERSISTENT_CHANNEL_ID = "persistent_channel_id";
+    public static final String PERSISTENT_CHANNEL_NAME = "الصلاة القادمة";
+    public static final int PERSISTENT_NOTIFICATION_ID = 9999;
 
-    // 2. دالة إنشاء القناة
+    // 1. إنشاء قنوات الإشعارات
     public static void createNotificationChannel(Context context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel channel = new NotificationChannel(
+            NotificationManager manager = context.getSystemService(NotificationManager.class);
+            if (manager == null) return;
+
+            // قناة الأذان (بصوت عالي)
+            NotificationChannel adhanChannel = new NotificationChannel(
                     CHANNEL_ID,
                     CHANNEL_NAME,
                     NotificationManager.IMPORTANCE_HIGH
             );
-            channel.setDescription("إشعارات مواقيت الأذان");
-            channel.setSound(null, null);
-            channel.enableVibration(true);
+            adhanChannel.setDescription("إشعارات مواقيت الأذان");
+            adhanChannel.setSound(null, null);
+            adhanChannel.enableVibration(true);
+            manager.createNotificationChannel(adhanChannel);
 
-            NotificationManager manager = context.getSystemService(NotificationManager.class);
-            if (manager != null) {
-                manager.createNotificationChannel(channel);
-            }
+            // قناة الإشعار الدائم (هادئة جداً ولا تصدر صوتاً)
+            NotificationChannel persistentChannel = new NotificationChannel(
+                    PERSISTENT_CHANNEL_ID,
+                    PERSISTENT_CHANNEL_NAME,
+                    NotificationManager.IMPORTANCE_LOW
+            );
+            persistentChannel.setDescription("يعرض الوقت المتبقي للصلاة القادمة");
+            persistentChannel.setSound(null, null);
+            persistentChannel.enableVibration(false);
+            persistentChannel.setShowBadge(false);
+            manager.createNotificationChannel(persistentChannel);
         }
     }
 
-    // 3. دالة بناء الإشعار (التي يطلبها AdhanService)
+    public static void ensureChannels(Context context) {
+        createNotificationChannel(context);
+    }
+
+    // 2. دالة تحديث الإشعار الدائم (الصلاة القادمة)
+    public static void updatePersistent(Context context) {
+        try {
+            long now = System.currentTimeMillis();
+            long nextTime = Long.MAX_VALUE;
+            String nextPrayerName = "";
+
+            // البحث عن الصلاة القادمة من قاعدة البيانات
+            for (AdhanStore.Item it : AdhanStore.load(context)) {
+                if (it.at > now && it.at < nextTime) {
+                    nextTime = it.at;
+                    // نستخدم اسم الصلاة، وإذا لم يوجد نستخدم العنوان
+                    nextPrayerName = it.prayer != null && !it.prayer.isEmpty() ? it.prayer : it.title;
+                }
+            }
+
+            // إذا لم يتم العثور على صلاة قادمة، لا نعرض شيئاً
+            if (nextTime == Long.MAX_VALUE) return;
+
+            // تنسيق الوقت (مثال: 03:15 م)
+            SimpleDateFormat sdf = new SimpleDateFormat("hh:mm a", new Locale("ar"));
+            String timeString = sdf.format(new Date(nextTime));
+
+            // Intent لفتح التطبيق عند الضغط على الإشعار
+            Intent intent = new Intent(context, MainActivity.class);
+            int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                flags |= PendingIntent.FLAG_IMMUTABLE;
+            }
+            PendingIntent pendingIntent = PendingIntent.getActivity(context, 0, intent, flags);
+
+            // بناء الإشعار الدائم
+            NotificationCompat.Builder builder = new NotificationCompat.Builder(context, PERSISTENT_CHANNEL_ID)
+                    .setContentTitle("الصلاة القادمة: " + nextPrayerName)
+                    .setContentText("موعد الأذان: " + timeString)
+                    .setSmallIcon(android.R.drawable.ic_lock_idle_alarm) // يمكنك تغييرها بأيقونة تطبيقك
+                    .setOngoing(true) // يمنع سحب الإشعار أو إخفاءه
+                    .setAutoCancel(false)
+                    .setPriority(NotificationCompat.PRIORITY_LOW)
+                    .setContentIntent(pendingIntent);
+
+            NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (manager != null) {
+                manager.notify(PERSISTENT_NOTIFICATION_ID, builder.build());
+            }
+
+        } catch (Exception e) {
+            Log.e("NotificationHelper", "خطأ في تحديث الإشعار الدائم", e);
+        }
+    }
+
+    // 3. بناء إشعار الأذان العادي
     public static Notification buildPlaying(Context context, String title, String body) {
         Intent stopIntent = new Intent(context, AdhanReceiver.class);
         stopIntent.setAction("STOP_ADHAN_ACTION");
-
+        
         int flags = PendingIntent.FLAG_UPDATE_CURRENT;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             flags |= PendingIntent.FLAG_IMMUTABLE;
@@ -69,7 +142,7 @@ public class NotificationHelper {
                 .build();
     }
 
-    // 4. دالة التذكير (التي يطلبها AdhanReceiver)
+    // 4. دالة التذكير
     public static void showReminder(Context context, int id, String title, String body) {
         Intent intent = new Intent(context, MainActivity.class);
         int flags = PendingIntent.FLAG_UPDATE_CURRENT;
@@ -90,12 +163,7 @@ public class NotificationHelper {
         if (manager != null) manager.notify(id, builder.build());
     }
 
-    // 5. دالة تحديث الإشعار الدائم (التي يطلبها AdhanReceiver)
-    public static void updatePersistent(Context context) {
-        // فارغة لتجنب الأخطاء
-    }
-
-    // 6. دالة إلغاء الإشعار
+    // 5. إلغاء إشعار الأذان
     public static void cancelAdhanNotification(Context context) {
         NotificationManager notificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
         if (notificationManager != null) {
@@ -104,7 +172,7 @@ public class NotificationHelper {
         }
     }
 
-    // 7. دالة فتح التطبيق (التي يطلبها AdhanScheduler)
+    // 6. دالة فتح التطبيق
     public static PendingIntent openApp(Context context) {
         Intent intent = new Intent(context, MainActivity.class);
         int flags = PendingIntent.FLAG_UPDATE_CURRENT;
