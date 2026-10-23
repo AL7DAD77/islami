@@ -66,6 +66,32 @@ public class NotificationHelper {
         }
     }
 
+    // دالة جديدة لصياغة الوقت بالعربية الفصحى (ساعة، ساعتان، ساعات / دقيقة، دقيقتان، دقائق)
+    private static String formatTimeDiff(long diffMs) {
+        long minutes = (diffMs / (1000 * 60)) % 60;
+        long hours = (diffMs / (1000 * 60 * 60)) % 24;
+        
+        if (hours == 0 && minutes == 0) return "أقل من دقيقة";
+        
+        StringBuilder sb = new StringBuilder();
+        if (hours > 0) {
+            if (hours == 1) sb.append("ساعة");
+            else if (hours == 2) sb.append("ساعتان");
+            else if (hours >= 3 && hours <= 10) sb.append(hours).append(" ساعات");
+            else sb.append(hours).append(" ساعة");
+        }
+        
+        if (minutes > 0) {
+            if (sb.length() > 0) sb.append(" و ");
+            if (minutes == 1) sb.append("دقيقة");
+            else if (minutes == 2) sb.append("دقيقتان");
+            else if (minutes >= 3 && minutes <= 10) sb.append(minutes).append(" دقائق");
+            else sb.append(minutes).append(" دقيقة");
+        }
+        
+        return sb.toString();
+    }
+
     public static void updatePersistent(Context context) {
         try {
             long now = System.currentTimeMillis();
@@ -76,7 +102,14 @@ public class NotificationHelper {
             String prevPrayerName = "";
 
             for (AdhanStore.Item it : AdhanStore.load(context)) {
-                String prayer = translatePrayer(it.prayer != null && !it.prayer.isEmpty() ? it.prayer : it.title);
+                // 🛑 تجاهل أي حدث ليس له اسم صلاة (مثل أحداث منتصف الليل القديمة أو نقاط المنتصف)
+                if (it.prayer == null || it.prayer.trim().isEmpty()) {
+                    continue;
+                }
+                
+                String prayer = translatePrayer(it.prayer);
+                if (prayer.isEmpty()) continue;
+
                 if (it.at > now && it.at < nextTime) {
                     nextTime = it.at;
                     nextPrayerName = prayer;
@@ -90,36 +123,23 @@ public class NotificationHelper {
             String timeText = "";
             String sign = "";
 
+            // تحديد ما إذا كنا سنعرض "متبقي على" أو "مضى على"
             if (nextTime != Long.MAX_VALUE && (prevTime == Long.MIN_VALUE || (nextTime - now) < (now - prevTime))) {
                 long diff = nextTime - now;
-                long hours = diff / (1000 * 60 * 60);
-                long minutes = (diff / (1000 * 60)) % 60;
-                
-                if (hours > 0) {
-                    timeText = String.format(Locale.getDefault(), "%d ساعة و %d دقيقة", hours, minutes);
-                } else {
-                    timeText = String.format(Locale.getDefault(), "%d دقيقة", minutes);
-                }
-                sign = "-";
+                timeText = formatTimeDiff(diff);
+                sign = "- ";
                 titleText = "متبقي على " + nextPrayerName;
             } 
             else if (prevTime != Long.MIN_VALUE) {
                 long diff = now - prevTime;
-                long hours = diff / (1000 * 60 * 60);
-                long minutes = (diff / (1000 * 60)) % 60;
-                
-                if (hours > 0) {
-                    timeText = String.format(Locale.getDefault(), "%d ساعة و %d دقيقة", hours, minutes);
-                } else {
-                    timeText = String.format(Locale.getDefault(), "%d دقيقة", minutes);
-                }
-                sign = "+";
+                timeText = formatTimeDiff(diff);
+                sign = "+ ";
                 titleText = "مضى على " + prevPrayerName;
             } else {
                 return;
             }
 
-            // ⚠️ الحل الجذري للتاريخ الهجري (يدوي لضمان عدم ظهور أي كلمات إنجليزية)
+            // التاريخ الهجري
             String hijriDate = "";
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 android.icu.util.IslamicCalendar hijriCal = new android.icu.util.IslamicCalendar();
@@ -134,8 +154,14 @@ public class NotificationHelper {
                 hijriDate = new SimpleDateFormat("dd/MM/yyyy", new Locale("ar")).format(new Date(now));
             }
 
-            SimpleDateFormat sdf = new SimpleDateFormat("hh:mm a", new Locale("ar"));
-            String prayerTimeStr = nextTime != Long.MAX_VALUE ? sdf.format(new Date(nextTime)) : "";
+            // تنسيق وقت الأذان القادم (استخدام US لضمان ظهور الأرقام الإنجليزية ثم استبدال AM/PM)
+            SimpleDateFormat sdf = new SimpleDateFormat("hh:mm a", Locale.US);
+            String prayerTimeStr = "";
+            if (nextTime != Long.MAX_VALUE) {
+                prayerTimeStr = sdf.format(new Date(nextTime))
+                        .replace("AM", "ص")
+                        .replace("PM", "م");
+            }
 
             Intent intent = new Intent(context, MainActivity.class);
             int flags = PendingIntent.FLAG_UPDATE_CURRENT;
@@ -145,7 +171,10 @@ public class NotificationHelper {
             PendingIntent pendingIntent = PendingIntent.getActivity(context, 0, intent, flags);
 
             String bodyText = "الوقت: " + sign + timeText;
-            String bigText = bodyText + "\n" + hijriDate + (nextTime != Long.MAX_VALUE ? "\nموعد الأذان: " + prayerTimeStr : "");
+            String bigText = bodyText + "\n" + hijriDate;
+            if (nextTime != Long.MAX_VALUE) {
+                bigText += "\nموعد الأذان: " + prayerTimeStr;
+            }
 
             NotificationCompat.Builder builder = new NotificationCompat.Builder(context, PERSISTENT_CHANNEL_ID)
                     .setContentTitle(titleText)

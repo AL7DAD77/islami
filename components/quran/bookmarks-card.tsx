@@ -13,7 +13,7 @@ export function BookmarksCard() {
     <>
       {position && (
         <Link
-          href={`/quran/${position.surah}?ayah=${position.ayah}`}
+          href={`/quran/${position.surah}?page=${position.page}`}
           className="flex items-center gap-3 rounded-2xl bg-card p-3 shadow-sm ring-1 ring-border hover:bg-secondary"
         >
           <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground">
@@ -22,7 +22,7 @@ export function BookmarksCard() {
           <span className="min-w-0 flex-1">
             <span className="block text-[11px] text-muted-foreground">{'متابعة القراءة'}</span>
             <span className="block truncate font-bold">
-              {`سورة ${position.surahName || toArabicNumber(position.surah)} · آية ${toArabicNumber(position.ayah)}`}
+              {`سورة ${position.surahName || toArabicNumber(position.surah)} · صفحة ${toArabicNumber(position.page)}`}
             </span>
           </span>
         </Link>
@@ -43,13 +43,12 @@ export function BookmarksCard() {
           <ul className="flex flex-col divide-y divide-border border-t px-3">
             {bookmarks.map((b) => (
               <li key={b.id} className="flex items-center gap-2 py-2">
-                <Link href={`/quran/${b.surah}?ayah=${b.ayah}`} className="flex-1 text-sm">
-                  {`سورة ${b.surahName || toArabicNumber(b.surah)} · آية ${toArabicNumber(b.ayah)}`}
+                <Link href={`/quran/${b.surah}?page=${b.page}`} className="flex-1 text-sm">
+                  {`سورة ${b.surahName || toArabicNumber(b.surah)} · صفحة ${toArabicNumber(b.page)}`}
                 </Link>
                 <button
                   type="button"
                   onClick={() => removeBookmark(b.id)}
-                  aria-label="حذف العلامة"
                   className="flex size-8 items-center justify-center rounded-full bg-muted text-muted-foreground hover:text-destructive"
                 >
                   <Trash2 className="size-4" aria-hidden="true" />

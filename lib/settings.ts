@@ -36,7 +36,6 @@ export interface AppSettings {
   hijriAdjust: number
   adhanVoice: string
   fajrVoice: string
-  /** صوت مختار لكل صلاة (إن غاب تُستخدم الافتراضية) */
   prayerVoices: Partial<Record<PrayerKey, string>>
   adhanEnabled: Record<PrayerKey, boolean>
   adhanVolume: number
@@ -50,9 +49,7 @@ export interface AppSettings {
   persistentNotification: boolean
   locationStatus: 'unknown' | 'ok' | 'denied' | 'error'
   quranView: 'scroll' | 'pages'
-  /** ملاءمة الصفحة للشاشة تلقائياً (تُلغى عند اختيار حجم يدوي) */
   quranFitPage: boolean
-  /** إظهار «دعاء اليوم» مرة واحدة في اليوم */
   showDailyMessage: boolean
   ayahHighlight: boolean
 }

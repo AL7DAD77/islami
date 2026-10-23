@@ -45,12 +45,8 @@ function isCustomMethod(m: MethodKey): m is CustomMethodKey {
 }
 
 /**
- * طرق وطنية غير موجودة في مكتبة adhan، نبنيها فوق Other():
- * - الأردن (وزارة الأوقاف): فجر 18° وعشاء 18° و+5 دقائق للمغرب.
- * - الجزائر (وزارة الشؤون الدينية والأوقاف): فجر 18° وعشاء 17°.
- * - تونس (وزارة الشؤون الدينية): فجر 18° وعشاء 18°.
- * - المغرب (وزارة الأوقاف والشؤون الإسلامية): فجر 19° وعشاء 17°، الشروق −3 والظهر +5 والمغرب +5.
- * المصدر: توثيق مكتبة adhan_dart. تُراجع أوقاتها مع الجدول الرسمي لكل دولة.
+ * ضبط دقيق للطرق المحلية.
+ * الأردن: الفجر 18، العشاء 18، مع إضافة 5 دقائق للظهر والمغرب كما في التقويم الرسمي.
  */
 function getCustomParams(method: CustomMethodKey) {
   const p = CalculationMethod.Other()
@@ -58,6 +54,8 @@ function getCustomParams(method: CustomMethodKey) {
     case 'JordanAwqaf':
       p.fajrAngle = 18
       p.ishaAngle = 18
+      // الأردن تضيف 5 دقائق للظهر و 5 دقائق للمغرب
+      p.adjustments.dhuhr = 5
       p.adjustments.maghrib = 5
       break
     case 'AlgeriaMinistry':
@@ -79,7 +77,6 @@ function getCustomParams(method: CustomMethodKey) {
   return p
 }
 
-/** أي قيمة غير معروفة (مثلاً مخزّنة من إصدار آخر) ترجع لأم القرى بدل أن ينهار التطبيق. */
 function getParams(method: MethodKey) {
   if (isCustomMethod(method)) return getCustomParams(method)
   return (CalculationMethod[method] ?? CalculationMethod.UmmAlQura)()
@@ -90,7 +87,16 @@ export function getPrayerTimes(settings: AppSettings, date = new Date()): DayTim
   const params = getParams(settings.method)
   params.madhab = settings.madhab === 'hanafi' ? Madhab.Hanafi : Madhab.Shafi
   const t = new PrayerTimes(coords, date, params)
-  return { fajr: t.fajr, sunrise: t.sunrise, dhuhr: t.dhuhr, asr: t.asr, maghrib: t.maghrib, isha: t.isha }
+  
+  // نرجع التواريخ كما هي، ليقوم المتصفح بعرضها حسب التوقيت المحلي للجهاز
+  return { 
+    fajr: t.fajr, 
+    sunrise: t.sunrise, 
+    dhuhr: t.dhuhr, 
+    asr: t.asr, 
+    maghrib: t.maghrib, 
+    isha: t.isha 
+  }
 }
 
 export const PRAYER_ORDER: PrayerKey[] = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']

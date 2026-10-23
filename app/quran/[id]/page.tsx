@@ -1,20 +1,25 @@
-'use client'
-
-import { notFound, useParams, useSearchParams } from 'next/navigation'
+import { Suspense } from 'react'
 import { MushafViewer } from '@/components/mushaf/mushaf-viewer'
 
-/**
- * صفحة السورة: تفتح المصحف بصفحاته على أول صفحة في السورة (أو على آية محددة عبر ?ayah=).
- * كل روابط /quran/N في التطبيق (قائمة السور، آخر تلاوة، العلامات المرجعية، قسم الأطفال) تصل هنا.
- */
-export default function SurahPage() {
-  const params = useParams<{ id: string }>()
-  const searchParams = useSearchParams()
+// 1. إجبار Next.js على إنشاء مسارات لجميع السور (من 1 إلى 114) للتصدير الثابت
+export function generateStaticParams() {
+  return Array.from({ length: 114 }, (_, i) => ({
+    id: String(i + 1),
+  }))
+}
 
-  const surah = Number(params.id)
-  if (!Number.isInteger(surah) || surah < 1 || surah > 114) notFound()
+// 2. الصفحة (Server Component) - تقرأ الـ id من الرابط وتمرره للعارض
+export default async function SurahPage({ params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = await params
+  const surah = Number(resolvedParams.id)
 
-  const ayah = Number(searchParams.get('ayah')) || undefined
+  if (!Number.isInteger(surah) || surah < 1 || surah > 114) {
+    return <div className="flex h-screen items-center justify-center text-xl">السورة غير موجودة</div>
+  }
 
-  return <MushafViewer key={`${surah}:${ayah ?? 0}`} initialSurah={surah} initialAyah={ayah} />
+  return (
+    <Suspense fallback={<div className="flex h-screen items-center justify-center font-sans text-xl">جاري التحميل...</div>}>
+      <MushafViewer initialSurah={surah} />
+    </Suspense>
+  )
 }

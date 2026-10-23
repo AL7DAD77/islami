@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
 import { ChevronLeft } from 'lucide-react'
+import { Suspense } from 'react'
 import { PageHeader } from '@/components/page-header'
 import { SectionTitle } from '@/components/ui-kit'
 import { SearchButton } from '@/components/search-button'
@@ -12,15 +13,23 @@ export const metadata: Metadata = { title: 'الأذكار والأدعية | إ
 export default function AdhkarPage() {
   const hisn = ADHKAR.filter((c) => c.group === 'hisn')
   const hisnItems = hisn.reduce((sum, c) => sum + c.items.length, 0)
-  // الرقية الشرعية تُعرض بجوار حصن المسلم في الأعلى، فلا تتكرر ضمن المجموعات أسفلها
   const ruqyah = ADHKAR.find((c) => c.id === 'ruqyah')
-  // نعرض المجموعات التي فيها أقسام فقط (الأقسام المكرّرة في حصن المسلم حُذفت من هنا)
+  
   const groups = ADHKAR_GROUPS.filter(
     (g) => (g.id !== 'ruqyah' || !ruqyah) && ADHKAR.some((c) => c.group === g.id),
   )
+
   return (
-    <>
-      <PageHeader title="الأذكار والأدعية" subtitle="من القرآن والسنة الصحيحة مع ذكر المصدر" action={<SearchButton />} />
+    <div dir="rtl">
+      <PageHeader 
+        title="الأذكار والأدعية" 
+        subtitle="من القرآن والسنة الصحيحة مع ذكر المصدر" 
+        action={
+          <Suspense fallback={<div className="size-10" />}>
+            <SearchButton />
+          </Suspense>
+        } 
+      />
 
       <Link
         href="/tasbih"
@@ -38,7 +47,7 @@ export default function AdhkarPage() {
 
       <div className={`mb-5 grid gap-2.5 ${ruqyah ? 'grid-cols-2' : 'grid-cols-1'}`}>
         <Link
-          href="/adhkar/hisn"
+          href="/adhkar/hisn" // تم إرجاع الرابط الأصلي
           className="flex items-center gap-2.5 rounded-2xl bg-card p-3 shadow-sm ring-1 ring-border transition-colors hover:bg-secondary"
         >
           <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-accent text-xl text-accent-foreground">
@@ -101,6 +110,6 @@ export default function AdhkarPage() {
       <p className="mt-8 text-center text-xs leading-relaxed text-muted-foreground">
         {'الأذكار مأخوذة من القرآن الكريم وكتاب حصن المسلم وكتب السنة، مع الاقتصار على ما صح أو حسن إسناده بحسب تخريج أهل العلم.'}
       </p>
-    </>
+    </div>
   )
 }

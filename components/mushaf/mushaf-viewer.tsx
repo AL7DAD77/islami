@@ -1,457 +1,171 @@
-'use client';
+'use client'
 
-import { useEffect, useState, useRef } from 'react';
-import { useRouter } from 'next/navigation';
-import { registerPlugin } from '@capacitor/core';
-import { Menu, X, ArrowRight, ArrowLeft, Bookmark, Play, Pause, Volume2 } from 'lucide-react';
-import { saveReadingPosition, toggleBookmark, isBookmarked, useBookmarkState } from '@/lib/bookmarks';
+import { useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { ChevronRight, Bookmark, Play, Pause, Headphones } from 'lucide-react'
+import { saveReadingPosition, useBookmarkState, toggleBookmark, isBookmarked } from '@/lib/bookmarks'
+import { toArabicNumber } from '@/lib/quran'
+import { useQuranPlayer } from '@/lib/quran-player'
 
-interface LineItem { t: 's' | 'b' | 'a'; n?: number; c?: number; w?: string[]; }
-interface PageData { p: number; j: number; l: LineItem[]; }
-interface MetaData { surahNames: string[]; basmalah: string; surahStartPage: number[]; }
-
-type MushafViewerProps = {
-  initialSurah: number;
-  initialAyah?: number;
-  onHomeClick?: () => void;
-};
-
-interface QuranPlayerPluginInterface {
-  playQueue(options: { items: Array<{ url: string; title: string; id?: string }>; startIndex?: number; repeat?: boolean; ui?: string }): Promise<any>;
-  toggle(options?: {}): Promise<any>;
-  stop(options?: {}): Promise<any>;
-  getState(options?: {}): Promise<{ playing: boolean; loading: boolean; progress: number; repeat: boolean; title: string; url?: string; index?: number }>;
+interface MetaData {
+  surahNames: string[]
+  surahStartPage: number[]
 }
 
-const QuranPlayer = registerPlugin<QuranPlayerPluginInterface>('QuranPlayer');
+export function MushafViewer({ initialSurah }: { initialSurah: number }) {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const pageParam = Number(searchParams.get('page'))
+  const initialPage = pageParam > 0 ? pageParam : undefined
 
-const RECITERS = [
-  { name: 'مشاري العفاسي', server: 'https://server8.mp3quran.net/afs/' },
-  { name: 'سعود الشريم', server: 'https://server7.mp3quran.net/shur/' },
-  { name: 'عبد الباسط عبد الصمد', server: 'https://server7.mp3quran.net/basit/' },
-  { name: 'محمود خليل الحصري', server: 'https://server13.mp3quran.net/husr/' },
-  { name: 'ماهر المعيقلي', server: 'https://server12.mp3quran.net/maher/' },
-  { name: 'عبد الرحمن السديس', server: 'https://server11.mp3quran.net/sds/' },
-  { name: 'ياسر الدوسري', server: 'https://server11.mp3quran.net/yasser/' },
-  { name: 'محمد صديق المنشاوي', server: 'https://server10.mp3quran.net/minsh/' },
-  { name: 'أحمد العجمي', server: 'https://server10.mp3quran.net/ajm/' },
-  { name: 'سعد الغامدي', server: 'https://server7.mp3quran.net/s_gmd/' },
-  { name: 'فارس عباد', server: 'https://server8.mp3quran.net/frs_a/' },
-  { name: 'خالد الجليل', server: 'https://server10.mp3quran.net/jleel/' },
-  { name: 'علي الحذيفي', server: 'https://server9.mp3quran.net/hthfi/' },
-  { name: 'ماجد الزامل', server: 'https://server9.mp3quran.net/zaml/' }
-];
-
-const SURAH_DETAILS: { [key: number]: { count: number; type: 'مكية' | 'مدنية' } } = {
-  1: { count: 7, type: 'مكية' }, 2: { count: 286, type: 'مدنية' }, 3: { count: 200, type: 'مدنية' },
-  4: { count: 176, type: 'مدنية' }, 5: { count: 120, type: 'مدنية' }, 6: { count: 165, type: 'مكية' },
-  7: { count: 206, type: 'مكية' }, 8: { count: 75, type: 'مدنية' }, 9: { count: 129, type: 'مدنية' },
-  10: { count: 109, type: 'مكية' }, 11: { count: 123, type: 'مكية' }, 12: { count: 111, type: 'مكية' },
-  13: { count: 43, type: 'مدنية' }, 14: { count: 52, type: 'مكية' }, 15: { count: 99, type: 'مكية' },
-  16: { count: 128, type: 'مكية' }, 17: { count: 111, type: 'مكية' }, 18: { count: 110, type: 'مكية' },
-  19: { count: 98, type: 'مكية' }, 20: { count: 135, type: 'مكية' }, 21: { count: 112, type: 'مكية' },
-  22: { count: 78, type: 'مدنية' }, 23: { count: 118, type: 'مكية' }, 24: { count: 64, type: 'مدنية' },
-  25: { count: 77, type: 'مكية' }, 26: { count: 227, type: 'مكية' }, 27: { count: 93, type: 'مكية' },
-  28: { count: 88, type: 'مكية' }, 29: { count: 69, type: 'مكية' }, 30: { count: 60, type: 'مكية' },
-  31: { count: 34, type: 'مكية' }, 32: { count: 30, type: 'مكية' }, 33: { count: 73, type: 'مدنية' },
-  34: { count: 54, type: 'مكية' }, 35: { count: 45, type: 'مكية' }, 36: { count: 83, type: 'مكية' },
-  37: { count: 182, type: 'مكية' }, 38: { count: 88, type: 'مكية' }, 39: { count: 75, type: 'مكية' },
-  40: { count: 85, type: 'مكية' }, 41: { count: 54, type: 'مكية' }, 42: { count: 53, type: 'مكية' },
-  43: { count: 89, type: 'مكية' }, 44: { count: 59, type: 'مكية' }, 45: { count: 37, type: 'مكية' },
-  46: { count: 35, type: 'مكية' }, 47: { count: 38, type: 'مدنية' }, 48: { count: 29, type: 'مدنية' },
-  49: { count: 18, type: 'مدنية' }, 50: { count: 45, type: 'مكية' }, 51: { count: 60, type: 'مكية' },
-  52: { count: 49, type: 'مكية' }, 53: { count: 62, type: 'مكية' }, 54: { count: 55, type: 'مكية' },
-  55: { count: 78, type: 'مدنية' }, 56: { count: 96, type: 'مكية' }, 57: { count: 29, type: 'مدنية' },
-  58: { count: 22, type: 'مدنية' }, 59: { count: 24, type: 'مدنية' }, 60: { count: 13, type: 'مدنية' },
-  61: { count: 14, type: 'مدنية' }, 62: { count: 11, type: 'مدنية' }, 63: { count: 11, type: 'مدنية' },
-  64: { count: 18, type: 'مدنية' }, 65: { count: 12, type: 'مدنية' }, 66: { count: 12, type: 'مدنية' },
-  67: { count: 30, type: 'مكية' }, 68: { count: 52, type: 'مكية' }, 69: { count: 52, type: 'مكية' },
-  70: { count: 44, type: 'مكية' }, 71: { count: 28, type: 'مكية' }, 72: { count: 28, type: 'مكية' },
-  73: { count: 20, type: 'مكية' }, 74: { count: 56, type: 'مكية' }, 75: { count: 40, type: 'مكية' },
-  76: { count: 31, type: 'مدنية' }, 77: { count: 50, type: 'مكية' }, 78: { count: 40, type: 'مكية' },
-  79: { count: 46, type: 'مكية' }, 80: { count: 42, type: 'مكية' }, 81: { count: 29, type: 'مكية' },
-  82: { count: 19, type: 'مكية' }, 83: { count: 36, type: 'مكية' }, 84: { count: 25, type: 'مكية' },
-  85: { count: 22, type: 'مكية' }, 86: { count: 17, type: 'مكية' }, 87: { count: 19, type: 'مكية' },
-  88: { count: 26, type: 'مكية' }, 89: { count: 30, type: 'مكية' }, 90: { count: 20, type: 'مكية' },
-  91: { count: 15, type: 'مكية' }, 92: { count: 21, type: 'مكية' }, 93: { count: 11, type: 'مكية' },
-  94: { count: 8, type: 'مكية' }, 95: { count: 8, type: 'مكية' }, 96: { count: 19, type: 'مكية' },
-  97: { count: 5, type: 'مكية' }, 98: { count: 8, type: 'مدنية' }, 99: { count: 8, type: 'مدنية' },
-  100: { count: 11, type: 'مكية' }, 101: { count: 11, type: 'مكية' }, 102: { count: 8, type: 'مكية' },
-  103: { count: 3, type: 'مكية' }, 104: { count: 9, type: 'مكية' }, 105: { count: 5, type: 'مكية' },
-  106: { count: 4, type: 'مكية' }, 107: { count: 7, type: 'مكية' }, 108: { count: 3, type: 'مكية' },
-  109: { count: 6, type: 'مكية' }, 110: { count: 3, type: 'مدنية' }, 111: { count: 5, type: 'مكية' },
-  112: { count: 4, type: 'مكية' }, 113: { count: 5, type: 'مكية' }, 114: { count: 6, type: 'مكية' }
-};
-
-export function MushafViewer({ initialSurah = 1, initialAyah, onHomeClick }: MushafViewerProps) {
-  const router = useRouter();
-  const bookmarkState = useBookmarkState();
+  const [currentPage, setCurrentPage] = useState<number>(initialPage || 1)
+  const [metaData, setMetaData] = useState<MetaData | null>(null)
+  const [loading, setLoading] = useState<boolean>(true)
   
-  const [pageData, setPageData] = useState<PageData | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [currentPage, setCurrentPage] = useState<number>(1);
-  const [metaData, setMetaData] = useState<MetaData | null>(null);
-  const [isIndexOpen, setIsIndexOpen] = useState<boolean>(false);
-  const [fontSize, setFontSize] = useState<number>(24);
-  
-  const [isPlaying, setIsPlaying] = useState<boolean>(false);
-  const [audioServer, setAudioServer] = useState<string>('https://server8.mp3quran.net/afs/');
-  const [reciterName, setReciterName] = useState<string>('مشاري العفاسي');
-  const [showReciterModal, setShowReciterModal] = useState<boolean>(false);
-  
-  const webAudioRef = useRef<HTMLAudioElement | null>(null); 
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const bookmarkState = useBookmarkState()
+  const player = useQuranPlayer()
+
+  const handlePrev = () => { if (currentPage > 1) setCurrentPage(currentPage - 1) }
+  const handleNext = () => { if (currentPage < 604) setCurrentPage(currentPage + 1) }
+
+  // التنقل بالماوس
+  const [mouseStartX, setMouseStartX] = useState<number | null>(null)
+  const handleMouseDown = (e: React.MouseEvent) => setMouseStartX(e.clientX)
+  const handleMouseUp = (e: React.MouseEvent) => {
+    if (mouseStartX === null) return
+    const distance = mouseStartX - e.clientX
+    if (distance > 50) handleNext()
+    else if (distance < -50) handlePrev()
+    setMouseStartX(null)
+  }
+
+  // التنقل باللمس
+  const [touchStartX, setTouchStartX] = useState<number | null>(null)
+  const handleTouchStart = (e: React.TouchEvent) => setTouchStartX(e.targetTouches[0].clientX)
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX === null) return
+    const distance = touchStartX - e.changedTouches[0].clientX
+    if (distance > 50) handleNext()
+    else if (distance < -50) handlePrev()
+    setTouchStartX(null)
+  }
+
+  // التنقل بالأسهم
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') handleNext()
+      if (e.key === 'ArrowRight') handlePrev()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [currentPage])
 
   useEffect(() => {
-    document.body.classList.add('reading-fullscreen');
-    const savedFontSize = localStorage.getItem('mushaf_font_size');
-    if (savedFontSize) setFontSize(Number(savedFontSize));
-
-    const savedServer = localStorage.getItem('selected_reciter_server');
-    const savedName = localStorage.getItem('selected_reciter_name');
-    if (savedServer) setAudioServer(savedServer);
-    if (savedName) setReciterName(savedName);
-
-    return () => {
-      document.body.classList.remove('reading-fullscreen');
-    };
-  }, []);
-
-  useEffect(() => {
-    async function getSurahInfo() {
+    async function loadMeta() {
       try {
-        const response = await fetch('/mushaf/meta.json');
-        const meta: MetaData = await response.json();
-        setMetaData(meta);
-        setCurrentPage(meta.surahStartPage[initialSurah - 1] || 1);
-      } catch (error) { console.error("خطأ في جلب meta", error); }
+        const res = await fetch('/mushaf/meta.json')
+        const meta = await res.json()
+        setMetaData(meta)
+        if (!initialPage) {
+          const startPage = meta.surahStartPage[initialSurah - 1] || 1
+          setCurrentPage(startPage)
+        }
+      } catch (error) {
+        console.error("خطأ في جلب meta", error)
+      } finally {
+        setLoading(false)
+      }
     }
-    if (!metaData) getSurahInfo();
-  }, [initialSurah, metaData]);
+    loadMeta()
+  }, [initialSurah, initialPage])
 
   useEffect(() => {
-    if (!currentPage) return;
-    async function loadPage() {
-      setLoading(true);
+    if (currentPage && metaData) {
+      saveReadingPosition(initialSurah, metaData.surahNames[initialSurah - 1] || '', currentPage)
+    }
+  }, [currentPage, metaData, initialSurah])
+
+  const handlePlayToggle = () => {
+    if (player.playing && player.surah === initialSurah) {
+      player.toggle()
+    } else {
+      let server = 'https://server8.mp3quran.net/afs/';
+      let reciterName = 'مشاري العفاسي';
       try {
-        const paddedPageNumber = String(currentPage).padStart(3, '0');
-        const response = await fetch(`/mushaf/pages/${paddedPageNumber}.json`);
-        if (!response.ok) throw new Error("الصفحة غير موجودة");
-        const data: PageData = await response.json();
-        setPageData(data);
-        
-        if (scrollRef.current) {
-          scrollRef.current.scrollTop = 0;
-        }
-      } catch (error) { console.error("خطأ في تحميل الصفحة", error); } finally { setLoading(false); }
-    }
-    loadPage();
-  }, [currentPage]);
+        server = localStorage.getItem('selected_reciter_server') || server;
+        reciterName = localStorage.getItem('selected_reciter_name') || reciterName;
+      } catch (e) {}
 
-  const getCurrentSurahNum = (): number => {
-    if (!pageData || !metaData) return initialSurah || 1;
-    const surahLine = pageData.l.find((line) => line.t === 's');
-    if (surahLine && surahLine.n) return surahLine.n;
-    for (let i = metaData.surahStartPage.length - 1; i >= 0; i--) {
-      if (metaData.surahStartPage[i] <= currentPage) return i + 1;
-    }
-    return initialSurah || 1;
-  };
-
-  useEffect(() => {
-    if (currentPage && metaData && pageData) {
-      const currentSurahNum = getCurrentSurahNum();
-      const surahName = metaData.surahNames[currentSurahNum - 1] || '';
-      saveReadingPosition(currentSurahNum, surahName, currentPage);
-    }
-  }, [currentPage, metaData, pageData]);
-
-  const handleBookmarkToggle = () => {
-    if (!metaData) return;
-    const currentSurahNum = getCurrentSurahNum();
-    const surahName = metaData.surahNames[currentSurahNum - 1] || '';
-    toggleBookmark(currentSurahNum, surahName, currentPage);
-  };
-
-  const handleZoomIn = () => {
-    setFontSize(prev => { const n = Math.min(prev + 2, 40); localStorage.setItem('mushaf_font_size', String(n)); return n; });
-  };
-  const handleZoomOut = () => {
-    setFontSize(prev => { const n = Math.max(prev - 2, 18); localStorage.setItem('mushaf_font_size', String(n)); return n; });
-  };
-
-  const toggleAudio = async () => {
-    const currentSurah = getCurrentSurahNum();
-    const padded = String(currentSurah).padStart(3, '0');
-    const audioUrl = `${audioServer}${padded}.mp3`;
-
-    try {
-      const state = await QuranPlayer.getState();
-      if (state && (state.playing || state.url)) {
-        const res = await QuranPlayer.toggle();
-        if (res) setIsPlaying(res.playing);
-      } else {
-        const queueItems = [];
-        for (let i = currentSurah; i <= 114; i++) {
-          const p = String(i).padStart(3, '0');
-          const url = `${audioServer}${p}.mp3`;
-          const name = metaData?.surahNames[i - 1] || '';
-          queueItems.push({ url, title: `سورة ${name}`, id: url });
-        }
-        await QuranPlayer.playQueue({ items: queueItems, startIndex: 0 });
-        setIsPlaying(true);
-      }
-    } catch (err) {
-      let audio = webAudioRef.current;
-      if (!audio) {
-        audio = new Audio(audioUrl);
-        webAudioRef.current = audio;
-      } else {
-        audio.src = audioUrl;
-      }
-
-      audio.onended = () => {
-        if (currentSurah < 114) {
-          const nextSurah = currentSurah + 1;
-          const nextPadded = String(nextSurah).padStart(3, '0');
-          const nextUrl = `${audioServer}${nextPadded}.mp3`;
-          audio!.src = nextUrl;
-          audio!.play();
-        } else {
-          setIsPlaying(false);
-        }
-      };
-
-      if (isPlaying) {
-        audio.pause();
-        setIsPlaying(false);
-      } else {
-        audio.play();
-        setIsPlaying(true);
-      }
-    }
-  };
-
-  const selectReciter = async (reciter: { name: string; server: string }) => {
-    const wasPlaying = isPlaying;
-    
-    if (webAudioRef.current) {
-      webAudioRef.current.pause();
-    }
-    try { await QuranPlayer.stop(); } catch (e) {}
-    setIsPlaying(false);
-
-    setReciterName(reciter.name);
-    setAudioServer(reciter.server);
-    localStorage.setItem('selected_reciter_server', reciter.server);
-    localStorage.setItem('selected_reciter_name', reciter.name);
-    setShowReciterModal(false);
-
-    if (wasPlaying) {
-      const currentSurah = getCurrentSurahNum();
-      const p = String(currentSurah).padStart(3, '0');
-      const url = `${reciter.server}${p}.mp3`;
-
-      try {
-        const queueItems = [];
-        for (let i = currentSurah; i <= 114; i++) {
-          const pi = String(i).padStart(3, '0');
-          const ui = `${reciter.server}${pi}.mp3`;
-          const name = metaData?.surahNames[i - 1] || '';
-          queueItems.push({ url: ui, title: `سورة ${name}`, id: ui });
-        }
-        await QuranPlayer.playQueue({ items: queueItems, startIndex: 0 });
-        setIsPlaying(true);
-      } catch (err) {
-        let audio = webAudioRef.current;
-        if (!audio) {
-          audio = new Audio(url);
-          webAudioRef.current = audio;
-        } else {
-          audio.src = url;
-        }
-        audio.play();
-        setIsPlaying(true);
-      }
-    }
-  };
-
-  const goToSurah = (index: number) => {
-    if (metaData) { setCurrentPage(metaData.surahStartPage[index]); setIsIndexOpen(false); }
-  };
-
-  const currentSurahNum = getCurrentSurahNum();
-  const isBookmarkedCurrent = isBookmarked(bookmarkState, currentSurahNum, currentPage);
-
-  if (loading) return <div className="h-screen flex items-center justify-center font-mushaf text-xl bg-[#FDFBF7] text-[#1A120B]">جاري تحميل المصحف...</div>;
-  if (!pageData || !metaData) return <div className="h-screen flex items-center justify-center text-red-400">حدث خطأ في جلب البيانات.</div>;
-  return (
-    <div 
-      className="fixed inset-0 z-50 w-full bg-[#FDFBF7] flex flex-col overflow-hidden select-none" 
-      dir="rtl"
-      style={{ touchAction: 'pan-y' }}
-    >
+      const defaultReciter = { id: 1, name: reciterName, featured: true, moshaf: [{ id: 1, name: 'حفص', server, surahs: [] }] };
       
-      <div className="flex justify-between items-center px-4 py-2 bg-[#F7F2E8] border-b border-[#E5DCB8] shrink-0 z-10">
-        <div className="flex items-center gap-2">
-          <button onClick={() => setIsIndexOpen(true)} className="p-2 bg-white rounded-full shadow-sm hover:bg-gray-50">
-            <Menu className="size-5 text-[#2C5E3B]" />
+      player.play(
+        initialSurah, 
+        metaData?.surahNames[initialSurah - 1] || '', 
+        player.reciter || defaultReciter, 
+        player.moshafServer || server
+      )
+    }
+  }
+
+  if (loading || !metaData) return <div className="h-screen flex items-center justify-center font-sans text-xl">جاري تحميل المصحف...</div>
+
+  const pageNumberPadded = String(currentPage).padStart(3, '0')
+  const surahName = metaData.surahNames[initialSurah - 1] || ''
+  const isMarked = isBookmarked(bookmarkState, initialSurah, currentPage)
+  const isCurrentSurahPlaying = player.playing && player.surah === initialSurah
+
+  return (
+    <div className="h-[100dvh] w-full bg-[#f4ece1] flex flex-col overflow-hidden select-none" dir="rtl">
+      
+      {/* الشريط العلوي المحدث: يحتوي على اسم السورة والأزرار فقط */}
+      <div className="w-full flex justify-between items-center p-2 bg-[#fdfbf7] border-b border-[#b89965] shrink-0 z-20">
+        
+        {/* اليمين: رجوع واسم السورة */}
+        <div className="flex items-center gap-1">
+          <button onClick={() => router.back()} className="p-2 bg-[#f4ece1] rounded-full text-[#5a3e1b] hover:bg-[#e8dccb]">
+            <ChevronRight className="size-5" />
           </button>
-          <button onClick={handleBookmarkToggle} className={`p-2 rounded-full shadow-sm ${isBookmarkedCurrent ? 'bg-[#C5A059] text-white' : 'bg-white text-[#2C5E3B] hover:bg-gray-50'}`} title="حفظ العلامة المرجعية">
-            <Bookmark className="size-5" />
+          <span className="font-bold text-[#5a3e1b] text-sm md:text-base mr-1">{surahName}</span>
+        </div>
+        
+        {/* الوسط: أزرار الصوت */}
+        <div className="flex items-center gap-2">
+          <button onClick={() => router.push('/quran/reciters')} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[#f4ece1] rounded-full text-[#5a3e1b] hover:bg-[#e8dccb] text-[11px] font-bold transition-colors">
+             <Headphones className="size-4" />
+             <span>القارئ</span>
+          </button>
+          
+          <button onClick={handlePlayToggle} className="p-2 bg-[#0a1f1a] rounded-full text-[#fdfbf7] shadow-md hover:bg-[#0a1f1a]/90 transition-colors">
+             {isCurrentSurahPlaying ? <Pause className="size-4" fill="currentColor" /> : <Play className="size-4" fill="currentColor" />}
           </button>
         </div>
 
-        <div className="flex items-center gap-2 bg-white rounded-full px-2 py-1 shadow-sm border border-[#E5DCB8]">
-          <button onClick={handleZoomOut} className="px-2 py-1 text-xs font-bold text-[#2C5E3B] hover:bg-gray-100 rounded-md transition-colors">تصغير</button>
-          <span className="text-xs font-bold text-gray-500 w-6 text-center">{fontSize}</span>
-          <button onClick={handleZoomIn} className="px-2 py-1 text-xs font-bold text-[#2C5E3B] hover:bg-gray-100 rounded-md transition-colors">تكبير</button>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button onClick={toggleAudio} className="p-2 bg-[#2C5E3B] text-white rounded-full shadow-sm hover:bg-[#1E4329]">
-            {isPlaying ? <Pause className="size-5" /> : <Play className="size-5" />}
-          </button>
-          <button onClick={() => setShowReciterModal(true)} className="p-2 bg-white rounded-full shadow-sm hover:bg-gray-50" title="تغيير القارئ">
-            <Volume2 className="size-5 text-[#2C5E3B]" />
-          </button>
-          <button onClick={() => onHomeClick ? onHomeClick() : router.push('/quran')} className="p-2 bg-white rounded-full shadow-sm hover:bg-gray-50">
-            <ArrowRight className="size-5 text-[#2C5E3B]" />
-          </button>
-        </div>
+        {/* اليسار: الحفظ */}
+        <button 
+          onClick={() => toggleBookmark(initialSurah, surahName, currentPage)}
+          className={`p-2 rounded-full transition-colors ${isMarked ? 'bg-[#d4af37] text-white' : 'bg-[#f4ece1] text-[#5a3e1b]'}`}
+        >
+          <Bookmark className="size-5" fill={isMarked ? "currentColor" : "none"} />
+        </button>
       </div>
 
+      {/* منطقة عرض الصورة - تملأ كل الشاشة المتبقية */}
       <div 
-        ref={scrollRef} 
-        className="flex-1 overflow-y-auto px-2 py-4 flex flex-col items-center no-scrollbar w-full"
+        className="w-full flex-grow relative bg-white flex flex-col overflow-y-auto cursor-grab active:cursor-grabbing"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        onMouseDown={handleMouseDown}
+        onMouseUp={handleMouseUp}
       >
-        <div className="w-full max-w-3xl flex flex-col justify-start items-center">
-          {pageData.l.map((line, idx) => {
-            if (line.t === 's') {
-              const surahNum = line.n || 1;
-              const surahName = metaData.surahNames[surahNum - 1];
-              const details = SURAH_DETAILS[surahNum] || { count: '', type: '' };
-
-              return (
-                <div key={idx} className="w-full my-6 shrink-0 select-none">
-                  <div className="w-full border border-[#C5A059] bg-[#F7F2E8] py-2 px-3 rounded-xl shadow-sm flex items-center justify-between relative">
-                    <div className="text-right font-sans text-xs font-bold text-[#2C5E3B] w-1/3">
-                      <div>{details.type}</div>
-                      <div className="text-[10px] text-[#8C6B2B]">ترتيبها: {surahNum}</div>
-                    </div>
-                    <div className="text-center font-mushaf text-xl md:text-2xl font-bold text-[#1A120B] w-1/3">
-                      سُورَةُ {surahName}
-                    </div>
-                    <div className="text-left font-sans text-xs font-bold text-[#2C5E3B] w-1/3">
-                      <div>آيَاتُهَا</div>
-                      <div className="text-[10px] text-[#8C6B2B]">{details.count} آية</div>
-                    </div>
-                  </div>
-                </div>
-              );
-            } 
-            else if (line.t === 'b') {
-              return (
-                <div key={idx} className="w-full text-center my-3">
-                  <span className="font-mushaf text-2xl text-[#1A120B]">{metaData.basmalah}</span>
-                </div>
-              );
-            } 
-            else if (line.t === 'a' && line.w) {
-              const lineText = line.w.join(' ');
-              return (
-                <div 
-                  key={idx} 
-                  className="font-mushaf w-full text-center text-[#1A120B]"
-                  style={{ fontSize: `${fontSize}px`, wordSpacing: '0.1em', textAlignLast: 'center' }}
-                >
-                  {lineText}
-                </div>
-              );
-            }
-            return null;
-          })}
-        </div>
+        <img 
+          key={currentPage}
+          src={`/mushaf/pages/${pageNumberPadded}.webp`} 
+          alt={`صفحة ${currentPage}`}
+          className="w-full h-auto animate-in fade-in duration-300 pointer-events-none"
+          draggable={false}
+        />
       </div>
-
-      <div className="flex justify-center items-center gap-6 px-4 py-3 bg-[#F7F2E8] border-t border-[#E5DCB8] shrink-0 w-full">
-        <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="px-6 py-2 bg-white border border-[#E5DCB8] text-[#2C5E3B] rounded-lg shadow-sm disabled:opacity-30 font-bold text-sm">
-          السابق
-        </button>
-        <span className="font-bold text-[#2C5E3B] text-sm select-none">{currentPage} / 604</span>
-        <button onClick={() => setCurrentPage(p => Math.min(604, p + 1))} disabled={currentPage === 604} className="px-6 py-2 bg-white border border-[#E5DCB8] text-[#2C5E3B] rounded-lg shadow-sm disabled:opacity-30 font-bold text-sm">
-          التالي
-        </button>
-      </div>
-
-      {isIndexOpen && (
-        <div className="fixed inset-0 z-50 flex">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setIsIndexOpen(false)} />
-          <div className="relative w-[85%] max-w-sm h-full bg-[#FDFBF7] shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
-            <div className="flex justify-between items-center p-4 border-b bg-[#F7F2E8]">
-              <h3 className="font-bold text-lg text-[#2C5E3B]">فهرس السور</h3>
-              <button onClick={() => setIsIndexOpen(false)} className="p-1 rounded-full bg-white shadow-sm">
-                <X className="size-5 text-red-500" />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-3 no-scrollbar">
-              {metaData.surahNames.map((name, index) => {
-                const surahNum = index + 1;
-                const details = SURAH_DETAILS[surahNum];
-                const isCurrent = surahNum === currentSurahNum;
-                
-                return (
-                  <button
-                    key={index}
-                    onClick={() => goToSurah(index)}
-                    className={`w-full text-right p-3 mb-2 rounded-xl border transition-all flex justify-between items-center ${
-                      isCurrent 
-                        ? 'bg-[#2C5E3B] border-[#2C5E3B] text-white shadow-md' 
-                        : 'bg-white border-[#E5DCB8] text-[#1A120B] hover:bg-[#F7F2E8]'
-                    }`}
-                  >
-                    <div className="flex flex-col">
-                      <span className={`font-bold text-lg font-mushaf mb-1 ${isCurrent ? 'text-white' : 'text-[#1A120B]'}`}>{name}</span>
-                      <span className={`text-xs font-sans font-semibold ${isCurrent ? 'text-gray-200' : 'text-[#6B7280]'}`}>
-                        {details?.type} • {details?.count} آية
-                      </span>
-                    </div>
-                    <span className={`text-sm px-3 py-1.5 rounded-full font-bold ${isCurrent ? 'bg-white/20 text-white' : 'bg-[#F7F2E8] text-[#2C5E3B]'}`}>
-                      {surahNum}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showReciterModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-[#FDFBF7] w-full max-w-sm rounded-2xl p-4 border border-[#C5A059] shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[80vh]">
-            <h3 className="text-base font-bold text-[#2C5E3B] mb-3 text-center border-b pb-2 shrink-0">اختر القارئ</h3>
-            <div className="flex flex-col gap-2 overflow-y-auto no-scrollbar">
-              {RECITERS.map((r, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => selectReciter(r)}
-                  className={`p-3 rounded-xl text-sm font-bold text-right transition-all flex justify-between items-center shrink-0 ${
-                    reciterName === r.name ? 'bg-[#2C5E3B] text-white' : 'bg-white text-[#1A120B] border border-[#E5DCB8] hover:bg-[#F7F2E8]'
-                  }`}
-                >
-                  <span>{r.name}</span>
-                  {reciterName === r.name && <span>✓</span>}
-                </button>
-              ))}
-            </div>
-            <button onClick={() => setShowReciterModal(false)} className="mt-4 w-full py-2.5 bg-[#2C5E3B] text-white rounded-xl text-sm font-bold shrink-0">
-              إغلاق
-            </button>
-          </div>
-        </div>
-      )}
 
     </div>
-  );
+  )
 }

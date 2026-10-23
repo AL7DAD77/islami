@@ -6,6 +6,9 @@ export interface AdhanVoice {
 }
 
 export const ADHAN_VOICES: AdhanVoice[] = [
+  // ✅ أضفنا التكبيرتين هنا ليكون الخيار الأول في القائمة
+  { id: 'takbeeratain', file: 'takbeeratain.mp3', name: 'تكبيرتان (تنبيه قصير)', reciter: 'تنبيه سريع' },
+  
   { id: 'makkah', file: 'makkah_al_banna.mp3', name: 'أذان مكة المكرمة', reciter: 'الشيخ علي ملا' },
   { id: 'abdulbasit', file: 'abdubasit.mp3', name: 'أذان عبد الباسط', reciter: 'الشيخ عبد الباسط عبد الصمد' },
   { id: 'abdulbasit_cairo', file: 'abdubasit_cairo.mp3', name: 'أذان القاهرة', reciter: 'الشيخ عبد الباسط' },
@@ -23,11 +26,9 @@ export const ADHAN_VOICES: AdhanVoice[] = [
 ]
 
 export function getAdhanVoice(id: string): AdhanVoice | undefined {
-  // إن كان المعرّف قديماً أو غير صالح (مثل a1/a2) نرجع الصوت الافتراضي بدل عدم تشغيل أي صوت
   return ADHAN_VOICES.find((v) => v.id === id) ?? (id === 'a2' ? ADHAN_VOICES.find((v) => v.id === 'fajr') : ADHAN_VOICES[0])
 }
 
-/** صوت الصلاة: اختيار الشخص لصلاة بعينها إن وُجد، وإلا الافتراضي (الفجر له صوته الافتراضي) */
 export function voiceIdFor(
   s: { adhanVoice: string; fajrVoice: string; prayerVoices?: Partial<Record<string, string>> },
   prayer: string,

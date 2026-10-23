@@ -17,9 +17,6 @@ const BUZZ_DONE = [30, 50, 30]
 const BUZZ_NEXT = [120]
 const BUZZ_CATEGORY = [150, 100, 150, 100, 150]
 
-// النص الذي سنبحث عنه لفصل السور
-const BASMALA_TEXT = 'بسم الله الرحمن الرحيم'
-
 function vibrate(pattern: number | number[]) {
   try {
     if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
@@ -30,47 +27,11 @@ function vibrate(pattern: number | number[]) {
 
 function moveToElement(element: HTMLElement | null) {
   if (!element) return
-
   try {
-    element.scrollIntoView({
-      behavior: 'instant',
-      block: 'start',
-      inline: 'nearest',
-    })
+    element.scrollIntoView({ behavior: 'instant', block: 'start', inline: 'nearest' })
   } catch {
     element.scrollIntoView(true)
   }
-}
-
-// دالة جديدة لتنسيق النص وفصل المعوذات
-function formatDhikrText(text: string, fontSize: number) {
-  // التحقق مما إذا كان النص يحتوي على البسملة مكررة (أكثر من مرة)
-  if (text.includes(BASMALA_TEXT) && text.split(BASMALA_TEXT).length > 2) {
-    // تقسيم النص بناءً على البسملة
-    const parts = text.split(BASMALA_TEXT).filter((p) => p.trim() !== '');
-    
-    return (
-      <div className="flex flex-col gap-3">
-        {parts.map((part, idx) => (
-          <div key={idx} className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-4 dark:border-emerald-900/30 dark:bg-emerald-950/20">
-            <p className="mb-2 text-center font-quran text-emerald-700 dark:text-emerald-400" style={{ fontSize: fontSize - 2 }}>
-              {BASMALA_TEXT}
-            </p>
-            <p className="font-quran leading-loose" style={{ fontSize }}>
-              {part.trim()}
-            </p>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  // العرض الافتراضي إذا لم تكن معوذات
-  return (
-    <p className="font-quran leading-loose" style={{ fontSize }}>
-      {text}
-    </p>
-  );
 }
 
 export function DhikrList({
@@ -85,9 +46,7 @@ export function DhikrList({
   const router = useRouter()
 
   const [fontSize, setFontSize] = useState(DEFAULT_FONT)
-  const [counts, setCounts] = useState<number[]>(() =>
-    items.map(() => 0),
-  )
+  const [counts, setCounts] = useState<number[]>(() => items.map(() => 0))
   const [autoScroll, setAutoScroll] = useState(true)
   const [settingsLoaded, setSettingsLoaded] = useState(false)
   const [justCompleted, setJustCompleted] = useState<number | null>(null)
@@ -112,7 +71,6 @@ export function DhikrList({
       timers.current.delete(timer)
       fn()
     }, ms)
-
     timers.current.add(timer)
     return timer
   }, [])
@@ -120,27 +78,22 @@ export function DhikrList({
   useEffect(() => {
     try {
       const savedFont = Number(localStorage.getItem(FONT_KEY))
-
       if (Number.isFinite(savedFont) && savedFont >= 16 && savedFont <= 40) {
         setFontSize(savedFont)
       }
-
       const savedAutoScroll = localStorage.getItem(AUTO_SCROLL_KEY)
       const enabled = savedAutoScroll !== 'false'
-
       autoScrollRef.current = enabled
       setAutoScroll(enabled)
     } catch {
       autoScrollRef.current = true
       setAutoScroll(true)
     }
-
     setSettingsLoaded(true)
   }, [])
 
   useEffect(() => {
     if (!settingsLoaded) return
-
     try {
       localStorage.setItem(AUTO_SCROLL_KEY, String(autoScroll))
     } catch {}
@@ -150,7 +103,6 @@ export function DhikrList({
     fontSize,
     (value) => {
       setFontSize(value)
-
       try {
         localStorage.setItem(FONT_KEY, String(value))
       } catch {}
@@ -167,8 +119,7 @@ export function DhikrList({
   }, [clearTimers])
 
   const done = items.reduce(
-    (total, item, index) =>
-      total + ((counts[index] ?? 0) >= item.count ? 1 : 0),
+    (total, item, index) => total + ((counts[index] ?? 0) >= item.count ? 1 : 0),
     0,
   )
 
@@ -176,27 +127,18 @@ export function DhikrList({
 
   const nextIncomplete = (from: number, current: number[]) => {
     for (let index = from + 1; index < items.length; index++) {
-      if ((current[index] ?? 0) < items[index].count) {
-        return index
-      }
+      if ((current[index] ?? 0) < items[index].count) return index
     }
-
     for (let index = 0; index < from; index++) {
-      if ((current[index] ?? 0) < items[index].count) {
-        return index
-      }
+      if ((current[index] ?? 0) < items[index].count) return index
     }
-
     return -1
   }
 
   const scrollToCard = (element: HTMLElement | null) => {
     if (!element) return
-
     const toolbarHeight = toolbarRef.current?.getBoundingClientRect().height ?? 100
-
     element.style.scrollMarginTop = `${Math.ceil(toolbarHeight + 24)}px`
-
     moveToElement(element)
   }
 
@@ -210,50 +152,41 @@ export function DhikrList({
     if (before >= item.count) return
 
     const next = items.map((_, itemIndex) =>
-      itemIndex === index
-        ? before + 1
-        : (current[itemIndex] ?? 0),
+      itemIndex === index ? before + 1 : (current[itemIndex] ?? 0),
     )
 
     countsRef.current = next
     setCounts(next)
 
+    // إزالة الاهتزاز مع كل ضغطة (تم حذف vibrate(15))
     if (next[index] < item.count) {
-      vibrate(15)
-      return
+      return 
     }
 
     setJustCompleted(index)
     vibrate(BUZZ_DONE)
 
     later(() => {
-      setJustCompleted((currentIndex) =>
-        currentIndex === index ? null : currentIndex,
-      )
+      setJustCompleted((currentIndex) => (currentIndex === index ? null : currentIndex))
     }, 1000)
 
     if (!autoScrollRef.current) return
 
     later(() => {
       if (!autoScrollRef.current) return
-
       const target = nextIncomplete(index, countsRef.current)
-
       if (target >= 0) {
         scrollToCard(refs.current[target] ?? null)
       } else {
         scrollToCard(doneRef.current)
       }
-
       vibrate(BUZZ_NEXT)
     }, 450)
   }
 
   const reset = () => {
     clearTimers()
-
     const initialCounts = items.map(() => 0)
-
     countsRef.current = initialCounts
     setCounts(initialCounts)
     setJustCompleted(null)
@@ -268,7 +201,6 @@ export function DhikrList({
 
   const goNext = useCallback(() => {
     if (!nextHref) return
-
     vibrate(BUZZ_CATEGORY)
     router.push(nextHref)
   }, [nextHref, router])
@@ -280,15 +212,7 @@ export function DhikrList({
   }, [goNext])
 
   useEffect(() => {
-    if (
-      !settingsLoaded ||
-      !allDone ||
-      !autoScroll ||
-      !nextHref ||
-      cancelledNext
-    ) {
-      return
-    }
+    if (!settingsLoaded || !allDone || !autoScroll || !nextHref || cancelledNext) return
 
     setSecondsLeft(NEXT_DELAY_SECONDS)
 
@@ -304,17 +228,10 @@ export function DhikrList({
       clearInterval(tick)
       clearTimeout(go)
     }
-  }, [
-    settingsLoaded,
-    allDone,
-    autoScroll,
-    nextHref,
-    cancelledNext,
-  ])
+  }, [settingsLoaded, allDone, autoScroll, nextHref, cancelledNext])
 
   const share = async (dhikr: Dhikr) => {
     const text = `${dhikr.text}\n\n${dhikr.source}`
-
     try {
       if (navigator.share) {
         await navigator.share({ text })
@@ -325,36 +242,36 @@ export function DhikrList({
   }
 
   return (
-    <div ref={pinch.ref} className="flex flex-col gap-3">
+    <div ref={pinch.ref} className="flex flex-col gap-4 pb-10">
       {/* الشريط العلوي */}
       <div
         ref={toolbarRef}
-        className="sticky top-0 z-10 -mx-4 flex flex-col gap-2 bg-background/90 px-4 py-2 backdrop-blur"
+        className="sticky top-0 z-10 -mx-4 flex flex-col gap-2 bg-background/90 px-4 py-3 backdrop-blur border-b border-border/50"
       >
         <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm font-medium text-primary">
             {`أنجزت ${toArabicNumber(done)} من ${toArabicNumber(items.length)}`}
           </p>
 
           <button
             type="button"
             onClick={reset}
-            className="flex items-center gap-1 rounded-full bg-muted px-3 py-1.5 text-xs"
+            className="flex items-center gap-1 rounded-full bg-muted px-3 py-1.5 text-xs hover:bg-muted/80 transition-colors"
           >
             <RotateCcw className="size-3.5" aria-hidden="true" />
             {'إعادة'}
           </button>
         </div>
 
-        <label className="flex cursor-pointer items-center justify-between rounded-xl bg-muted/50 px-3 py-2">
-          <span className="text-xs font-medium">
+        <label className="flex cursor-pointer items-center justify-between rounded-xl bg-card border border-border px-3 py-2 shadow-sm">
+          <span className="text-xs font-medium text-muted-foreground">
             {'الانتقال التلقائي للذكر التالي ثم للقسم التالي'}
           </span>
 
           <span
             className={cn(
               'relative inline-flex h-5 w-9 items-center rounded-full transition-colors',
-              autoScroll ? 'bg-gold' : 'bg-muted-foreground/30',
+              autoScroll ? 'bg-primary' : 'bg-muted-foreground/30',
             )}
           >
             <input
@@ -363,7 +280,6 @@ export function DhikrList({
               onChange={(event) => changeAutoScroll(event.target.checked)}
               className="sr-only"
             />
-
             <span
               className={cn(
                 'inline-block size-4 transform rounded-full bg-white shadow transition-transform',
@@ -383,42 +299,42 @@ export function DhikrList({
         return (
           <article
             key={index}
-            ref={(element) => {
-              refs.current[index] = element
-            }}
+            ref={(element) => { refs.current[index] = element }}
             style={{ scrollMarginTop: 140 }}
             className={cn(
-              'overflow-hidden rounded-2xl bg-card shadow-sm ring-1 ring-border transition-all duration-500',
+              'overflow-hidden rounded-3xl bg-card shadow-sm ring-1 ring-border transition-all duration-500',
               complete && 'opacity-60',
-              isJustCompleted && 'ring-2 ring-gold shadow-lg',
+              isJustCompleted && 'ring-2 ring-primary shadow-lg scale-[1.01]',
             )}
           >
             <button
               type="button"
               onClick={() => tap(index)}
               disabled={complete}
-              className="block w-full p-5 text-right"
+              className="block w-full p-5 text-right outline-none"
               aria-label={`اضغط للعد: ${toArabicNumber(count)} من ${toArabicNumber(dhikr.count)}`}
             >
-              {/* استدعاء دالة التنسيق الجديدة هنا بدلاً من <p> المباشر */}
-              {formatDhikrText(dhikr.text, pinch.size)}
+              {/* تم إزالة دالة التنسيق المعقدة والعودة للعرض البسيط */}
+              <p className="font-quran leading-loose text-foreground" style={{ fontSize: pinch.size }}>
+                {dhikr.text}
+              </p>
 
               {dhikr.note && (
-                <p className="mt-3 rounded-xl bg-accent/60 p-3 text-sm leading-relaxed text-accent-foreground">
+                <p className="mt-4 rounded-xl bg-accent/60 p-3 text-sm leading-relaxed text-accent-foreground text-right">
                   {dhikr.note}
                 </p>
               )}
             </button>
 
-            <div className="flex items-center gap-3 border-t px-5 py-3">
-              <p className="flex-1 text-xs text-muted-foreground">
+            <div className="flex items-center gap-3 border-t px-5 py-3 bg-muted/20">
+              <p className="flex-1 text-xs text-muted-foreground text-right">
                 {dhikr.source}
               </p>
 
               <button
                 type="button"
                 onClick={() => share(dhikr)}
-                className="flex size-8 items-center justify-center rounded-full bg-muted"
+                className="flex size-8 items-center justify-center rounded-full bg-muted hover:bg-muted-foreground/20 transition-colors"
                 aria-label="مشاركة الذكر"
               >
                 <Share2 className="size-4" />
@@ -429,14 +345,14 @@ export function DhikrList({
                 onClick={() => tap(index)}
                 disabled={complete}
                 className={cn(
-                  'flex h-9 min-w-16 items-center justify-center gap-1 rounded-full px-3 text-sm font-bold',
+                  'flex h-10 min-w-16 items-center justify-center gap-1 rounded-full px-4 text-sm font-bold shadow-sm transition-all',
                   complete
                     ? 'bg-secondary text-primary'
-                    : 'bg-primary text-primary-foreground',
+                    : 'bg-primary text-primary-foreground active:scale-95',
                 )}
               >
                 {complete ? (
-                  <Check className="size-4" aria-label="تم" />
+                  <Check className="size-5" aria-label="تم" />
                 ) : (
                   `${toArabicNumber(count)} / ${toArabicNumber(dhikr.count)}`
                 )}
@@ -452,11 +368,11 @@ export function DhikrList({
           ref={doneRef}
           role="status"
           style={{ scrollMarginTop: 140 }}
-          className="flex flex-col items-center gap-3 rounded-2xl bg-linear-to-l from-emerald-600 to-emerald-700 p-5 text-center text-white shadow-lg"
+          className="flex flex-col items-center gap-4 rounded-3xl bg-gradient-to-l from-emerald-600 to-emerald-700 p-6 text-center text-white shadow-xl"
         >
-          <PartyPopper className="size-8" aria-hidden="true" />
+          <PartyPopper className="size-10 text-gold" aria-hidden="true" />
 
-          <p className="text-lg font-bold">
+          <p className="text-xl font-bold">
             {'تقبّل الله منك، أتممت هذا القسم'}
           </p>
 
@@ -466,13 +382,13 @@ export function DhikrList({
                 {autoScroll && !cancelledNext
                   ? `الانتقال إلى «${nextTitle}» بعد ${toArabicNumber(secondsLeft)} ثوانٍ`
                   : `القسم التالي: ${nextTitle}`}
-                </p>
+              </p>
 
-              <div className="flex w-full gap-2">
+              <div className="flex w-full gap-3 mt-2">
                 <button
                   type="button"
                   onClick={goNext}
-                  className="flex-1 rounded-xl bg-white py-2.5 text-sm font-bold text-emerald-700"
+                  className="flex-1 rounded-xl bg-white py-3 text-sm font-bold text-emerald-700 shadow-sm hover:bg-gray-50 transition-colors"
                 >
                   {'الانتقال الآن'}
                 </button>
@@ -481,7 +397,7 @@ export function DhikrList({
                   <button
                     type="button"
                     onClick={() => setCancelledNext(true)}
-                    className="flex-1 rounded-xl bg-white/20 py-2.5 text-sm font-medium"
+                    className="flex-1 rounded-xl bg-white/20 py-3 text-sm font-medium hover:bg-white/30 transition-colors"
                   >
                     {'البقاء هنا'}
                   </button>

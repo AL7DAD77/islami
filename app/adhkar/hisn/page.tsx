@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
+import { Suspense } from 'react' // تمت الإضافة
 import { PageHeader } from '@/components/page-header'
 import { SearchButton } from '@/components/search-button'
 import { ADHKAR } from '@/lib/adhkar'
@@ -12,15 +13,19 @@ export default function HisnPage() {
   const total = chapters.reduce((sum, c) => sum + c.items.length, 0)
 
   return (
-    <>
+    <div dir="rtl">
       <PageHeader
         title="حصن المسلم"
         subtitle={`${toArabicNumber(chapters.length)} باباً - ${toArabicNumber(total)} ذكراً`}
         backHref="/adhkar"
-        action={<SearchButton />}
+        action={
+          <Suspense fallback={<div className="size-10" />}>
+            <SearchButton />
+          </Suspense>
+        }
       />
 
-      <ul className="grid grid-cols-2 gap-2.5">
+      <ul className="grid grid-cols-2 gap-2.5 mt-4">
         {chapters.map((c) => (
           <li key={c.id}>
             <Link
@@ -40,6 +45,6 @@ export default function HisnPage() {
         النصوص من كتاب «حصن المسلم من أذكار الكتاب والسنة» لسعيد بن علي بن وهف القحطاني. لم يُضَف تخريج الأحاديث في هذا
         القسم، فيُنصح بمراجعة الأذكار مع أهل العلم. تفاصيل المصدر في «المزيد» ← «حول التطبيق».
       </p>
-    </>
+    </div>
   )
 }

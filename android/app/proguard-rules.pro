@@ -19,3 +19,19 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+# الحفاظ على كلاسات Capacitor الأساسية
+-keep class com.getcapacitor.** { *; }
+-keep @com.getcapacitor.annotation.CapacitorPlugin public class * {
+    @com.getcapacitor.annotation.PermissionCallback <methods>;
+    @com.getcapacitor.annotation.ActivityCallback <methods>;
+    @com.getcapacitor.PluginMethod public <methods>;
+}
+
+# الحفاظ على كلاساتنا الخاصة (الصوت، الأذان، الإشعارات)
+-keep class com.alhaddad.islami.** { *; }
+
+# الحفاظ على مكتبة Media3 (ExoPlayer)
+-keep class androidx.media3.** { *; }
+
+# الحفاظ على إعدادات Cordova
+-keep class org.apache.cordova.** { *; }

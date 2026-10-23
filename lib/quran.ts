@@ -52,11 +52,13 @@ export async function getSurah(id: number): Promise<{ meta: SurahMeta; ayahs: Ay
 }
 
 export async function getReciters(): Promise<Reciter[]> {
-  const res = await fetch('https://www.mp3quran.net/api/v3/reciters?language=ar', {
+  // ✅ التعديل الأول: أضفنا limit=300 لجلب جميع القراء وليس 15 فقط
+  const res = await fetch('https://www.mp3quran.net/api/v3/reciters?language=ar&limit=300', {
     next: { revalidate: 60 * 60 * 24 },
   })
   if (!res.ok) return []
   const json = await res.json()
+  
   const list: Reciter[] = json.reciters.map(
     (r: { id: number; name: string; moshaf: { id: number; name: string; server: string; surah_list: string }[] }) => ({
       id: r.id,
@@ -65,11 +67,13 @@ export async function getReciters(): Promise<Reciter[]> {
       moshaf: r.moshaf.map((m) => ({
         id: m.id,
         name: m.name.replace(/\s+/g, ' ').trim(),
-        server: m.server,
+        // ✅ التعديل الثاني: تأمين أن كل رابط سيرفر ينتهي بـ / 
+        server: m.server.endsWith('/') ? m.server : `${m.server}/`,
         surahs: m.surah_list.split(',').map(Number),
       })),
     }),
   )
+  
   return list.sort((a, b) => {
     const fa = FEATURED_RECITERS.indexOf(a.id)
     const fb = FEATURED_RECITERS.indexOf(b.id)

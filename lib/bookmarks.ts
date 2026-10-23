@@ -6,14 +6,14 @@ export interface Bookmark {
   id: string
   surah: number
   surahName: string
-  ayah: number
+  page: number // تم التغيير من آية إلى صفحة
   createdAt: number
 }
 
 export interface ReadingPosition {
   surah: number
   surahName: string
-  ayah: number
+  page: number // تم التغيير
   updatedAt: number
 }
 
@@ -22,9 +22,8 @@ interface State {
   position: ReadingPosition | null
 }
 
-const KEY = 'islami-bookmarks-v1'
-const POS_KEY = 'islami-reading-position-v1'
-const OLD_KEY = 'quran-bookmark' // المفتاح القديم: كان يُكتب ولا يُقرأ أبداً
+const KEY = 'islami-bookmarks-v2' // غيرنا الإصدار لمسح القديم
+const POS_KEY = 'islami-reading-position-v2'
 
 const EMPTY: State = { bookmarks: [], position: null }
 let state: State | null = null
@@ -43,24 +42,7 @@ function load(): State {
     const raw = window.localStorage.getItem(POS_KEY)
     if (raw) position = JSON.parse(raw)
   } catch {}
-  // ترحيل العلامة القديمة (إن وُجدت)
-  try {
-    const old = window.localStorage.getItem(OLD_KEY)
-    if (old) {
-      const o = JSON.parse(old)
-      if (o?.surah && o?.ayah && !bookmarks.some((b) => b.id === `${o.surah}:${o.ayah}`)) {
-        bookmarks.unshift({
-          id: `${o.surah}:${o.ayah}`,
-          surah: o.surah,
-          surahName: '',
-          ayah: o.ayah,
-          createdAt: Date.now(),
-        })
-      }
-      window.localStorage.removeItem(OLD_KEY)
-      window.localStorage.setItem(KEY, JSON.stringify(bookmarks))
-    }
-  } catch {}
+  
   state = { bookmarks: Array.isArray(bookmarks) ? bookmarks : [], position }
   return state
 }
@@ -85,20 +67,20 @@ export function useBookmarkState(): State {
   return useSyncExternalStore(subscribe, load, () => EMPTY)
 }
 
-export function isBookmarked(s: State, surah: number, ayah: number) {
-  return s.bookmarks.some((b) => b.id === `${surah}:${ayah}`)
+export function isBookmarked(s: State, surah: number, page: number) {
+  return s.bookmarks.some((b) => b.id === `${surah}:${page}`)
 }
 
-export function toggleBookmark(surah: number, surahName: string, ayah: number): boolean {
+export function toggleBookmark(surah: number, surahName: string, page: number): boolean {
   const cur = load()
-  const id = `${surah}:${ayah}`
+  const id = `${surah}:${page}`
   if (cur.bookmarks.some((b) => b.id === id)) {
     commit({ ...cur, bookmarks: cur.bookmarks.filter((b) => b.id !== id) })
     return false
   }
   commit({
     ...cur,
-    bookmarks: [{ id, surah, surahName, ayah, createdAt: Date.now() }, ...cur.bookmarks],
+    bookmarks: [{ id, surah, surahName, page, createdAt: Date.now() }, ...cur.bookmarks],
   })
   return true
 }
@@ -108,8 +90,8 @@ export function removeBookmark(id: string) {
   commit({ ...cur, bookmarks: cur.bookmarks.filter((b) => b.id !== id) })
 }
 
-export function saveReadingPosition(surah: number, surahName: string, ayah: number) {
+export function saveReadingPosition(surah: number, surahName: string, page: number) {
   const cur = load()
-  if (cur.position && cur.position.surah === surah && cur.position.ayah === ayah) return
-  commit({ ...cur, position: { surah, surahName, ayah, updatedAt: Date.now() } })
+  if (cur.position && cur.position.surah === surah && cur.position.page === page) return
+  commit({ ...cur, position: { surah, surahName, page, updatedAt: Date.now() } })
 }

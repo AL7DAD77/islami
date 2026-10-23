@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { MapPin, Calculator, Bell, BellRing, ChevronDown, RefreshCw, Check } from 'lucide-react'
+import { MapPin, Calculator, Bell, BellRing, ChevronDown, RefreshCw, Check, Volume2 } from 'lucide-react'
 import { useSettings, useHydrated, type MethodKey, type PrayerKey } from '@/lib/settings'
 import { PRAYER_NAMES, PRAYER_ORDER } from '@/lib/prayer'
 import { getAdhanVoice } from '@/lib/adhan-list'
@@ -51,7 +51,6 @@ export function PrayerSettings() {
   const [exactAlarmOk, setExactAlarmOk] = useState<boolean | null>(null)
   const [nativeSched, setNativeSched] = useState(false)
 
-  // الحالة الفعلية من النظام، وتُعاد قراءتها عند العودة للتطبيق (بعد تغيير الإعدادات من الهاتف)
   useEffect(() => {
     const refresh = async () => {
       setNotifPermission(await getNotificationStatusAsync())
@@ -66,7 +65,6 @@ export function PrayerSettings() {
     return registerAppStateListener(refresh)
   }, [])
 
-  // ============ Location ============
   const [query, setQuery] = useState('')
   const [online, setOnline] = useState<OnlineCity[]>([])
   const [searching, setSearching] = useState(false)
@@ -86,7 +84,6 @@ export function PrayerSettings() {
     }
   }
 
-  // البحث عن مدن من الإنترنت أثناء الكتابة (بالإضافة إلى القائمة المحلية)
   useEffect(() => {
     if (!openCityPicker) return
     const q = query.trim()
@@ -131,7 +128,6 @@ export function PrayerSettings() {
   const localNames = new Set(localMatches.map((c) => normalizeArabic(c.name)))
   const onlineMatches = online.filter((o) => !localNames.has(normalizeArabic(o.name)))
 
-  // ============ Notifications ============
   const handleEnableNotifications = async () => {
     const result = await requestNativeNotificationPermission()
     setNotifPermission(result)
@@ -146,7 +142,6 @@ export function PrayerSettings() {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* الموقع */}
       <section className="rounded-2xl bg-card p-4 shadow-sm ring-1 ring-border">
         <div className="mb-3 flex items-center gap-2">
           <span className="flex size-8 items-center justify-center rounded-xl bg-accent text-accent-foreground">
@@ -167,8 +162,7 @@ export function PrayerSettings() {
           )}
           {settings.locationStatus === 'denied' && (
             <p className="rounded-xl bg-amber-100 p-3 text-xs leading-relaxed text-amber-900 dark:bg-amber-950 dark:text-amber-100">
-              لم يُسمح بالوصول للموقع، فالمواقيت الحالية لمدينة {settings.location.city}. اضغط «تحديد موقعي تلقائياً» وامنح
-              الإذن، أو اختر مدينتك يدوياً.
+              لم يُسمح بالوصول للموقع، فالمواقيت الحالية لمدينة {settings.location.city}. اضغط «تحديد موقعي تلقائياً» وامنح الإذن، أو اختر مدينتك يدوياً.
             </p>
           )}
           {settings.locationStatus === 'error' && (
@@ -246,7 +240,6 @@ export function PrayerSettings() {
         </div>
       </section>
 
-      {/* طريقة الحساب */}
       <section className="rounded-2xl bg-card p-4 shadow-sm ring-1 ring-border">
         <div className="mb-3 flex items-center gap-2">
           <span className="flex size-8 items-center justify-center rounded-xl bg-accent text-accent-foreground">
@@ -308,8 +301,6 @@ export function PrayerSettings() {
           </div>
         </div>
       </section>
-
-      {/* التنبيه والأذان */}
       <section className="rounded-2xl bg-card p-4 shadow-sm ring-1 ring-border">
         <div className="mb-3 flex items-center gap-2">
           <span className="flex size-8 items-center justify-center rounded-xl bg-accent text-accent-foreground">
@@ -317,7 +308,7 @@ export function PrayerSettings() {
           </span>
           <h3 className="font-bold text-zinc-800 dark:text-zinc-100">التنبيه والأذان</h3>
         </div>
-        <div className="space-y-3">
+        <div className="space-y-4">
           <div>
             <p className="mb-2 text-xs text-muted-foreground">
               التنبيه قبل الأذان ({toArabicNumber(settings.reminderMinutes)} دقيقة)
@@ -356,24 +347,17 @@ export function PrayerSettings() {
               ))}
             </div>
           </div>
-          <div>
-            <p className="mb-2 text-xs text-muted-foreground">
-              مستوى الصوت ({Math.round(settings.adhanVolume * 100)}٪)
+          
+          <div className="flex items-center gap-2 rounded-xl bg-muted/50 p-3 text-muted-foreground">
+            <Volume2 className="size-5 shrink-0" />
+            <p className="text-xs font-medium leading-relaxed">
+              يمكنك التحكم في مستوى صوت الأذان باستخدام أزرار الصوت الجانبية في هاتفك.
             </p>
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.1}
-              value={settings.adhanVolume}
-              onChange={(e) => update({ adhanVolume: Number(e.target.value) })}
-              className="w-full accent-emerald-600"
-            />
           </div>
+          
         </div>
       </section>
 
-      {/* الإشعارات */}
       <section className="rounded-2xl bg-card p-4 shadow-sm ring-1 ring-border">
         <div className="mb-3 flex items-center gap-2">
           <span className="flex size-8 items-center justify-center rounded-xl bg-accent text-accent-foreground">
@@ -470,37 +454,19 @@ export function PrayerSettings() {
               <div className="rounded-xl bg-muted/50 p-3">
                 <p className="font-medium text-zinc-800 dark:text-zinc-100">تجربة الأذان</p>
                 <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                  اضغط الزر ثم أغلق التطبيق تماماً وانتظر دقيقة؛ يجب أن يرتفع الأذان من تلقاء نفسه.
+                  اضغط لتشغيل تجربة سريعة للأذان (10 ثوانٍ) حسب المؤذن المختار في القائمة.
                 </p>
                 <button
                   type="button"
-                  onClick={async () => {
-                    const voice = getAdhanVoice(settings.adhanVoice)
-                    const ok = await testNativeAdhan(60, voice?.file ?? '', settings.adhanVolume)
-                    alert(ok ? 'سيُرفع الأذان بعد دقيقة. أغلق التطبيق الآن للتجربة.' : 'تعذّرت التجربة، حدّث التطبيق من المتجر.')
+                  onClick={() => {
+                    const testFile = getAdhanVoice(settings.adhanVoice)?.file || '';
+                    testNativeAdhan(10, testFile, 1);
                   }}
-                  className="mt-2 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white"
+                  className="mt-2 rounded-lg bg-primary px-4 py-1.5 text-xs font-bold text-primary-foreground"
                 >
-                  تجربة الأذان بعد دقيقة
+                  تجربة الصوت
                 </button>
-                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-                  إن لم يعمل في الخلفية على هواتف شاومي وهواوي وأوبو وسامسونج: فعّل «التشغيل التلقائي» للتطبيق واستثنِه من
-                  «توفير البطارية» في إعدادات الهاتف.
-                </p>
               </div>
-
-              {exactAlarmOk === false && (
-                <div className="rounded-xl bg-amber-100 p-3 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-100">
-                  <p className="font-medium">لتشغيل الأذان في وقته بدقة والتطبيق مغلق، اسمح بـ «المنبهات والتذكيرات».</p>
-                  <button
-                    type="button"
-                    onClick={() => requestExactAlarmPermission()}
-                    className="mt-2 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white"
-                  >
-                    فتح الإعدادات
-                  </button>
-                </div>
-              )}
             </>
           )}
         </div>
