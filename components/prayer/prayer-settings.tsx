@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { MapPin, Calculator, Bell, BellRing, ChevronDown, RefreshCw, Check } from 'lucide-react'
 import { useSettings, useHydrated, type MethodKey, type PrayerKey } from '@/lib/settings'
 import { PRAYER_NAMES, PRAYER_ORDER } from '@/lib/prayer'
-import { getAdhanVoice } from '@/lib/adhan-list'
 import { CITIES, type City } from '@/lib/places'
 import { methodForCountry, searchCities, searchCitiesOnline, normalizeArabic, type OnlineCity } from '@/lib/city-search'
 import { updateAutoLocation } from '@/lib/location'
@@ -12,15 +11,12 @@ import { toArabicNumber } from '@/lib/quran'
 import { cn } from '@/lib/utils'
 import {
   requestNativeNotificationPermission,
-  showNativeNotification,
   getNotificationStatusAsync,
   registerAppStateListener,
   isNativePlatform,
   isAdhanSchedulerAvailable,
   getNativeAlarmStatus,
-  requestExactAlarmPermission,
   setPersistentNotification,
-  testNativeAdhan,
 } from '@/lib/native'
 
 const METHODS: { id: MethodKey; name: string }[] = [
@@ -48,18 +44,12 @@ export function PrayerSettings() {
   const [locating, setLocating] = useState(false)
   const [notifPermission, setNotifPermission] = useState<string>('checking')
 
-  const [exactAlarmOk, setExactAlarmOk] = useState<boolean | null>(null)
   const [nativeSched, setNativeSched] = useState(false)
 
   useEffect(() => {
     const refresh = async () => {
       setNotifPermission(await getNotificationStatusAsync())
-      const available = isAdhanSchedulerAvailable()
-      setNativeSched(available)
-      if (available) {
-        const st = await getNativeAlarmStatus()
-        setExactAlarmOk(st ? st.exactAlarmAllowed : null)
-      }
+      setNativeSched(isAdhanSchedulerAvailable())
     }
     refresh()
     return registerAppStateListener(refresh)
@@ -131,9 +121,6 @@ export function PrayerSettings() {
   const handleEnableNotifications = async () => {
     const result = await requestNativeNotificationPermission()
     setNotifPermission(result)
-    if (result === 'granted') {
-      await showNativeNotification('تم تفعيل الإشعارات', 'ستصلك تنبيهات الصلاة في وقتها')
-    }
   }
 
   if (!hydrated) {
@@ -301,6 +288,7 @@ export function PrayerSettings() {
           </div>
         </div>
       </section>
+
       <section className="rounded-2xl bg-card p-4 shadow-sm ring-1 ring-border">
         <div className="mb-3 flex items-center gap-2">
           <span className="flex size-8 items-center justify-center rounded-xl bg-accent text-accent-foreground">
@@ -360,9 +348,7 @@ export function PrayerSettings() {
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-3 rounded-xl bg-muted/50 p-3">
             <div className="flex-1">
-              <p className="font-medium text-zinc-800 dark:text-zinc-100">
-                إشعارات الأذان
-              </p>
+              <p className="font-medium text-zinc-800 dark:text-zinc-100">إشعارات الأذان</p>
               <p className="text-xs text-muted-foreground">
                 {notifPermission === 'granted'
                   ? 'مُفعّلة ✅'
@@ -376,17 +362,7 @@ export function PrayerSettings() {
               </p>
             </div>
 
-            {notifPermission === 'granted' ? (
-              <button
-                type="button"
-                onClick={async () => {
-                  await showNativeNotification('اختبار', 'الإشعارات تعمل بنجاح')
-                }}
-                className="rounded-xl bg-muted px-3 py-2 text-xs"
-              >
-                تجربة
-              </button>
-            ) : notifPermission === 'denied' ? (
+            {notifPermission === 'denied' ? (
               <button
                 type="button"
                 onClick={() => {
@@ -412,54 +388,35 @@ export function PrayerSettings() {
           </div>
 
           {nativeSched && (
-            <>
-              <div className="flex items-center justify-between gap-3 rounded-xl bg-muted/50 p-3">
-                <div className="flex-1">
-                  <p className="font-medium text-zinc-800 dark:text-zinc-100">إشعار دائم بالصلاة القادمة</p>
-                  <p className="text-xs text-muted-foreground">
-                    يبقى ظاهراً في الخلفية ويعرض الوقت المتبقي للصلاة القادمة
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={settings.persistentNotification}
-                  onClick={() => {
-                    const next = !settings.persistentNotification
-                    update({ persistentNotification: next })
-                    setPersistentNotification(next)
-                  }}
-                  className={cn(
-                    'relative h-6 w-11 shrink-0 rounded-full transition-colors',
-                    settings.persistentNotification ? 'bg-emerald-600' : 'bg-zinc-400',
-                  )}
-                >
-                  <span
-                    className={cn(
-                      'absolute top-0.5 size-5 rounded-full bg-white transition-all',
-                      settings.persistentNotification ? 'right-0.5' : 'right-[1.375rem]',
-                    )}
-                  />
-                </button>
-              </div>
-
-              <div className="rounded-xl bg-muted/50 p-3">
-                <p className="font-medium text-zinc-800 dark:text-zinc-100">تجربة الأذان</p>
-                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                  اضغط لتشغيل تجربة سريعة للأذان (10 ثوانٍ) حسب المؤذن المختار في القائمة.
+            <div className="flex items-center justify-between gap-3 rounded-xl bg-muted/50 p-3">
+              <div className="flex-1">
+                <p className="font-medium text-zinc-800 dark:text-zinc-100">إشعار دائم بالصلاة القادمة</p>
+                <p className="text-xs text-muted-foreground">
+                  يبقى ظاهراً في الخلفية ويعرض الوقت المتبقي للصلاة القادمة
                 </p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const testFile = getAdhanVoice(settings.adhanVoice)?.file || '';
-                    testNativeAdhan(10, testFile, 1);
-                  }}
-                  className="mt-2 rounded-lg bg-primary px-4 py-1.5 text-xs font-bold text-primary-foreground"
-                >
-                  تجربة الصوت
-                </button>
               </div>
-            </>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={settings.persistentNotification}
+                onClick={() => {
+                  const next = !settings.persistentNotification
+                  update({ persistentNotification: next })
+                  setPersistentNotification(next)
+                }}
+                className={cn(
+                  'relative h-6 w-11 shrink-0 rounded-full transition-colors',
+                  settings.persistentNotification ? 'bg-emerald-600' : 'bg-zinc-400',
+                )}
+              >
+                <span
+                  className={cn(
+                    'absolute top-0.5 size-5 rounded-full bg-white transition-all',
+                    settings.persistentNotification ? 'right-0.5' : 'right-[1.375rem]',
+                  )}
+                />
+              </button>
+            </div>
           )}
         </div>
       </section>

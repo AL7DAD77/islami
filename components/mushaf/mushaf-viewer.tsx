@@ -28,29 +28,19 @@ export function MushafViewer({ initialSurah }: { initialSurah: number }) {
   const handlePrev = () => { if (currentPage > 1) setCurrentPage(currentPage - 1) }
   const handleNext = () => { if (currentPage < 604) setCurrentPage(currentPage + 1) }
 
-  // التنقل بالماوس
-  const [mouseStartX, setMouseStartX] = useState<number | null>(null)
-  const handleMouseDown = (e: React.MouseEvent) => setMouseStartX(e.clientX)
-  const handleMouseUp = (e: React.MouseEvent) => {
-    if (mouseStartX === null) return
-    const distance = mouseStartX - e.clientX
-    if (distance > 50) handleNext()
-    else if (distance < -50) handlePrev()
-    setMouseStartX(null)
-  }
-
-  // التنقل باللمس
+  // ✅ إصلاح الخطأ المطبعي هنا (e.touches بدلاً من e.target.touches)
   const [touchStartX, setTouchStartX] = useState<number | null>(null)
-  const handleTouchStart = (e: React.TouchEvent) => setTouchStartX(e.targetTouches[0].clientX)
+  const handleTouchStart = (e: React.TouchEvent) => setTouchStartX(e.touches[0].clientX)
   const handleTouchEnd = (e: React.TouchEvent) => {
     if (touchStartX === null) return
     const distance = touchStartX - e.changedTouches[0].clientX
-    if (distance > 50) handleNext()
-    else if (distance < -50) handlePrev()
+    // السحب لليسار يذهب للسابق، والسحب لليمين يذهب للتالي
+    if (distance > 50) handlePrev()
+    else if (distance < -50) handleNext()
     setTouchStartX(null)
   }
 
-  // التنقل بالأسهم
+  // التنقل بالأسهم للكمبيوتر
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'ArrowLeft') handleNext()
@@ -117,45 +107,38 @@ export function MushafViewer({ initialSurah }: { initialSurah: number }) {
   return (
     <div className="h-[100dvh] w-full bg-[#f4ece1] flex flex-col overflow-hidden select-none" dir="rtl">
       
-      {/* الشريط العلوي المحدث: يحتوي على اسم السورة والأزرار فقط */}
-      <div className="w-full flex justify-between items-center p-2 bg-[#fdfbf7] border-b border-[#b89965] shrink-0 z-20">
+      <div className="w-full flex justify-between items-center px-2 py-1.5 bg-[#fdfbf7] border-b border-[#b89965] shrink-0 z-20">
         
-        {/* اليمين: رجوع واسم السورة */}
         <div className="flex items-center gap-1">
-          <button onClick={() => router.back()} className="p-2 bg-[#f4ece1] rounded-full text-[#5a3e1b] hover:bg-[#e8dccb]">
+          <button onClick={() => router.back()} className="p-1.5 bg-[#f4ece1] rounded-full text-[#5a3e1b] hover:bg-[#e8dccb]">
             <ChevronRight className="size-5" />
           </button>
           <span className="font-bold text-[#5a3e1b] text-sm md:text-base mr-1">{surahName}</span>
         </div>
         
-        {/* الوسط: أزرار الصوت */}
         <div className="flex items-center gap-2">
-          <button onClick={() => router.push('/quran/reciters')} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[#f4ece1] rounded-full text-[#5a3e1b] hover:bg-[#e8dccb] text-[11px] font-bold transition-colors">
-             <Headphones className="size-4" />
+          <button onClick={() => router.push('/quran/reciters')} className="flex items-center gap-1 px-2.5 py-1.5 bg-[#f4ece1] rounded-full text-[#5a3e1b] hover:bg-[#e8dccb] text-[11px] font-bold transition-colors">
+             <Headphones className="size-3.5" />
              <span>القارئ</span>
           </button>
           
-          <button onClick={handlePlayToggle} className="p-2 bg-[#0a1f1a] rounded-full text-[#fdfbf7] shadow-md hover:bg-[#0a1f1a]/90 transition-colors">
+          <button onClick={handlePlayToggle} className="p-1.5 bg-[#0a1f1a] rounded-full text-[#fdfbf7] shadow-sm hover:bg-[#0a1f1a]/90 transition-colors">
              {isCurrentSurahPlaying ? <Pause className="size-4" fill="currentColor" /> : <Play className="size-4" fill="currentColor" />}
           </button>
         </div>
 
-        {/* اليسار: الحفظ */}
         <button 
           onClick={() => toggleBookmark(initialSurah, surahName, currentPage)}
-          className={`p-2 rounded-full transition-colors ${isMarked ? 'bg-[#d4af37] text-white' : 'bg-[#f4ece1] text-[#5a3e1b]'}`}
+          className={`p-1.5 rounded-full transition-colors ${isMarked ? 'bg-[#d4af37] text-white' : 'bg-[#f4ece1] text-[#5a3e1b]'}`}
         >
           <Bookmark className="size-5" fill={isMarked ? "currentColor" : "none"} />
         </button>
       </div>
 
-      {/* منطقة عرض الصورة - تملأ كل الشاشة المتبقية */}
       <div 
-        className="w-full flex-grow relative bg-white flex flex-col overflow-y-auto cursor-grab active:cursor-grabbing"
+        className="w-full flex-grow relative bg-white flex flex-col overflow-y-auto cursor-grab active:cursor-grabbing no-scrollbar"
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
-        onMouseDown={handleMouseDown}
-        onMouseUp={handleMouseUp}
       >
         <img 
           key={currentPage}

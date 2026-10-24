@@ -6,6 +6,8 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.BitmapFactory;
+import android.graphics.Color;
 import android.os.Build;
 import android.util.Log;
 
@@ -34,7 +36,7 @@ public class NotificationHelper {
             NotificationChannel adhanChannel = new NotificationChannel(
                     CHANNEL_ID, CHANNEL_NAME, NotificationManager.IMPORTANCE_HIGH
             );
-            adhanChannel.setSound(null, null);
+            adhanChannel.setSound(null, null); // الصوت يتم التحكم به من الخدمة
             adhanChannel.enableVibration(true);
             manager.createNotificationChannel(adhanChannel);
 
@@ -66,7 +68,7 @@ public class NotificationHelper {
         }
     }
 
-    // دالة جديدة لصياغة الوقت بالعربية الفصحى (ساعة، ساعتان، ساعات / دقيقة، دقيقتان، دقائق)
+    // صياغة الوقت بالعربية الفصحى (ساعة، ساعتان، ساعات / دقيقة، دقيقتان، دقائق)
     private static String formatTimeDiff(long diffMs) {
         long minutes = (diffMs / (1000 * 60)) % 60;
         long hours = (diffMs / (1000 * 60 * 60)) % 24;
@@ -102,7 +104,7 @@ public class NotificationHelper {
             String prevPrayerName = "";
 
             for (AdhanStore.Item it : AdhanStore.load(context)) {
-                // 🛑 تجاهل أي حدث ليس له اسم صلاة (مثل أحداث منتصف الليل القديمة أو نقاط المنتصف)
+                // 🛑 تجاهل أي حدث ليس له اسم صلاة (يمنع مشكلة إشعار 12:00 ص)
                 if (it.prayer == null || it.prayer.trim().isEmpty()) {
                     continue;
                 }
@@ -123,7 +125,6 @@ public class NotificationHelper {
             String timeText = "";
             String sign = "";
 
-            // تحديد ما إذا كنا سنعرض "متبقي على" أو "مضى على"
             if (nextTime != Long.MAX_VALUE && (prevTime == Long.MIN_VALUE || (nextTime - now) < (now - prevTime))) {
                 long diff = nextTime - now;
                 timeText = formatTimeDiff(diff);
@@ -154,7 +155,7 @@ public class NotificationHelper {
                 hijriDate = new SimpleDateFormat("dd/MM/yyyy", new Locale("ar")).format(new Date(now));
             }
 
-            // تنسيق وقت الأذان القادم (استخدام US لضمان ظهور الأرقام الإنجليزية ثم استبدال AM/PM)
+            // تنسيق وقت الأذان القادم
             SimpleDateFormat sdf = new SimpleDateFormat("hh:mm a", Locale.US);
             String prayerTimeStr = "";
             if (nextTime != Long.MAX_VALUE) {
@@ -176,11 +177,17 @@ public class NotificationHelper {
                 bigText += "\nموعد الأذان: " + prayerTimeStr;
             }
 
+            // ✅ إضافة شعار التطبيق (Large Icon) ولون التطبيق
+            android.graphics.Bitmap largeIcon = BitmapFactory.decodeResource(context.getResources(), R.mipmap.ic_launcher);
+            int appColor = Color.parseColor("#0a1f1a"); // لون التطبيق الأخضر الغامق
+
             NotificationCompat.Builder builder = new NotificationCompat.Builder(context, PERSISTENT_CHANNEL_ID)
                     .setContentTitle(titleText)
                     .setContentText(bodyText)
                     .setStyle(new NotificationCompat.BigTextStyle().bigText(bigText))
-                    .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+                    .setSmallIcon(R.mipmap.ic_launcher) // استخدام أيقونة التطبيق بدلاً من أيقونة الساعة
+                    .setLargeIcon(largeIcon) // إضافة الشعار الكبير
+                    .setColor(appColor) // تلوين الإشعار
                     .setOngoing(true)
                     .setAutoCancel(false)
                     .setOnlyAlertOnce(true)
@@ -208,9 +215,14 @@ public class NotificationHelper {
         openAppIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         PendingIntent openAppPendingIntent = PendingIntent.getActivity(context, 0, openAppIntent, flags);
 
+        android.graphics.Bitmap largeIcon = BitmapFactory.decodeResource(context.getResources(), R.mipmap.ic_launcher);
+        int appColor = Color.parseColor("#0a1f1a");
+
         return new NotificationCompat.Builder(context, CHANNEL_ID)
                 .setContentTitle(title).setContentText(body)
-                .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+                .setSmallIcon(R.mipmap.ic_launcher)
+                .setLargeIcon(largeIcon)
+                .setColor(appColor)
                 .setPriority(NotificationCompat.PRIORITY_MAX)
                 .setCategory(NotificationCompat.CATEGORY_ALARM)
                 .setOngoing(true).setAutoCancel(false)
@@ -225,9 +237,14 @@ public class NotificationHelper {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) flags |= PendingIntent.FLAG_IMMUTABLE;
         PendingIntent pendingIntent = PendingIntent.getActivity(context, id, intent, flags);
 
+        android.graphics.Bitmap largeIcon = BitmapFactory.decodeResource(context.getResources(), R.mipmap.ic_launcher);
+        int appColor = Color.parseColor("#0a1f1a");
+
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
                 .setContentTitle(title).setContentText(body)
-                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setSmallIcon(R.mipmap.ic_launcher)
+                .setLargeIcon(largeIcon)
+                .setColor(appColor)
                 .setContentIntent(pendingIntent)
                 .setAutoCancel(true).setPriority(NotificationCompat.PRIORITY_HIGH);
 
