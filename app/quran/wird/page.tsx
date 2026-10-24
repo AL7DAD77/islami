@@ -1,10 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react'; // ✅ أضفنا Suspense
 import { MushafViewer } from '@/components/mushaf/mushaf-viewer';
 
 export default function DailyWirdPage() {
-  // نطاق الورد اليومي الحالي (مثلاً من صفحة 5 إلى 8)
   const [startPage] = useState<number>(5);
   const [endPage] = useState<number>(8);
 
@@ -21,9 +20,11 @@ export default function DailyWirdPage() {
         </div>
       </div>
 
-      {/* عرض الورد باستخدام عارض المصحف التراثي الجديد المطور */}
+      {/* عرض الورد باستخدام عارض المصحف مع تغليفه بـ Suspense */}
       <div className="w-full grow flex items-center justify-center">
-        <MushafViewer initialSurah={2} />
+        <Suspense fallback={<div className="text-white p-10">جاري تحميل المصحف...</div>}>
+          <MushafViewer initialSurah={2} />
+        </Suspense>
       </div>
     </div>
   );

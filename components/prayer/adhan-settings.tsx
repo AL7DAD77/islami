@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Volume2, Check, Play, Square, BatteryWarning, ShieldCheck } from 'lucide-react'
+import { Volume2, Play, Square, BatteryWarning } from 'lucide-react'
 import { useSettings, type PrayerKey } from '@/lib/settings'
 import { ADHAN_VOICES, getAdhanVoice, voiceIdFor } from '@/lib/adhan-list'
 import { PRAYER_NAMES, PRAYER_ORDER } from '@/lib/prayer'
@@ -25,17 +25,9 @@ function stopPreview() {
 export function AdhanSettings() {
   const [settings, update] = useSettings()
   const [playingId, setPlayingId] = useState<string | null>(previewId)
-  const [volume, setVolume] = useState<number>(70)
-  const [batteryIgnored, setBatteryIgnored] = useState<boolean>(true) // افتراضي true حتى نتأكد
+  const [batteryIgnored, setBatteryIgnored] = useState<boolean>(true) 
 
-  // استرجاع مستوى الصوت وحالة البطارية
   useEffect(() => {
-    const savedVolume = localStorage.getItem('adhan_volume')
-    if (savedVolume !== null) {
-      setVolume(Number(savedVolume))
-    }
-
-    // فحص حالة البطارية من الأندرويد
     const checkBattery = async () => {
       try {
         const res = await AdhanScheduler.checkBatteryOptimization()
@@ -47,16 +39,9 @@ export function AdhanSettings() {
     checkBattery()
   }, [])
 
-  const handleVolumeChange = (newVolume: number) => {
-    setVolume(newVolume)
-    localStorage.setItem('adhan_volume', String(newVolume))
-    if (previewAudio) previewAudio.volume = newVolume / 100
-  }
-
   const requestBatteryPermission = async () => {
     try {
       await AdhanScheduler.requestIgnoreBatteryOptimizations()
-      // سنقوم بتحديث الحالة بعد ثانية (لأن المستخدم قد يستغرق وقتاً في الشاشة)
       setTimeout(async () => {
         const res = await AdhanScheduler.checkBatteryOptimization()
         setBatteryIgnored(res.isIgnored)
@@ -78,7 +63,7 @@ export function AdhanSettings() {
     }
     stopPreview()
     const audio = new Audio(`/audio/adhans/${voice.file}`)
-    audio.volume = volume / 100
+    audio.volume = 1 
     audio.onended = () => {
       previewAudio = null
       previewId = null
@@ -112,7 +97,7 @@ export function AdhanSettings() {
   return (
     <div className="flex flex-col gap-6">
       
-      {/* ============ إذن البطارية (جديد) ============ */}
+      {/* تنبيه البطارية (يظهر فقط إذا كانت هناك مشكلة) */}
       {!batteryIgnored && (
         <section className="rounded-2xl border-2 border-amber-200 bg-amber-50 p-4 dark:border-amber-900/50 dark:bg-amber-950/30">
           <div className="flex items-start gap-3">
@@ -133,40 +118,6 @@ export function AdhanSettings() {
           </div>
         </section>
       )}
-
-      {batteryIgnored && (
-        <div className="flex items-center gap-2 rounded-xl bg-emerald-50 px-4 py-2 text-xs text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">
-          <ShieldCheck className="size-4" />
-          <span>التطبيق يعمل في الخلفية بشكل مثالي (الأذان مضمون).</span>
-        </div>
-      )}
-
-      {/* ============ مستوى الصوت ============ */}
-      <section aria-labelledby="volume-setting">
-        <div className="mb-3 flex items-center justify-between">
-          <h3 id="volume-setting" className="text-sm font-bold text-muted-foreground flex items-center gap-2">
-            <Volume2 className="size-4" />
-            {'مستوى صوت الأذان'}
-          </h3>
-          <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
-            {volume}%
-          </span>
-        </div>
-        <div className="rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-          <input 
-            type="range" 
-            min="0" 
-            max="100" 
-            value={volume} 
-            onChange={(e) => handleVolumeChange(Number(e.target.value))}
-            className="w-full accent-emerald-600 h-2 bg-zinc-200 rounded-lg appearance-none cursor-pointer dark:bg-zinc-700"
-          />
-          <div className="flex justify-between text-xs text-zinc-400 mt-2">
-            <span>صامت</span>
-            <span>عالي</span>
-          </div>
-        </div>
-      </section>
 
       {/* ============ أذان كل صلاة ============ */}
       <section aria-labelledby="per-prayer">
@@ -234,7 +185,7 @@ export function AdhanSettings() {
         </div>
       </section>
 
-      {/* ============ الصوت الافتراضي ============ */}
+      {/* ============ الصوت الافتراضي (محدث إلى قائمة منسدلة) ============ */}
       <section aria-labelledby="default-voice">
         <div className="mb-3 rounded-2xl bg-linear-to-l from-emerald-600 to-emerald-700 p-4 text-white shadow-md">
           <div className="flex items-center gap-3">
@@ -251,52 +202,37 @@ export function AdhanSettings() {
         <h3 id="default-voice" className="mb-2 text-sm font-bold text-muted-foreground">
           {'اختر الصوت الافتراضي'}
         </h3>
-        <div className="flex flex-col gap-2">
-          {ADHAN_VOICES.map((voice) => {
-            const selected = settings.adhanVoice === voice.id
-            const isPlaying = playingId === voice.id
-            return (
-              <div
-                key={voice.id}
-                className={`flex items-center gap-3 rounded-2xl border p-3 transition ${
-                  selected
-                    ? 'border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30'
-                    : 'border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900'
-                }`}
-              >
-                <button
-                  type="button"
-                  onClick={() => setDefaultVoice(voice.id)}
-                  className="flex size-8 shrink-0 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800"
-                  aria-label={selected ? 'مختار' : 'اختيار'}
-                >
-                  {selected ? (
-                    <Check className="size-4 text-emerald-600 dark:text-emerald-400" />
-                  ) : (
-                    <span className="size-3 rounded-full border-2 border-zinc-300 dark:border-zinc-600" />
-                  )}
-                </button>
-                <button type="button" onClick={() => setDefaultVoice(voice.id)} className="flex-1 text-right">
-                  <p className="font-bold text-zinc-800 dark:text-zinc-100">{voice.name}</p>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400">{voice.reciter}</p>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => preview(voice.id)}
-                  aria-label={isPlaying ? 'إيقاف' : 'تجربة'}
-                  className={`flex size-9 shrink-0 items-center justify-center rounded-full transition ${
-                    isPlaying
-                      ? 'bg-emerald-600 text-white'
-                      : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-400'
-                  }`}
-                >
-                  {isPlaying ? <Square className="size-3.5" /> : <Play className="size-4" />}
-                </button>
-              </div>
-            )
-          })}
+        
+        {/* التصميم الجديد: قائمة منسدلة بدلاً من القائمة الطويلة */}
+        <div className="flex items-center gap-2 rounded-2xl border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-900">
+          <select
+            value={settings.adhanVoice}
+            onChange={(e) => setDefaultVoice(e.target.value)}
+            aria-label="اختر الصوت الافتراضي"
+            className="flex-1 rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-800"
+          >
+            {ADHAN_VOICES.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.name}
+              </option>
+            ))}
+          </select>
+
+          <button
+            type="button"
+            onClick={() => preview(defaultVoice.id)}
+            aria-label={playingId === defaultVoice.id ? 'إيقاف' : 'تجربة'}
+            className={`flex size-10 shrink-0 items-center justify-center rounded-full transition ${
+              playingId === defaultVoice.id
+                ? 'bg-emerald-600 text-white'
+                : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-400'
+            }`}
+          >
+            {playingId === defaultVoice.id ? <Square className="size-4" /> : <Play className="size-4" />}
+          </button>
         </div>
       </section>
+
     </div>
   )
 }

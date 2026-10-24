@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { MapPin, Calculator, Bell, BellRing, ChevronDown, RefreshCw, Check, Volume2 } from 'lucide-react'
+import { MapPin, Calculator, Bell, BellRing, ChevronDown, RefreshCw, Check } from 'lucide-react'
 import { useSettings, useHydrated, type MethodKey, type PrayerKey } from '@/lib/settings'
 import { PRAYER_NAMES, PRAYER_ORDER } from '@/lib/prayer'
 import { getAdhanVoice } from '@/lib/adhan-list'
@@ -347,14 +347,6 @@ export function PrayerSettings() {
               ))}
             </div>
           </div>
-          
-          <div className="flex items-center gap-2 rounded-xl bg-muted/50 p-3 text-muted-foreground">
-            <Volume2 className="size-5 shrink-0" />
-            <p className="text-xs font-medium leading-relaxed">
-              يمكنك التحكم في مستوى صوت الأذان باستخدام أزرار الصوت الجانبية في هاتفك.
-            </p>
-          </div>
-          
         </div>
       </section>
 

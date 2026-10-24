@@ -1,6 +1,6 @@
 import { ADHKAR } from '@/lib/adhkar'
 import { PROPHETS } from '@/lib/prophets'
-import { HADITHS } from '@/lib/hadith'
+import { HADITHS } from '@/lib/hadiths'
 import { GHAZAWAT } from '@/lib/ghazawat'
 import { FORGOTTEN_SUNAN, RAWATIB } from '@/lib/sunan'
 

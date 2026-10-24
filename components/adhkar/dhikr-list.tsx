@@ -25,15 +25,6 @@ function vibrate(pattern: number | number[]) {
   } catch {}
 }
 
-function moveToElement(element: HTMLElement | null) {
-  if (!element) return
-  try {
-    element.scrollIntoView({ behavior: 'instant', block: 'start', inline: 'nearest' })
-  } catch {
-    element.scrollIntoView(true)
-  }
-}
-
 export function DhikrList({
   items,
   nextHref,
@@ -53,9 +44,9 @@ export function DhikrList({
   const [cancelledNext, setCancelledNext] = useState(false)
   const [secondsLeft, setSecondsLeft] = useState(NEXT_DELAY_SECONDS)
 
-  const refs = useRef<(HTMLElement | null)[]>([])
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null)
   const doneRef = useRef<HTMLDivElement | null>(null)
-  const toolbarRef = useRef<HTMLDivElement | null>(null)
+  const [activeIndex, setActiveIndex] = useState(0)
 
   const timers = useRef<Set<ReturnType<typeof setTimeout>>>(new Set())
   const countsRef = useRef<number[]>(items.map(() => 0))
@@ -122,7 +113,6 @@ export function DhikrList({
     (total, item, index) => total + ((counts[index] ?? 0) >= item.count ? 1 : 0),
     0,
   )
-
   const allDone = items.length > 0 && done === items.length
 
   const nextIncomplete = (from: number, current: number[]) => {
@@ -135,11 +125,17 @@ export function DhikrList({
     return -1
   }
 
-  const scrollToCard = (element: HTMLElement | null) => {
-    if (!element) return
-    const toolbarHeight = toolbarRef.current?.getBoundingClientRect().height ?? 100
-    element.style.scrollMarginTop = `${Math.ceil(toolbarHeight + 24)}px`
-    moveToElement(element)
+  const scrollToCard = (index: number) => {
+    if (!scrollContainerRef.current) return
+    const container = scrollContainerRef.current
+    const child = container.children[index] as HTMLElement
+    if (child) {
+      child.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+        inline: 'center',
+      })
+    }
   }
 
   const tap = (index: number) => {
@@ -152,15 +148,15 @@ export function DhikrList({
     if (before >= item.count) return
 
     const next = items.map((_, itemIndex) =>
-      itemIndex === index ? before + 1 : (current[itemIndex] ?? 0),
+      itemIndex === index ? before + 1 : (current[itemIndex] ?? 0)
     )
 
     countsRef.current = next
     setCounts(next)
 
-    // إزالة الاهتزاز مع كل ضغطة (تم حذف vibrate(15))
     if (next[index] < item.count) {
-      return 
+      vibrate(15)
+      return
     }
 
     setJustCompleted(index)
@@ -176,12 +172,28 @@ export function DhikrList({
       if (!autoScrollRef.current) return
       const target = nextIncomplete(index, countsRef.current)
       if (target >= 0) {
-        scrollToCard(refs.current[target] ?? null)
+        scrollToCard(target)
       } else {
-        scrollToCard(doneRef.current)
+        if (scrollContainerRef.current) {
+          const container = scrollContainerRef.current
+          const endCard = container.children[items.length] as HTMLElement
+          if (endCard) {
+            endCard.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
+          }
+        }
       }
       vibrate(BUZZ_NEXT)
     }, 450)
+  }
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLDivElement
+    const width = target.clientWidth
+    const scrollLeft = Math.abs(target.scrollLeft)
+    const newIndex = Math.round(scrollLeft / width)
+    if (newIndex !== activeIndex && newIndex < items.length) {
+      setActiveIndex(newIndex)
+    }
   }
 
   const reset = () => {
@@ -192,11 +204,7 @@ export function DhikrList({
     setJustCompleted(null)
     setCancelledNext(false)
     setSecondsLeft(NEXT_DELAY_SECONDS)
-  }
-
-  const changeAutoScroll = (enabled: boolean) => {
-    autoScrollRef.current = enabled
-    setAutoScroll(enabled)
+    scrollToCard(0)
   }
 
   const goNext = useCallback(() => {
@@ -213,17 +221,13 @@ export function DhikrList({
 
   useEffect(() => {
     if (!settingsLoaded || !allDone || !autoScroll || !nextHref || cancelledNext) return
-
     setSecondsLeft(NEXT_DELAY_SECONDS)
-
     const tick = setInterval(() => {
       setSecondsLeft((seconds) => Math.max(0, seconds - 1))
     }, 1000)
-
     const go = setTimeout(() => {
       goNextRef.current()
     }, NEXT_DELAY_SECONDS * 1000)
-
     return () => {
       clearInterval(tick)
       clearTimeout(go)
@@ -242,175 +246,167 @@ export function DhikrList({
   }
 
   return (
-    <div ref={pinch.ref} className="flex flex-col gap-4 pb-10">
-      {/* الشريط العلوي */}
-      <div
-        ref={toolbarRef}
-        className="sticky top-0 z-10 -mx-4 flex flex-col gap-2 bg-background/90 px-4 py-3 backdrop-blur border-b border-border/50"
-      >
+    <div className="flex flex-col h-[calc(100dvh-120px)] w-full overflow-hidden select-none" dir="rtl">
+      
+      <div className="shrink-0 flex flex-col gap-2 bg-background/95 px-4 py-2 border-b border-border/50 z-10">
         <div className="flex items-center justify-between">
-          <p className="text-sm font-medium text-primary">
+          <p className="text-sm font-bold text-primary">
             {`أنجزت ${toArabicNumber(done)} من ${toArabicNumber(items.length)}`}
           </p>
-
           <button
             type="button"
             onClick={reset}
-            className="flex items-center gap-1 rounded-full bg-muted px-3 py-1.5 text-xs hover:bg-muted/80 transition-colors"
+            className="flex items-center gap-1 rounded-full bg-muted px-3 py-1.5 text-xs font-medium hover:bg-muted/80 transition-colors"
           >
             <RotateCcw className="size-3.5" aria-hidden="true" />
             {'إعادة'}
           </button>
         </div>
-
-        <label className="flex cursor-pointer items-center justify-between rounded-xl bg-card border border-border px-3 py-2 shadow-sm">
-          <span className="text-xs font-medium text-muted-foreground">
-            {'الانتقال التلقائي للذكر التالي ثم للقسم التالي'}
-          </span>
-
-          <span
-            className={cn(
-              'relative inline-flex h-5 w-9 items-center rounded-full transition-colors',
-              autoScroll ? 'bg-primary' : 'bg-muted-foreground/30',
-            )}
-          >
-            <input
-              type="checkbox"
-              checked={autoScroll}
-              onChange={(event) => changeAutoScroll(event.target.checked)}
-              className="sr-only"
-            />
-            <span
-              className={cn(
-                'inline-block size-4 transform rounded-full bg-white shadow transition-transform',
-                autoScroll ? '-translate-x-4' : '-translate-x-1',
-              )}
-            />
-          </span>
-        </label>
       </div>
 
-      {/* قائمة الأذكار */}
-      {items.map((dhikr, index) => {
-        const count = counts[index] ?? 0
-        const complete = count >= dhikr.count
-        const isJustCompleted = justCompleted === index
+      <div 
+        ref={scrollContainerRef}
+        onScroll={handleScroll}
+        className="flex-1 flex overflow-x-auto snap-x snap-mandatory no-scrollbar"
+      >
+        {items.map((dhikr, index) => {
+          const count = counts[index] ?? 0
+          const complete = count >= dhikr.count
+          const isJustCompleted = justCompleted === index
+          const progress = Math.min(1, count / dhikr.count)
+          const circumference = 2 * Math.PI * 74 // نصف قطر الدائرة 74
 
-        return (
-          <article
-            key={index}
-            ref={(element) => { refs.current[index] = element }}
-            style={{ scrollMarginTop: 140 }}
-            className={cn(
-              'overflow-hidden rounded-3xl bg-card shadow-sm ring-1 ring-border transition-all duration-500',
-              complete && 'opacity-60',
-              isJustCompleted && 'ring-2 ring-primary shadow-lg scale-[1.01]',
-            )}
-          >
-            <button
-              type="button"
-              onClick={() => tap(index)}
-              disabled={complete}
-              className="block w-full p-5 text-right outline-none"
-              aria-label={`اضغط للعد: ${toArabicNumber(count)} من ${toArabicNumber(dhikr.count)}`}
+          return (
+            <div
+              key={index}
+              className="min-w-full h-full snap-center p-4 flex flex-col justify-between"
             >
-              {/* تم إزالة دالة التنسيق المعقدة والعودة للعرض البسيط */}
-              <p className="font-quran leading-loose text-foreground" style={{ fontSize: pinch.size }}>
-                {dhikr.text}
-              </p>
-
-              {dhikr.note && (
-                <p className="mt-4 rounded-xl bg-accent/60 p-3 text-sm leading-relaxed text-accent-foreground text-right">
-                  {dhikr.note}
-                </p>
-              )}
-            </button>
-
-            <div className="flex items-center gap-3 border-t px-5 py-3 bg-muted/20">
-              <p className="flex-1 text-xs text-muted-foreground text-right">
-                {dhikr.source}
-              </p>
-
-              <button
-                type="button"
-                onClick={() => share(dhikr)}
-                className="flex size-8 items-center justify-center rounded-full bg-muted hover:bg-muted-foreground/20 transition-colors"
-                aria-label="مشاركة الذكر"
-              >
-                <Share2 className="size-4" />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => tap(index)}
-                disabled={complete}
+              <div 
+                ref={pinch.ref}
                 className={cn(
-                  'flex h-10 min-w-16 items-center justify-center gap-1 rounded-full px-4 text-sm font-bold shadow-sm transition-all',
-                  complete
-                    ? 'bg-secondary text-primary'
-                    : 'bg-primary text-primary-foreground active:scale-95',
+                  "flex-1 overflow-y-auto overflow-x-hidden rounded-3xl bg-card p-5 shadow-sm ring-1 ring-border transition-all duration-500 mb-2 custom-scrollbar",
+                  complete && 'opacity-60',
+                  isJustCompleted && 'ring-2 ring-primary shadow-lg scale-[0.99]'
                 )}
               >
-                {complete ? (
-                  <Check className="size-5" aria-label="تم" />
-                ) : (
-                  `${toArabicNumber(count)} / ${toArabicNumber(dhikr.count)}`
+                <p className="font-quran leading-loose text-foreground text-center" style={{ fontSize: pinch.size }}>
+                  {dhikr.text}
+                </p>
+                {dhikr.note && (
+                  <p className="mt-4 rounded-xl bg-accent/60 p-3 text-sm leading-relaxed text-accent-foreground text-center">
+                    {dhikr.note}
+                  </p>
                 )}
-              </button>
-            </div>
-          </article>
-        )
-      })}
+                <p className="mt-6 text-center text-xs text-muted-foreground">
+                  {dhikr.source}
+                </p>
+              </div>
 
-      {/* بطاقة الإتمام */}
-      {allDone && (
-        <div
-          ref={doneRef}
-          role="status"
-          style={{ scrollMarginTop: 140 }}
-          className="flex flex-col items-center gap-4 rounded-3xl bg-gradient-to-l from-emerald-600 to-emerald-700 p-6 text-center text-white shadow-xl"
-        >
-          <PartyPopper className="size-10 text-gold" aria-hidden="true" />
-
-          <p className="text-xl font-bold">
-            {'تقبّل الله منك، أتممت هذا القسم'}
-          </p>
-
-          {nextHref ? (
-            <>
-              <p className="text-sm opacity-90">
-                {autoScroll && !cancelledNext
-                  ? `الانتقال إلى «${nextTitle}» بعد ${toArabicNumber(secondsLeft)} ثوانٍ`
-                  : `القسم التالي: ${nextTitle}`}
-              </p>
-
-              <div className="flex w-full gap-3 mt-2">
+              {/* ============ المسبحة الإلكترونية (تصميم الدائرة) ============ */}
+              <div className="shrink-0 flex items-center justify-center relative py-6">
+                
+                {/* زر المشاركة (يطفو على الجانب) */}
                 <button
                   type="button"
-                  onClick={goNext}
-                  className="flex-1 rounded-xl bg-white py-3 text-sm font-bold text-emerald-700 shadow-sm hover:bg-gray-50 transition-colors"
+                  onClick={() => share(dhikr)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 flex size-11 items-center justify-center rounded-full bg-white text-muted-foreground shadow-sm hover:bg-gray-50 transition-colors z-20 border border-border/50"
+                  aria-label="مشاركة الذكر"
                 >
-                  {'الانتقال الآن'}
+                  <Share2 className="size-5" />
                 </button>
 
-                {autoScroll && !cancelledNext && (
-                  <button
-                    type="button"
-                    onClick={() => setCancelledNext(true)}
-                    className="flex-1 rounded-xl bg-white/20 py-3 text-sm font-medium hover:bg-white/30 transition-colors"
-                  >
-                    {'البقاء هنا'}
-                  </button>
-                )}
+                {/* الدائرة الكبيرة */}
+                <button
+                  type="button"
+                  onClick={() => tap(index)}
+                  disabled={complete}
+                  className="relative flex flex-col items-center justify-center size-40 rounded-full group focus:outline-none z-10"
+                >
+                  {/* حلقة التقدم SVG */}
+                  <svg className="absolute inset-0 size-full -rotate-90 pointer-events-none" viewBox="0 0 160 160">
+                    <circle 
+                      cx="80" cy="80" r="74" 
+                      fill="none" 
+                      stroke="var(--border)" 
+                      strokeWidth="6" 
+                    />
+                    <circle 
+                      cx="80" cy="80" r="74" 
+                      fill="none" 
+                      stroke="var(--primary)" 
+                      strokeWidth="6" 
+                      strokeDasharray={circumference} 
+                      strokeDashoffset={circumference * (1 - progress)}
+                      strokeLinecap="round"
+                      style={{ transition: 'stroke-dashoffset 0.3s ease' }}
+                    />
+                  </svg>
+
+                  {/* الجزء الداخلي (النقطة السوداء والعدد) */}
+                  <div className="flex flex-col items-center justify-center size-32 rounded-full bg-card shadow-sm z-10 transition-transform group-active:scale-95 group-disabled:group-active:scale-100 border border-border/50">
+                    {complete ? (
+                      <div className="flex flex-col items-center text-primary">
+                        <Check className="size-10 mb-1" />
+                        <span className="text-xs font-bold">تم بحمد الله</span>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="size-3 bg-[#1a1a1a] rounded-full mb-1" />
+                        <span className="text-4xl font-bold text-foreground">{toArabicNumber(count)}</span>
+                        <span className="text-[10px] text-muted-foreground mt-1">الهدف: {toArabicNumber(dhikr.count)} مرة</span>
+                      </>
+                    )}
+                  </div>
+                </button>
+
               </div>
-            </>
-          ) : (
-            <p className="text-sm opacity-90">
-              {'هذا آخر قسم من الأذكار والأدعية'}
-            </p>
-          )}
-        </div>
-      )}
+            </div>
+          )
+        })}
+
+        {allDone && (
+          <div className="min-w-full h-full snap-center p-4 flex flex-col justify-center">
+            <div
+              ref={doneRef}
+              role="status"
+              className="flex flex-col items-center gap-5 rounded-3xl bg-gradient-to-l from-emerald-600 to-emerald-700 p-8 text-center text-white shadow-xl"
+            >
+              <PartyPopper className="size-14 text-gold animate-bounce" aria-hidden="true" />
+              <p className="text-2xl font-bold">تقبّل الله منك، أتممت هذا القسم</p>
+              
+              {nextHref ? (
+                <>
+                  <p className="text-sm opacity-90">
+                    {autoScroll && !cancelledNext
+                      ? `الانتقال إلى «${nextTitle}» بعد ${toArabicNumber(secondsLeft)} ثوانٍ`
+                      : `القسم التالي: ${nextTitle}`}
+                  </p>
+                  <div className="flex w-full gap-3 mt-4">
+                    <button
+                      type="button"
+                      onClick={goNext}
+                      className="flex-1 rounded-xl bg-white py-3.5 text-sm font-bold text-emerald-700 shadow-sm hover:bg-gray-50 transition-colors"
+                    >
+                      {'الانتقال الآن'}
+                    </button>
+                    {autoScroll && !cancelledNext && (
+                      <button
+                        type="button"
+                        onClick={() => setCancelledNext(true)}
+                        className="flex-1 rounded-xl bg-white/20 py-3.5 text-sm font-medium hover:bg-white/30 transition-colors"
+                      >
+                        {'البقاء هنا'}
+                      </button>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm opacity-90">هذا آخر قسم من الأذكار والأدعية</p>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
