@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ChevronRight, Bookmark, Play, Pause, Headphones } from 'lucide-react'
 import { saveReadingPosition, useBookmarkState, toggleBookmark, isBookmarked } from '@/lib/bookmarks'
@@ -22,33 +22,95 @@ export function MushafViewer({ initialSurah }: { initialSurah: number }) {
   const [metaData, setMetaData] = useState<MetaData | null>(null)
   const [loading, setLoading] = useState<boolean>(true)
   
+  // حالة إظهار/إخفاء الأزرار
+  const [showControls, setShowControls] = useState(true)
+  
+  // حالات التكبير والتحريك
+  const [scale, setScale] = useState(1)
+  const [pan, setPan] = useState({ x: 0, y: 0 })
+
+  // مراجع لتتبع اللمس
+  const touchStartX = useRef<number | null>(null)
+  const touchStartY = useRef<number | null>(null)
+  const initialPinchDist = useRef<number | null>(null)
+  
   const bookmarkState = useBookmarkState()
   const player = useQuranPlayer()
+
+  // إخفاء شريط التنقل السفلي
+  useEffect(() => {
+    document.body.classList.add('reading-fullscreen')
+    return () => {
+      document.body.classList.remove('reading-fullscreen')
+    }
+  }, [])
+
+  // تصفير التكبير عند تغيير الصفحة
+  useEffect(() => {
+    setScale(1)
+    setPan({ x: 0, y: 0 })
+  }, [currentPage])
 
   const handlePrev = () => { if (currentPage > 1) setCurrentPage(currentPage - 1) }
   const handleNext = () => { if (currentPage < 604) setCurrentPage(currentPage + 1) }
 
-  // ✅ إصلاح الخطأ المطبعي هنا (e.touches بدلاً من e.target.touches)
-  const [touchStartX, setTouchStartX] = useState<number | null>(null)
-  const handleTouchStart = (e: React.TouchEvent) => setTouchStartX(e.touches[0].clientX)
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (touchStartX === null) return
-    const distance = touchStartX - e.changedTouches[0].clientX
-    // السحب لليسار يذهب للسابق، والسحب لليمين يذهب للتالي
-    if (distance > 50) handlePrev()
-    else if (distance < -50) handleNext()
-    setTouchStartX(null)
+  // ================= إدارة اللمس (سحب + تكبير) =================
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      // بدء التكبير
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      )
+      initialPinchDist.current = dist
+    } else if (e.touches.length === 1) {
+      // بدء السحب أو التحريك
+      touchStartX.current = e.touches[0].clientX
+      touchStartY.current = e.touches[0].clientY
+    }
   }
 
-  // التنقل بالأسهم للكمبيوتر
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowLeft') handleNext()
-      if (e.key === 'ArrowRight') handlePrev()
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2 && initialPinchDist.current) {
+      // تنفيذ التكبير
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      )
+      const newScale = Math.max(1, Math.min(dist / initialPinchDist.current, 3)) // التكبير من 1x إلى 3x
+      setScale(newScale)
+      if (newScale === 1) setPan({ x: 0, y: 0 })
+    } else if (e.touches.length === 1 && scale > 1) {
+      // تحريك الصورة المكبرة (Pan)
+      if (touchStartX.current !== null && touchStartY.current !== null) {
+        const dx = e.touches[0].clientX - touchStartX.current
+        const dy = e.touches[0].clientY - touchStartY.current
+        setPan(prev => ({ x: prev.x + dx, y: prev.y + dy }))
+        touchStartX.current = e.touches[0].clientX
+        touchStartY.current = e.touches[0].clientY
+      }
     }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [currentPage])
+  }
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (e.touches.length === 0) {
+      if (scale === 1 && touchStartX.current !== null) {
+        // السحب الأفقي (فقط عندما تكون الصورة غير مكبرة)
+        const distance = touchStartX.current - e.changedTouches[0].clientX
+        if (Math.abs(distance) > 50) {
+          if (distance > 0) handlePrev()
+          else handleNext()
+        } else {
+          // لمسة خفيفة: إظهار/إخفاء الأزرار
+          setShowControls(prev => !prev)
+        }
+      }
+      // تصفير المراجع
+      initialPinchDist.current = null
+      touchStartX.current = null
+      touchStartY.current = null
+    }
+  }
 
   useEffect(() => {
     async function loadMeta() {
@@ -105,48 +167,59 @@ export function MushafViewer({ initialSurah }: { initialSurah: number }) {
   const isCurrentSurahPlaying = player.playing && player.surah === initialSurah
 
   return (
-    <div className="h-[100dvh] w-full bg-[#f4ece1] flex flex-col overflow-hidden select-none" dir="rtl">
+    <div 
+      className="h-[100dvh] w-full bg-[#fdfbf7] relative overflow-hidden select-none" 
+      dir="rtl"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onClick={() => { if (scale === 1) setShowControls(prev => !prev) }}
+    >
       
-      <div className="w-full flex justify-between items-center px-2 py-1.5 bg-[#fdfbf7] border-b border-[#b89965] shrink-0 z-20">
-        
-        <div className="flex items-center gap-1">
-          <button onClick={() => router.back()} className="p-1.5 bg-[#f4ece1] rounded-full text-[#5a3e1b] hover:bg-[#e8dccb]">
+      {/* ============ الشريط العلوي ============ */}
+      <div 
+        className={`absolute top-0 left-0 right-0 z-50 flex justify-between items-start p-3 bg-gradient-to-b from-[#fdfbf7] via-[#fdfbf7]/80 to-transparent transition-all duration-300 ${showControls ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'}`}
+      >
+        <div className="flex items-center gap-1 bg-white/90 backdrop-blur-md rounded-full px-2 py-1 shadow-sm border border-[#e8dccb]">
+          <button onClick={(e) => { e.stopPropagation(); router.back(); }} className="p-1.5 text-[#5a3e1b]">
             <ChevronRight className="size-5" />
           </button>
-          <span className="font-bold text-[#5a3e1b] text-sm md:text-base mr-1">{surahName}</span>
+          <span className="font-bold text-[#5a3e1b] text-sm pr-2 pl-1">{surahName}</span>
         </div>
         
-        <div className="flex items-center gap-2">
-          <button onClick={() => router.push('/quran/reciters')} className="flex items-center gap-1 px-2.5 py-1.5 bg-[#f4ece1] rounded-full text-[#5a3e1b] hover:bg-[#e8dccb] text-[11px] font-bold transition-colors">
-             <Headphones className="size-3.5" />
+        <div className="flex items-center gap-2 bg-white/90 backdrop-blur-md rounded-full px-2 py-1 shadow-sm border border-[#e8dccb]">
+          <button onClick={(e) => { e.stopPropagation(); router.push('/quran/reciters'); }} className="flex items-center gap-1 text-[#5a3e1b] text-[12px] font-bold px-2">
+             <Headphones className="size-4" />
              <span>القارئ</span>
           </button>
           
-          <button onClick={handlePlayToggle} className="p-1.5 bg-[#0a1f1a] rounded-full text-[#fdfbf7] shadow-sm hover:bg-[#0a1f1a]/90 transition-colors">
+          <button onClick={(e) => { e.stopPropagation(); handlePlayToggle(); }} className="p-1.5 bg-[#0a1f1a] rounded-full text-[#fdfbf7] shadow-sm">
              {isCurrentSurahPlaying ? <Pause className="size-4" fill="currentColor" /> : <Play className="size-4" fill="currentColor" />}
           </button>
-        </div>
 
-        <button 
-          onClick={() => toggleBookmark(initialSurah, surahName, currentPage)}
-          className={`p-1.5 rounded-full transition-colors ${isMarked ? 'bg-[#d4af37] text-white' : 'bg-[#f4ece1] text-[#5a3e1b]'}`}
-        >
-          <Bookmark className="size-5" fill={isMarked ? "currentColor" : "none"} />
-        </button>
+          <button onClick={(e) => { e.stopPropagation(); toggleBookmark(initialSurah, surahName, currentPage); }} className={`p-1.5 ${isMarked ? 'text-[#d4af37]' : 'text-[#5a3e1b]'}`}>
+            <Bookmark className="size-5" fill={isMarked ? "currentColor" : "none"} />
+          </button>
+        </div>
       </div>
 
-      <div 
-        className="w-full flex-grow relative bg-white flex flex-col overflow-y-auto cursor-grab active:cursor-grabbing no-scrollbar"
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-      >
+      {/* ============ منطقة الصورة (تدعم التكبير والتحريك) ============ */}
+      <div className="w-full h-full relative overflow-hidden bg-white" style={{ touchAction: 'none' }}>
         <img 
           key={currentPage}
           src={`/mushaf/pages/${pageNumberPadded}.webp`} 
           alt={`صفحة ${currentPage}`}
-          className="w-full h-auto animate-in fade-in duration-300 pointer-events-none"
+          className="w-full h-full object-cover pointer-events-none transition-transform duration-75 origin-center"
+          style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})` }}
           draggable={false}
         />
+      </div>
+
+      {/* ============ رقم الصفحة ============ */}
+      <div 
+        className={`absolute bottom-6 left-1/2 -translate-x-1/2 z-50 bg-[#0a1f1a]/80 text-white text-xs font-bold px-5 py-2 rounded-full backdrop-blur-md transition-all duration-300 ${showControls ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}
+      >
+        صفحة {toArabicNumber(currentPage)}
       </div>
 
     </div>

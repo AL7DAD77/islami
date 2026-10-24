@@ -36,7 +36,7 @@ public class NotificationHelper {
             NotificationChannel adhanChannel = new NotificationChannel(
                     CHANNEL_ID, CHANNEL_NAME, NotificationManager.IMPORTANCE_HIGH
             );
-            adhanChannel.setSound(null, null); // الصوت يتم التحكم به من الخدمة
+            adhanChannel.setSound(null, null);
             adhanChannel.enableVibration(true);
             manager.createNotificationChannel(adhanChannel);
 
@@ -68,7 +68,6 @@ public class NotificationHelper {
         }
     }
 
-    // صياغة الوقت بالعربية الفصحى (ساعة، ساعتان، ساعات / دقيقة، دقيقتان، دقائق)
     private static String formatTimeDiff(long diffMs) {
         long minutes = (diffMs / (1000 * 60)) % 60;
         long hours = (diffMs / (1000 * 60 * 60)) % 24;
@@ -104,10 +103,7 @@ public class NotificationHelper {
             String prevPrayerName = "";
 
             for (AdhanStore.Item it : AdhanStore.load(context)) {
-                // 🛑 تجاهل أي حدث ليس له اسم صلاة (يمنع مشكلة إشعار 12:00 ص)
-                if (it.prayer == null || it.prayer.trim().isEmpty()) {
-                    continue;
-                }
+                if (it.prayer == null || it.prayer.trim().isEmpty()) continue;
                 
                 String prayer = translatePrayer(it.prayer);
                 if (prayer.isEmpty()) continue;
@@ -140,7 +136,6 @@ public class NotificationHelper {
                 return;
             }
 
-            // التاريخ الهجري
             String hijriDate = "";
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 android.icu.util.IslamicCalendar hijriCal = new android.icu.util.IslamicCalendar();
@@ -155,7 +150,6 @@ public class NotificationHelper {
                 hijriDate = new SimpleDateFormat("dd/MM/yyyy", new Locale("ar")).format(new Date(now));
             }
 
-            // تنسيق وقت الأذان القادم
             SimpleDateFormat sdf = new SimpleDateFormat("hh:mm a", Locale.US);
             String prayerTimeStr = "";
             if (nextTime != Long.MAX_VALUE) {
@@ -177,17 +171,17 @@ public class NotificationHelper {
                 bigText += "\nموعد الأذان: " + prayerTimeStr;
             }
 
-            // ✅ إضافة شعار التطبيق (Large Icon) ولون التطبيق
+            // ✅ التعديلات الجديدة: الشعار واللون
             android.graphics.Bitmap largeIcon = BitmapFactory.decodeResource(context.getResources(), R.mipmap.ic_launcher);
-            int appColor = Color.parseColor("#0a1f1a"); // لون التطبيق الأخضر الغامق
+            int appColor = Color.parseColor("#0a1f1a"); 
 
             NotificationCompat.Builder builder = new NotificationCompat.Builder(context, PERSISTENT_CHANNEL_ID)
                     .setContentTitle(titleText)
                     .setContentText(bodyText)
                     .setStyle(new NotificationCompat.BigTextStyle().bigText(bigText))
-                    .setSmallIcon(R.mipmap.ic_launcher) // استخدام أيقونة التطبيق بدلاً من أيقونة الساعة
-                    .setLargeIcon(largeIcon) // إضافة الشعار الكبير
-                    .setColor(appColor) // تلوين الإشعار
+                    .setSmallIcon(android.R.drawable.ic_lock_idle_alarm) // أيقونة النظام (تمنع الدائرة السوداء)
+                    .setLargeIcon(largeIcon) // شعار التطبيق
+                    .setColor(appColor) // لون التطبيق الأخضر
                     .setOngoing(true)
                     .setAutoCancel(false)
                     .setOnlyAlertOnce(true)
@@ -220,7 +214,7 @@ public class NotificationHelper {
 
         return new NotificationCompat.Builder(context, CHANNEL_ID)
                 .setContentTitle(title).setContentText(body)
-                .setSmallIcon(R.mipmap.ic_launcher)
+                .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
                 .setLargeIcon(largeIcon)
                 .setColor(appColor)
                 .setPriority(NotificationCompat.PRIORITY_MAX)
@@ -242,7 +236,7 @@ public class NotificationHelper {
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
                 .setContentTitle(title).setContentText(body)
-                .setSmallIcon(R.mipmap.ic_launcher)
+                .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
                 .setLargeIcon(largeIcon)
                 .setColor(appColor)
                 .setContentIntent(pendingIntent)
