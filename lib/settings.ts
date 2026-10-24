@@ -52,6 +52,12 @@ export interface AppSettings {
   quranFitPage: boolean
   showDailyMessage: boolean
   ayahHighlight: boolean
+  
+  // ✅ إضافات التذكيرات الذكية
+  salawatEnabled: boolean
+  salawatInterval: number
+  adhkarRemindersEnabled: boolean
+  adhkarRemindersInterval: number
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -77,6 +83,12 @@ export const DEFAULT_SETTINGS: AppSettings = {
   quranFitPage: true,
   showDailyMessage: true,
   ayahHighlight: true,
+  
+  // ✅ إعدادات افتراضية للتذكيرات
+  salawatEnabled: false,
+  salawatInterval: 120, // كل ساعتين
+  adhkarRemindersEnabled: false,
+  adhkarRemindersInterval: 180, // كل 3 ساعات
 }
 
 const KEY = 'noor-settings-v1'

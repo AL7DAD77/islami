@@ -89,7 +89,6 @@ export function QuranPlayerProvider({ children }: { children: ReactNode }) {
   const commandVersionRef = useRef(0)
   const busyRef = useRef(0)
   
-  // مرجع لدالة التشغيل لاستخدامها في حدث onended
   const playRef = useRef<(number: number, name: string, reciter: Reciter, server: string) => void>(() => {})
 
   const applySelection = useCallback((selection: Selection) => {
@@ -155,7 +154,6 @@ export function QuranPlayerProvider({ children }: { children: ReactNode }) {
       audio.onplaying = () => { if (mountedRef.current) { setPlaying(true); setLoading(false); } }
       audio.onpause = () => { if (mountedRef.current) setPlaying(false); }
       
-      // التشغيل التلقائي للسورة التالية
       audio.onended = () => {
         if (!mountedRef.current) return
         const current = selectionRef.current
@@ -174,6 +172,54 @@ export function QuranPlayerProvider({ children }: { children: ReactNode }) {
     }
     return () => { mountedRef.current = false }
   }, [])
+
+  // ✅ ميزة شاشة القفل (Media Session API)
+  useEffect(() => {
+    if (nativePlayerAvailable()) return
+    if (!reciter || !surahName || !('mediaSession' in navigator)) return
+    if (typeof MediaMetadata === 'undefined') return
+
+    try {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: `سورة ${surahName}`,
+        artist: reciter.name,
+        album: 'القرآن الكريم',
+        artwork: [{ src: '/icon-512.png', sizes: '512x512', type: 'image/png' }],
+      })
+
+      // ربط أزرار شاشة القفل بالوظائف
+      navigator.mediaSession.setActionHandler('play', () => {
+        const audio = audioRef.current
+        if (audio && audio.paused) {
+          setLoading(true)
+          audio.play().catch(() => setLoading(false))
+        }
+      })
+      
+      navigator.mediaSession.setActionHandler('pause', () => {
+        const audio = audioRef.current
+        if (audio && !audio.paused) {
+          audio.pause()
+        }
+      })
+
+      navigator.mediaSession.setActionHandler('nexttrack', () => {
+        const current = selectionRef.current
+        if (current && current.surah < 114) {
+           playRef.current(current.surah + 1, `السورة رقم ${current.surah + 1}`, current.reciter, current.server)
+        }
+      })
+
+      navigator.mediaSession.setActionHandler('previoustrack', () => {
+        const current = selectionRef.current
+        if (current && current.surah > 1) {
+           playRef.current(current.surah - 1, `السورة رقم ${current.surah - 1}`, current.reciter, current.server)
+        }
+      })
+    } catch (e) {
+      console.warn('MediaSession setup failed', e)
+    }
+  }, [surahName, reciter])
 
   useEffect(() => {
     if (!nativePlayerAvailable()) return
@@ -260,7 +306,6 @@ export function QuranPlayerProvider({ children }: { children: ReactNode }) {
     })
   }
 
-  // تحديث المرجع بالدالة الأحدث
   playRef.current = play
 
   const toggle = () => {

@@ -18,6 +18,7 @@ import {
   Share2,
   ShieldCheck,
   Star,
+  BellRing,
 } from 'lucide-react'
 import { PageHeader } from '@/components/page-header'
 import { TileLink, SectionTitle } from '@/components/ui-kit'
@@ -25,10 +26,8 @@ import { ThemeToggle } from '@/components/theme-toggle'
 import { DailyMessageToggle } from '@/components/daily-message-toggle'
 import { exitNativeApp, isNativePlatform } from '@/lib/native'
 
-// ⚠️ ضع رابط التطبيق الحقيقي على Google Play هنا لاحقاً
 const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.alhaddad.islami'
 
-// كل الأيقونات من مكتبة lucide المستخدمة في التطبيق، والنصوص من محتوى التطبيق نفسه
 const LEARN: { href: string; title: string; subtitle: string; icon: ReactNode }[] = [
   { href: '/hadith', title: 'الحديث النبوي', subtitle: 'أحاديث مختارة مع شرحها', icon: <BookOpen className="size-5" /> },
   { href: '/seerah', title: 'السيرة النبوية', subtitle: 'سيرة النبي ﷺ', icon: <Landmark className="size-5" /> },
@@ -38,11 +37,10 @@ const LEARN: { href: string; title: string; subtitle: string; icon: ReactNode }[
   { href: '/calendar', title: 'التقويم', subtitle: 'الهجري والميلادي', icon: <CalendarDays className="size-5" /> },
 ]
 
-const ABOUT: { href: string; title: string; subtitle: string; icon: ReactNode }[] = [
-  { href: '/more/support', title: 'الدعم والتواصل', subtitle: 'أرسل ملاحظتك', icon: <LifeBuoy className="size-5" /> },
+const INFO_LINKS: { href: string; title: string; subtitle: string; icon: ReactNode }[] = [
+  { href: '/more/about', title: 'عن التطبيق', subtitle: 'الإصدار والمزايا', icon: <Info className="size-5" /> },
   { href: '/more/privacy', title: 'سياسة الخصوصية', subtitle: 'كيف نحمي بياناتك', icon: <ShieldCheck className="size-5" /> },
   { href: '/more/disclaimer', title: 'إخلاء المسؤولية', subtitle: 'حدود المحتوى والخدمة', icon: <Scale className="size-5" /> },
-  { href: '/more/about', title: 'عن التطبيق', subtitle: 'الإصدار والمزايا', icon: <Info className="size-5" /> },
 ]
 
 function ActionTile({ title, subtitle, icon, onClick }: { title: string; subtitle: string; icon: ReactNode; onClick: () => void }) {
@@ -80,9 +78,7 @@ export default function MorePage() {
         setCopied(true)
         setTimeout(() => setCopied(false), 2000)
       }
-    } catch {
-      // المستخدم ألغى المشاركة
-    }
+    } catch {}
   }
 
   return (
@@ -90,6 +86,7 @@ export default function MorePage() {
       <PageHeader title="المزيد" subtitle="تعلّم وأدوات ومعلومات التطبيق" />
 
       <div className="flex flex-col gap-6">
+        {/* 1. أدوات */}
         <section aria-labelledby="tools">
           <SectionTitle>
             <span id="tools">أدوات</span>
@@ -97,9 +94,11 @@ export default function MorePage() {
           <div className="grid grid-cols-2 gap-3">
             <TileLink layout="stack" href="/ibadati" title="عباداتي" subtitle="متابعة يومية" icon={<ClipboardCheck className="size-5" />} />
             <TileLink layout="stack" href="/search" title="البحث" subtitle="في محتوى التطبيق" icon={<Search className="size-5" />} />
+            <TileLink layout="stack" href="/more/reminders" title="التذكيرات" subtitle="الصلاة على النبي" icon={<BellRing className="size-5" />} />
           </div>
         </section>
 
+        {/* 2. تعلّم */}
         <section aria-labelledby="learn">
           <SectionTitle>
             <span id="learn">تعلّم</span>
@@ -111,9 +110,10 @@ export default function MorePage() {
           </div>
         </section>
 
-        <section aria-labelledby="app">
+        {/* 3. إعدادات التطبيق */}
+        <section aria-labelledby="app-settings">
           <SectionTitle>
-            <span id="app">التطبيق</span>
+            <span id="app-settings">إعدادات التطبيق</span>
           </SectionTitle>
           <div className="grid grid-cols-2 gap-3">
             <ThemeToggle />
@@ -141,12 +141,24 @@ export default function MorePage() {
           </div>
         </section>
 
+        {/* 4. المساعدة والدعم */}
+        <section aria-labelledby="support">
+          <SectionTitle>
+            <span id="support">المساعدة والدعم</span>
+          </SectionTitle>
+          <div className="grid grid-cols-2 gap-3">
+            {/* ✅ تم حذف زر الإبلاغ المكرر، والاكتفاء بصفحة الدعم الشاملة */}
+            <TileLink layout="stack" href="/more/support" title="الدعم والتواصل" subtitle="أرسل ملاحظتك أو بلاغك" icon={<LifeBuoy className="size-5" />} />
+          </div>
+        </section>
+
+        {/* 5. حول التطبيق */}
         <section aria-labelledby="about">
           <SectionTitle>
             <span id="about">حول التطبيق</span>
           </SectionTitle>
           <div className="grid grid-cols-2 gap-3">
-            {ABOUT.map((l) => (
+            {INFO_LINKS.map((l) => (
               <TileLink key={l.href} layout="stack" href={l.href} title={l.title} subtitle={l.subtitle} icon={l.icon} />
             ))}
           </div>

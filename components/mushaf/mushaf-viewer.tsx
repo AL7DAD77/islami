@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ChevronRight, Bookmark, Play, Pause, Headphones } from 'lucide-react'
+import { ChevronRight, Bookmark, Play, Pause, Headphones, Moon, Sun } from 'lucide-react'
 import { saveReadingPosition, useBookmarkState, toggleBookmark, isBookmarked } from '@/lib/bookmarks'
 import { toArabicNumber } from '@/lib/quran'
 import { useQuranPlayer } from '@/lib/quran-player'
@@ -22,14 +22,12 @@ export function MushafViewer({ initialSurah }: { initialSurah: number }) {
   const [metaData, setMetaData] = useState<MetaData | null>(null)
   const [loading, setLoading] = useState<boolean>(true)
   
-  // حالة إظهار/إخفاء الأزرار
-  const [showControls, setShowControls] = useState(true)
-  
-  // حالات التكبير والتحريك
+  // ✅ تم حذف حالة showControls لأن الأزرار ستكون ثابتة
+  const [nightMode, setNightMode] = useState(false)
+
   const [scale, setScale] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
 
-  // مراجع لتتبع اللمس
   const touchStartX = useRef<number | null>(null)
   const touchStartY = useRef<number | null>(null)
   const initialPinchDist = useRef<number | null>(null)
@@ -37,7 +35,29 @@ export function MushafViewer({ initialSurah }: { initialSurah: number }) {
   const bookmarkState = useBookmarkState()
   const player = useQuranPlayer()
 
-  // إخفاء شريط التنقل السفلي
+  const vibrate = (ms: number = 10) => {
+    try {
+      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+        navigator.vibrate(ms)
+      }
+    } catch (e) {}
+  }
+
+  useEffect(() => {
+    const savedMode = localStorage.getItem('mushaf-night-mode')
+    if (savedMode === 'true') setNightMode(true)
+  }, [])
+
+  const toggleNightMode = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    vibrate(10)
+    setNightMode(prev => {
+      const newMode = !prev
+      localStorage.setItem('mushaf-night-mode', String(newMode))
+      return newMode
+    })
+  }
+
   useEffect(() => {
     document.body.classList.add('reading-fullscreen')
     return () => {
@@ -45,26 +65,33 @@ export function MushafViewer({ initialSurah }: { initialSurah: number }) {
     }
   }, [])
 
-  // تصفير التكبير عند تغيير الصفحة
   useEffect(() => {
     setScale(1)
     setPan({ x: 0, y: 0 })
   }, [currentPage])
 
-  const handlePrev = () => { if (currentPage > 1) setCurrentPage(currentPage - 1) }
-  const handleNext = () => { if (currentPage < 604) setCurrentPage(currentPage + 1) }
+  const handlePrev = () => { 
+    if (currentPage > 1) {
+      vibrate(15)
+      setCurrentPage(currentPage - 1) 
+    }
+  }
+  
+  const handleNext = () => { 
+    if (currentPage < 604) {
+      vibrate(15)
+      setCurrentPage(currentPage + 1) 
+    }
+  }
 
-  // ================= إدارة اللمس (سحب + تكبير) =================
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length === 2) {
-      // بدء التكبير
       const dist = Math.hypot(
         e.touches[0].clientX - e.touches[1].clientX,
         e.touches[0].clientY - e.touches[1].clientY
       )
       initialPinchDist.current = dist
     } else if (e.touches.length === 1) {
-      // بدء السحب أو التحريك
       touchStartX.current = e.touches[0].clientX
       touchStartY.current = e.touches[0].clientY
     }
@@ -72,16 +99,14 @@ export function MushafViewer({ initialSurah }: { initialSurah: number }) {
 
   const handleTouchMove = (e: React.TouchEvent) => {
     if (e.touches.length === 2 && initialPinchDist.current) {
-      // تنفيذ التكبير
       const dist = Math.hypot(
         e.touches[0].clientX - e.touches[1].clientX,
         e.touches[0].clientY - e.touches[1].clientY
       )
-      const newScale = Math.max(1, Math.min(dist / initialPinchDist.current, 3)) // التكبير من 1x إلى 3x
+      const newScale = Math.max(1, Math.min(dist / initialPinchDist.current, 3))
       setScale(newScale)
       if (newScale === 1) setPan({ x: 0, y: 0 })
     } else if (e.touches.length === 1 && scale > 1) {
-      // تحريك الصورة المكبرة (Pan)
       if (touchStartX.current !== null && touchStartY.current !== null) {
         const dx = e.touches[0].clientX - touchStartX.current
         const dy = e.touches[0].clientY - touchStartY.current
@@ -95,17 +120,12 @@ export function MushafViewer({ initialSurah }: { initialSurah: number }) {
   const handleTouchEnd = (e: React.TouchEvent) => {
     if (e.touches.length === 0) {
       if (scale === 1 && touchStartX.current !== null) {
-        // السحب الأفقي (فقط عندما تكون الصورة غير مكبرة)
         const distance = touchStartX.current - e.changedTouches[0].clientX
         if (Math.abs(distance) > 50) {
           if (distance > 0) handlePrev()
           else handleNext()
-        } else {
-          // لمسة خفيفة: إظهار/إخفاء الأزرار
-          setShowControls(prev => !prev)
         }
       }
-      // تصفير المراجع
       initialPinchDist.current = null
       touchStartX.current = null
       touchStartY.current = null
@@ -139,8 +159,10 @@ export function MushafViewer({ initialSurah }: { initialSurah: number }) {
 
   const handlePlayToggle = () => {
     if (player.playing && player.surah === initialSurah) {
+      vibrate(10)
       player.toggle()
     } else {
+      vibrate(10)
       let server = 'https://server8.mp3quran.net/afs/';
       let reciterName = 'مشاري العفاسي';
       try {
@@ -159,6 +181,12 @@ export function MushafViewer({ initialSurah }: { initialSurah: number }) {
     }
   }
 
+  const handleBookmark = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    vibrate(20)
+    toggleBookmark(initialSurah, surahName, currentPage)
+  }
+
   if (loading || !metaData) return <div className="h-screen flex items-center justify-center font-sans text-xl">جاري تحميل المصحف...</div>
 
   const pageNumberPadded = String(currentPage).padStart(3, '0')
@@ -166,60 +194,72 @@ export function MushafViewer({ initialSurah }: { initialSurah: number }) {
   const isMarked = isBookmarked(bookmarkState, initialSurah, currentPage)
   const isCurrentSurahPlaying = player.playing && player.surah === initialSurah
 
+  const bgColor = nightMode ? 'bg-[#1a1a1a]' : 'bg-[#fdfbf7]'
+
   return (
     <div 
-      className="h-[100dvh] w-full bg-[#fdfbf7] relative overflow-hidden select-none" 
+      className={`h-[100dvh] w-full ${bgColor} relative overflow-hidden select-none transition-colors duration-300 flex flex-col`} 
       dir="rtl"
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
-      onClick={() => { if (scale === 1) setShowControls(prev => !prev) }}
     >
       
-      {/* ============ الشريط العلوي ============ */}
+      {/* ✅ الشريط العلوي: ثابت دائماً في الأعلى ولا يختفي */}
       <div 
-        className={`absolute top-0 left-0 right-0 z-50 flex justify-between items-start p-3 bg-gradient-to-b from-[#fdfbf7] via-[#fdfbf7]/80 to-transparent transition-all duration-300 ${showControls ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'}`}
+        className={`w-full flex justify-between items-start p-3 shrink-0 z-50`}
+        style={{ background: nightMode ? '#1a1a1a' : '#fdfbf7' }}
       >
-        <div className="flex items-center gap-1 bg-white/90 backdrop-blur-md rounded-full px-2 py-1 shadow-sm border border-[#e8dccb]">
-          <button onClick={(e) => { e.stopPropagation(); router.back(); }} className="p-1.5 text-[#5a3e1b]">
+        <div className={`flex items-center gap-1 backdrop-blur-md rounded-full px-2 py-1 shadow-sm border ${nightMode ? 'bg-zinc-800/90 border-zinc-700' : 'bg-white/90 border-[#e8dccb]'}`}>
+          <button onClick={() => router.back()} className={`p-1.5 ${nightMode ? 'text-zinc-300' : 'text-[#5a3e1b]'}`}>
             <ChevronRight className="size-5" />
           </button>
-          <span className="font-bold text-[#5a3e1b] text-sm pr-2 pl-1">{surahName}</span>
+          <span className={`font-bold text-sm pr-2 pl-1 ${nightMode ? 'text-zinc-300' : 'text-[#5a3e1b]'}`}>{surahName}</span>
         </div>
         
-        <div className="flex items-center gap-2 bg-white/90 backdrop-blur-md rounded-full px-2 py-1 shadow-sm border border-[#e8dccb]">
-          <button onClick={(e) => { e.stopPropagation(); router.push('/quran/reciters'); }} className="flex items-center gap-1 text-[#5a3e1b] text-[12px] font-bold px-2">
+        <div className={`flex items-center gap-2 backdrop-blur-md rounded-full px-2 py-1 shadow-sm border ${nightMode ? 'bg-zinc-800/90 border-zinc-700' : 'bg-white/90 border-[#e8dccb]'}`}>
+          <button onClick={toggleNightMode} className={`p-1.5 ${nightMode ? 'text-[#d4af37]' : 'text-[#5a3e1b]'}`} title="الوضع الليلي">
+            {nightMode ? <Sun className="size-5" /> : <Moon className="size-5" />}
+          </button>
+
+          <button onClick={() => router.push('/quran/reciters')} className={`flex items-center gap-1 text-[12px] font-bold px-2 ${nightMode ? 'text-zinc-300' : 'text-[#5a3e1b]'}`}>
              <Headphones className="size-4" />
              <span>القارئ</span>
           </button>
           
-          <button onClick={(e) => { e.stopPropagation(); handlePlayToggle(); }} className="p-1.5 bg-[#0a1f1a] rounded-full text-[#fdfbf7] shadow-sm">
+          <button onClick={handlePlayToggle} className={`p-1.5 rounded-full shadow-sm ${nightMode ? 'bg-[#d4af37] text-[#1a1a1a]' : 'bg-[#0a1f1a] text-[#fdfbf7]'}`}>
              {isCurrentSurahPlaying ? <Pause className="size-4" fill="currentColor" /> : <Play className="size-4" fill="currentColor" />}
           </button>
 
-          <button onClick={(e) => { e.stopPropagation(); toggleBookmark(initialSurah, surahName, currentPage); }} className={`p-1.5 ${isMarked ? 'text-[#d4af37]' : 'text-[#5a3e1b]'}`}>
+          <button onClick={handleBookmark} className={`p-1.5 ${isMarked ? 'text-[#d4af37]' : (nightMode ? 'text-zinc-300' : 'text-[#5a3e1b]')}`}>
             <Bookmark className="size-5" fill={isMarked ? "currentColor" : "none"} />
           </button>
         </div>
       </div>
 
-      {/* ============ منطقة الصورة (تدعم التكبير والتحريك) ============ */}
-      <div className="w-full h-full relative overflow-hidden bg-white" style={{ touchAction: 'none' }}>
+      {/* منطقة الصورة (تأخذ المساحة المتبقية) */}
+      <div className={`flex-1 w-full relative overflow-hidden ${bgColor}`} style={{ touchAction: 'none' }}>
         <img 
           key={currentPage}
           src={`/mushaf/pages/${pageNumberPadded}.webp`} 
           alt={`صفحة ${currentPage}`}
-          className="w-full h-full object-cover pointer-events-none transition-transform duration-75 origin-center"
-          style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})` }}
+          className={`w-full h-full object-contain pointer-events-none transition-transform duration-75 origin-center`}
+          style={{ 
+            transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
+            filter: nightMode ? 'invert(0.95) hue-rotate(180deg) brightness(1.2) contrast(1.2)' : 'none' 
+          }}
           draggable={false}
         />
       </div>
 
-      {/* ============ رقم الصفحة ============ */}
+      {/* ✅ رقم الصفحة: ثابت دائماً في الأسفل */}
       <div 
-        className={`absolute bottom-6 left-1/2 -translate-x-1/2 z-50 bg-[#0a1f1a]/80 text-white text-xs font-bold px-5 py-2 rounded-full backdrop-blur-md transition-all duration-300 ${showControls ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}
+        className={`w-full flex justify-center py-2 shrink-0 z-50`}
+        style={{ background: nightMode ? '#1a1a1a' : '#fdfbf7' }}
       >
-        صفحة {toArabicNumber(currentPage)}
+        <div className={`text-xs font-bold px-5 py-2 rounded-full ${nightMode ? 'bg-[#d4af37]/90 text-[#1a1a1a]' : 'bg-[#0a1f1a]/80 text-white'}`}>
+          صفحة {toArabicNumber(currentPage)}
+        </div>
       </div>
 
     </div>

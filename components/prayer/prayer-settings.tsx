@@ -10,12 +10,8 @@ import { updateAutoLocation } from '@/lib/location'
 import { toArabicNumber } from '@/lib/quran'
 import { cn } from '@/lib/utils'
 import {
-  requestNativeNotificationPermission,
-  getNotificationStatusAsync,
-  registerAppStateListener,
   isNativePlatform,
   isAdhanSchedulerAvailable,
-  getNativeAlarmStatus,
   setPersistentNotification,
 } from '@/lib/native'
 
@@ -42,18 +38,6 @@ export function PrayerSettings() {
   const [openCityPicker, setOpenCityPicker] = useState(false)
   const [openMethodPicker, setOpenMethodPicker] = useState(false)
   const [locating, setLocating] = useState(false)
-  const [notifPermission, setNotifPermission] = useState<string>('checking')
-
-  const [nativeSched, setNativeSched] = useState(false)
-
-  useEffect(() => {
-    const refresh = async () => {
-      setNotifPermission(await getNotificationStatusAsync())
-      setNativeSched(isAdhanSchedulerAvailable())
-    }
-    refresh()
-    return registerAppStateListener(refresh)
-  }, [])
 
   const [query, setQuery] = useState('')
   const [online, setOnline] = useState<OnlineCity[]>([])
@@ -118,17 +102,11 @@ export function PrayerSettings() {
   const localNames = new Set(localMatches.map((c) => normalizeArabic(c.name)))
   const onlineMatches = online.filter((o) => !localNames.has(normalizeArabic(o.name)))
 
-  const handleEnableNotifications = async () => {
-    const result = await requestNativeNotificationPermission()
-    setNotifPermission(result)
-  }
-
-  if (!hydrated) {
-    return <div className="h-96 animate-pulse rounded-2xl bg-card" aria-hidden="true" />
-  }
+  if (!hydrated) return <div className="h-96 animate-pulse rounded-2xl bg-card" aria-hidden="true" />
 
   return (
     <div className="flex flex-col gap-4">
+      {/* الموقع */}
       <section className="rounded-2xl bg-card p-4 shadow-sm ring-1 ring-border">
         <div className="mb-3 flex items-center gap-2">
           <span className="flex size-8 items-center justify-center rounded-xl bg-accent text-accent-foreground">
@@ -140,23 +118,9 @@ export function PrayerSettings() {
           <div className="rounded-xl bg-muted/50 p-3">
             <p className="text-xs text-muted-foreground">المدينة الحالية</p>
             <p className="font-bold text-zinc-800 dark:text-zinc-100">
-              {settings.location.city}
-              {settings.location.country && ` - ${settings.location.country}`}
+              {settings.location.city} {settings.location.country && ` - ${settings.location.country}`}
             </p>
           </div>
-          {settings.location.auto && settings.locationStatus === 'ok' && (
-            <p className="text-xs text-emerald-600">✓ يتم تحديد موقعك تلقائياً وتحديث المواقيت عند سفرك</p>
-          )}
-          {settings.locationStatus === 'denied' && (
-            <p className="rounded-xl bg-amber-100 p-3 text-xs leading-relaxed text-amber-900 dark:bg-amber-950 dark:text-amber-100">
-              لم يُسمح بالوصول للموقع، فالمواقيت الحالية لمدينة {settings.location.city}. اضغط «تحديد موقعي تلقائياً» وامنح الإذن، أو اختر مدينتك يدوياً.
-            </p>
-          )}
-          {settings.locationStatus === 'error' && (
-            <p className="rounded-xl bg-amber-100 p-3 text-xs leading-relaxed text-amber-900 dark:bg-amber-950 dark:text-amber-100">
-              تعذّر تحديد موقعك. تأكد من تشغيل خدمة الموقع (GPS) في الهاتف.
-            </p>
-          )}
           <div className="flex gap-2">
             <button
               type="button"
@@ -177,13 +141,12 @@ export function PrayerSettings() {
             </button>
           </div>
           {openCityPicker && (
-            <div className="space-y-2">
+            <div className="space-y-2 mt-2">
               <input
                 type="search"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="ابحث عن مدينتك (مثال: أسيوط، تبوك، لندن...)"
-                aria-label="ابحث عن مدينة"
+                placeholder="ابحث عن مدينتك..."
                 className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm"
               />
               <div className="max-h-72 overflow-y-auto rounded-xl border border-border">
@@ -194,10 +157,7 @@ export function PrayerSettings() {
                     onClick={() => selectCity(c)}
                     className="flex w-full items-center justify-between border-b border-border px-3 py-2.5 text-right text-sm last:border-0 hover:bg-muted"
                   >
-                    <span>
-                      {c.name} <span className="text-xs text-muted-foreground">- {c.country}</span>
-                    </span>
-                    {settings.location.city === c.name && <Check className="size-4 text-emerald-600" />}
+                    <span>{c.name} <span className="text-xs text-muted-foreground">- {c.country}</span></span>
                   </button>
                 ))}
                 {onlineMatches.map((c) => (
@@ -207,26 +167,16 @@ export function PrayerSettings() {
                     onClick={() => selectOnline(c)}
                     className="flex w-full items-center justify-between border-b border-border px-3 py-2.5 text-right text-sm last:border-0 hover:bg-muted"
                   >
-                    <span>
-                      {c.name}
-                      <span className="text-xs text-muted-foreground">
-                        {` - ${[c.admin, c.country].filter(Boolean).join('، ')}`}
-                      </span>
-                    </span>
+                    <span>{c.name} <span className="text-xs text-muted-foreground">{` - ${[c.admin, c.country].filter(Boolean).join('، ')}`}</span></span>
                   </button>
                 ))}
-                {searching && <p className="p-3 text-center text-xs text-muted-foreground">جارٍ البحث في مدن العالم...</p>}
-                {!searching && localMatches.length === 0 && onlineMatches.length === 0 && (
-                  <p className="p-3 text-center text-xs text-muted-foreground">
-                    {query.trim().length < 2 ? 'اكتب حرفين على الأقل' : 'لا توجد نتائج. جرّب كتابة الاسم بطريقة أخرى.'}
-                  </p>
-                )}
               </div>
             </div>
           )}
         </div>
       </section>
 
+      {/* طريقة الحساب */}
       <section className="rounded-2xl bg-card p-4 shadow-sm ring-1 ring-border">
         <div className="mb-3 flex items-center gap-2">
           <span className="flex size-8 items-center justify-center rounded-xl bg-accent text-accent-foreground">
@@ -239,9 +189,7 @@ export function PrayerSettings() {
           onClick={() => setOpenMethodPicker(!openMethodPicker)}
           className="flex w-full items-center justify-between rounded-xl bg-muted/50 px-3 py-3 text-right"
         >
-          <span className="font-medium">
-            {METHODS.find((m) => m.id === settings.method)?.name ?? 'أم القرى'}
-          </span>
+          <span className="font-medium">{METHODS.find((m) => m.id === settings.method)?.name ?? 'أم القرى'}</span>
           <ChevronDown className={cn('size-4 transition', openMethodPicker && 'rotate-180')} />
         </button>
         {openMethodPicker && (
@@ -250,10 +198,7 @@ export function PrayerSettings() {
               <button
                 key={m.id}
                 type="button"
-                onClick={() => {
-                  update({ method: m.id })
-                  setOpenMethodPicker(false)
-                }}
+                onClick={() => { update({ method: m.id }); setOpenMethodPicker(false) }}
                 className="flex w-full items-center justify-between border-b border-border px-3 py-2.5 text-right text-sm last:border-0 hover:bg-muted"
               >
                 <span>{m.name}</span>
@@ -265,30 +210,13 @@ export function PrayerSettings() {
         <div className="mt-3">
           <p className="mb-2 text-xs text-muted-foreground">مذهب حساب العصر</p>
           <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => update({ madhab: 'shafi' })}
-              className={cn(
-                'flex-1 rounded-xl px-3 py-2 text-sm',
-                settings.madhab === 'shafi' ? 'bg-primary text-primary-foreground' : 'bg-muted'
-              )}
-            >
-              شافعي / مالكي / حنبلي
-            </button>
-            <button
-              type="button"
-              onClick={() => update({ madhab: 'hanafi' })}
-              className={cn(
-                'flex-1 rounded-xl px-3 py-2 text-sm',
-                settings.madhab === 'hanafi' ? 'bg-primary text-primary-foreground' : 'bg-muted'
-              )}
-            >
-              حنفي
-            </button>
+            <button type="button" onClick={() => update({ madhab: 'shafi' })} className={cn('flex-1 rounded-xl px-3 py-2 text-sm', settings.madhab === 'shafi' ? 'bg-primary text-primary-foreground' : 'bg-muted')}>شافعي / مالكي / حنبلي</button>
+            <button type="button" onClick={() => update({ madhab: 'hanafi' })} className={cn('flex-1 rounded-xl px-3 py-2 text-sm', settings.madhab === 'hanafi' ? 'bg-primary text-primary-foreground' : 'bg-muted')}>حنفي</button>
           </div>
         </div>
       </section>
 
+      {/* التنبيه والأذان */}
       <section className="rounded-2xl bg-card p-4 shadow-sm ring-1 ring-border">
         <div className="mb-3 flex items-center gap-2">
           <span className="flex size-8 items-center justify-center rounded-xl bg-accent text-accent-foreground">
@@ -298,14 +226,12 @@ export function PrayerSettings() {
         </div>
         <div className="space-y-4">
           <div>
-            <p className="mb-2 text-xs text-muted-foreground">
-              التنبيه قبل الأذان ({toArabicNumber(settings.reminderMinutes)} دقيقة)
-            </p>
+            <p className="mb-2 text-xs text-muted-foreground">التنبيه قبل الأذان ({toArabicNumber(settings.reminderMinutes)} دقيقة)</p>
             <input
               type="range"
               min={0}
               max={30}
-              step={5}
+              step={1} // ✅ تم التعديل ليعمل بالدقيقة
               value={settings.reminderMinutes}
               onChange={(e) => update({ reminderMinutes: Number(e.target.value) })}
               className="w-full accent-emerald-600"
@@ -318,17 +244,8 @@ export function PrayerSettings() {
                 <button
                   key={key}
                   type="button"
-                  onClick={() =>
-                    update((s) => ({
-                      adhanEnabled: { ...s.adhanEnabled, [key]: !s.adhanEnabled[key] },
-                    }))
-                  }
-                  className={cn(
-                    'rounded-xl px-2 py-2 text-xs font-medium transition',
-                    settings.adhanEnabled[key]
-                      ? 'bg-emerald-600 text-white'
-                      : 'bg-muted text-muted-foreground'
-                  )}
+                  onClick={() => update((s) => ({ adhanEnabled: { ...s.adhanEnabled, [key]: !s.adhanEnabled[key] } }))}
+                  className={cn('rounded-xl px-2 py-2 text-xs font-medium transition', settings.adhanEnabled[key] ? 'bg-emerald-600 text-white' : 'bg-muted text-muted-foreground')}
                 >
                   {PRAYER_NAMES[key]}
                 </button>
@@ -338,6 +255,7 @@ export function PrayerSettings() {
         </div>
       </section>
 
+      {/* الإشعارات - تم تنظيفها تماماً كما طلبت */}
       <section className="rounded-2xl bg-card p-4 shadow-sm ring-1 ring-border">
         <div className="mb-3 flex items-center gap-2">
           <span className="flex size-8 items-center justify-center rounded-xl bg-accent text-accent-foreground">
@@ -345,79 +263,26 @@ export function PrayerSettings() {
           </span>
           <h3 className="font-bold text-zinc-800 dark:text-zinc-100">الإشعارات</h3>
         </div>
-        <div className="space-y-3">
-          <div className="flex items-center justify-between gap-3 rounded-xl bg-muted/50 p-3">
-            <div className="flex-1">
-              <p className="font-medium text-zinc-800 dark:text-zinc-100">إشعارات الأذان</p>
-              <p className="text-xs text-muted-foreground">
-                {notifPermission === 'granted'
-                  ? 'مُفعّلة ✅'
-                  : notifPermission === 'denied'
-                    ? 'مرفوضة ❌ (افتح الإعدادات)'
-                    : notifPermission === 'unsupported'
-                      ? 'غير مدعومة'
-                      : notifPermission === 'checking'
-                        ? 'جارٍ الفحص…'
-                        : 'غير مُفعّلة'}
-              </p>
-            </div>
-
-            {notifPermission === 'denied' ? (
-              <button
-                type="button"
-                onClick={() => {
-                  alert(
-                    isNativePlatform()
-                      ? 'لتفعيل الإشعارات:\n\n١. افتح إعدادات الهاتف\n٢. التطبيقات ← إسلامي\n٣. الإشعارات ← فعّلها\n٤. ارجع للتطبيق'
-                      : 'لتفعيل الإشعارات:\n\n1. اضغط 🔒 بجانب الرابط\n2. Site settings\n3. Notifications → Allow\n4. أعد تحميل الصفحة'
-                  )
-                }}
-                className="rounded-xl bg-muted px-3 py-2 text-xs"
-              >
-                إعادة التفعيل
-              </button>
-            ) : notifPermission === 'checking' ? null : (
-              <button
-                type="button"
-                onClick={handleEnableNotifications}
-                className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white"
-              >
-                تفعيل
-              </button>
-            )}
+        
+        {/* ✅ لا يوجد نصوص حالة ولا أزرار تفعيل، فقط المفتاح الدائم */}
+        <div className="flex items-center justify-between gap-3 rounded-xl bg-muted/50 p-3">
+          <div className="flex-1">
+            <p className="font-medium text-zinc-800 dark:text-zinc-100">إشعار دائم بالصلاة القادمة</p>
+            <p className="text-xs text-muted-foreground">يبقى ظاهراً في الخلفية ويعرض الوقت المتبقي</p>
           </div>
-
-          {nativeSched && (
-            <div className="flex items-center justify-between gap-3 rounded-xl bg-muted/50 p-3">
-              <div className="flex-1">
-                <p className="font-medium text-zinc-800 dark:text-zinc-100">إشعار دائم بالصلاة القادمة</p>
-                <p className="text-xs text-muted-foreground">
-                  يبقى ظاهراً في الخلفية ويعرض الوقت المتبقي للصلاة القادمة
-                </p>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={settings.persistentNotification}
-                onClick={() => {
-                  const next = !settings.persistentNotification
-                  update({ persistentNotification: next })
-                  setPersistentNotification(next)
-                }}
-                className={cn(
-                  'relative h-6 w-11 shrink-0 rounded-full transition-colors',
-                  settings.persistentNotification ? 'bg-emerald-600' : 'bg-zinc-400',
-                )}
-              >
-                <span
-                  className={cn(
-                    'absolute top-0.5 size-5 rounded-full bg-white transition-all',
-                    settings.persistentNotification ? 'right-0.5' : 'right-[1.375rem]',
-                  )}
-                />
-              </button>
-            </div>
-          )}
+          <button
+            type="button"
+            role="switch"
+            aria-checked={settings.persistentNotification}
+            onClick={() => {
+              const next = !settings.persistentNotification
+              update({ persistentNotification: next })
+              setPersistentNotification(next)
+            }}
+            className={cn('relative h-6 w-11 shrink-0 rounded-full transition-colors', settings.persistentNotification ? 'bg-emerald-600' : 'bg-zinc-400')}
+          >
+            <span className={cn('absolute top-0.5 size-5 rounded-full bg-white transition-all', settings.persistentNotification ? 'right-0.5' : 'right-[1.375rem]')} />
+          </button>
         </div>
       </section>
     </div>

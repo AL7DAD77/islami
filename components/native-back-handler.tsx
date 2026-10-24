@@ -1,48 +1,44 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect } from 'react'
+import { App } from '@capacitor/app'
+import { Capacitor } from '@capacitor/core'
 import { usePathname, useRouter } from 'next/navigation'
-import { exitNativeApp, isNativePlatform } from '@/lib/native'
-
-// الصفحات الرئيسية (التبويبات السفلية): زر الرجوع فيها يخرج من التطبيق إلى واجهة الهاتف
-const ROOT_PAGES = ['/', '/prayer', '/quran', '/adhkar', '/kids', '/qibla', '/more']
 
 export function NativeBackHandler() {
   const router = useRouter()
   const pathname = usePathname()
-  const pathRef = useRef(pathname)
-  pathRef.current = pathname
 
   useEffect(() => {
-    if (!isNativePlatform()) return
-    let remove: (() => void) | null = null
+    // التأكد من أننا نعمل على الهاتف (أندرويد) وليس المتصفح
+    if (!Capacitor.isNativePlatform()) return
 
-    import('@capacitor/app').then(({ App }) => {
-      App.addListener('backButton', () => {
-        const path = pathRef.current
-        if (ROOT_PAGES.includes(path)) {
-          // إيقاف أي صوت قرآن يعمل داخل الصفحة ثم الخروج النهائي
-          try {
-            ;(window as any).__stopQuran?.()
-          } catch {}
-          exitNativeApp()
-          return
-        }
-        // صفحة داخلية: ارجع خطوة، وإن لم يوجد سجل فاذهب لأقرب تبويب رئيسي
-        if (window.history.length > 1) {
-          router.back()
+    let backListener: any = null
+
+    const setupListener = async () => {
+      backListener = await App.addListener('backButton', () => {
+        // قائمة بالصفحات الرئيسية (إذا كان فيها، يغلق التطبيق)
+        const rootPages = ['/', '/prayer', '/quran', '/adhkar', '/more', '/kids', '/qibla', '/tasbih']
+        
+        // إذا كان في صفحة رئيسية، أغلق التطبيق
+        if (rootPages.includes(pathname)) {
+          App.exitApp()
         } else {
-          router.push('/prayer')
+          // إذا كان في صفحة فرعية، ارجع للخلف
+          router.back()
         }
-      }).then((h) => {
-        remove = () => h.remove()
       })
-    })
-
-    return () => {
-      if (remove) remove()
     }
-  }, [router])
+
+    setupListener()
+
+    // تنظيف المستمع (Listener) عند إغلاق المكون
+    return () => {
+      if (backListener) {
+        backListener.remove()
+      }
+    }
+  }, [pathname, router])
 
   return null
 }

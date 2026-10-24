@@ -37,6 +37,7 @@ function buildSchedule(s: AppSettings): ScheduledItem[] {
   const now = Date.now()
   const timeline: number[] = []
 
+  // 1. جدولة الصلوات
   for (let d = -1; d < SCHEDULE_DAYS; d++) {
     const date = new Date()
     date.setDate(date.getDate() + d)
@@ -80,6 +81,42 @@ function buildSchedule(s: AppSettings): ScheduledItem[] {
         volume: 1,
       })
     })
+  }
+
+  // 2. جدولة تذكيرات الصلاة على النبي
+  if (s.salawatEnabled && s.salawatInterval > 0) {
+    let nextTime = now + s.salawatInterval * 60000;
+    const totalReminders = Math.floor((SCHEDULE_DAYS * 24 * 60) / s.salawatInterval);
+    
+    for (let i = 1; i <= totalReminders; i++) {
+      items.push({
+        id: 300000 + i,
+        at: nextTime,
+        kind: 'reminder',
+        prayer: 'salawat',
+        title: 'صلِّ على النبي ﷺ',
+        body: 'اللهم صلِّ وسلم على نبينا محمد',
+      });
+      nextTime += s.salawatInterval * 60000;
+    }
+  }
+
+  // 3. جدولة تذكيرات الأذكار والقرآن
+  if (s.adhkarRemindersEnabled && s.adhkarRemindersInterval > 0) {
+    let nextTime = now + s.adhkarRemindersInterval * 60000;
+    const totalReminders = Math.floor((SCHEDULE_DAYS * 24 * 60) / s.adhkarRemindersInterval);
+
+    for (let i = 1; i <= totalReminders; i++) {
+      items.push({
+        id: 400000 + i,
+        at: nextTime,
+        kind: 'reminder',
+        prayer: 'adhkar',
+        title: 'تذكير بالأذكار',
+        body: 'لا تنسَ أذكار الصباح والمساء ووردك من القرآن',
+      });
+      nextTime += s.adhkarRemindersInterval * 60000;
+    }
   }
 
   timeline.sort((a, b) => a - b)
@@ -168,6 +205,7 @@ export function AdhanEngine() {
     }
   }, [settings.location.auto])
 
+  // مفاتيح الجدولة (تمت إزالة adhanType)
   const scheduleKey = JSON.stringify([
     settings.location.lat,
     settings.location.lng,
@@ -180,6 +218,10 @@ export function AdhanEngine() {
     JSON.stringify(settings.prayerVoices),
     settings.reminderMinutes,
     settings.persistentNotification,
+    settings.salawatEnabled,
+    settings.salawatInterval,
+    settings.adhkarRemindersEnabled,
+    settings.adhkarRemindersInterval,
   ])
 
   useEffect(() => {
@@ -225,7 +267,6 @@ export function AdhanEngine() {
           notify(`حان الآن موعد أذان ${PRAYER_NAMES[key]}`, `حسب التوقيت المحلي لمدينة ${s.location.city}`)
 
           const audio = getGlobalAudio()
-          
           const voiceId = voiceIdFor(s, key)
           const voice = getAdhanVoice(voiceId)
           const finalFile = voiceId === 'takbeeratain' ? SHORT_ADHAN_FILE : voice?.file;

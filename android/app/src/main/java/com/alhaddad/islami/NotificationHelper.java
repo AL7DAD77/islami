@@ -19,6 +19,9 @@ import java.util.Locale;
 
 public class NotificationHelper {
 
+    // ==========================================
+    // 1. ثوابت القنوات (Channels)
+    // ==========================================
     public static final String CHANNEL_ID = "adhan_channel_id";
     public static final String CHANNEL_NAME = "أذان الصلاة";
     public static final int NOTIFICATION_ID = 1001;
@@ -28,18 +31,26 @@ public class NotificationHelper {
     public static final String PERSISTENT_CHANNEL_NAME = "مواقيت الصلاة";
     public static final int PERSISTENT_NOTIFICATION_ID = 9999;
 
+    // لون التطبيق الأخضر الغامق (لتوحيد الهوية البصرية)
+    private static final int APP_COLOR = Color.parseColor("#0a1f1a");
+
+    // ==========================================
+    // 2. إنشاء قنوات الإشعارات
+    // ==========================================
     public static void createNotificationChannel(Context context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationManager manager = context.getSystemService(NotificationManager.class);
             if (manager == null) return;
 
+            // قناة الأذان (أهمية عالية وصوت)
             NotificationChannel adhanChannel = new NotificationChannel(
                     CHANNEL_ID, CHANNEL_NAME, NotificationManager.IMPORTANCE_HIGH
             );
-            adhanChannel.setSound(null, null);
+            adhanChannel.setSound(null, null); // الصوت يُدار عبر الخدمة (AdhanService)
             adhanChannel.enableVibration(true);
             manager.createNotificationChannel(adhanChannel);
 
+            // قناة الإشعار الدائم (أهمية منخفضة وصامت)
             NotificationChannel persistentChannel = new NotificationChannel(
                     PERSISTENT_CHANNEL_ID, PERSISTENT_CHANNEL_NAME, NotificationManager.IMPORTANCE_LOW
             );
@@ -55,8 +66,13 @@ public class NotificationHelper {
         createNotificationChannel(context);
     }
 
+    // ==========================================
+    // 3. دوال مساعدة (Helper Functions)
+    // ==========================================
+    
+    // ترجمة أسماء الصلوات إلى العربية
     private static String translatePrayer(String englishName) {
-        if (englishName == null) return "";
+        if (englishName == null || englishName.trim().isEmpty()) return "";
         switch (englishName.toLowerCase()) {
             case "fajr": return "الفجر";
             case "sunrise": return "الشروق";
@@ -68,6 +84,7 @@ public class NotificationHelper {
         }
     }
 
+    // صياغة الوقت باللغة العربية الفصحى (ساعة، ساعتان، دقائق...)
     private static String formatTimeDiff(long diffMs) {
         long minutes = (diffMs / (1000 * 60)) % 60;
         long hours = (diffMs / (1000 * 60 * 60)) % 24;
@@ -93,6 +110,9 @@ public class NotificationHelper {
         return sb.toString();
     }
 
+    // ==========================================
+    // 4. الإشعار الدائم (Persistent Notification)
+    // ==========================================
     public static void updatePersistent(Context context) {
         try {
             long now = System.currentTimeMillis();
@@ -103,6 +123,7 @@ public class NotificationHelper {
             String prevPrayerName = "";
 
             for (AdhanStore.Item it : AdhanStore.load(context)) {
+                // تجاهل أي حدث ليس له اسم صلاة (يمنع مشكلة إشعار 12:00 ص)
                 if (it.prayer == null || it.prayer.trim().isEmpty()) continue;
                 
                 String prayer = translatePrayer(it.prayer);
@@ -117,9 +138,9 @@ public class NotificationHelper {
                 }
             }
 
-            String titleText = "";
-            String timeText = "";
-            String sign = "";
+            String titleText;
+            String timeText;
+            String sign;
 
             if (nextTime != Long.MAX_VALUE && (prevTime == Long.MIN_VALUE || (nextTime - now) < (now - prevTime))) {
                 long diff = nextTime - now;
@@ -136,6 +157,7 @@ public class NotificationHelper {
                 return;
             }
 
+            // التاريخ الهجري
             String hijriDate = "";
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 android.icu.util.IslamicCalendar hijriCal = new android.icu.util.IslamicCalendar();
@@ -150,6 +172,7 @@ public class NotificationHelper {
                 hijriDate = new SimpleDateFormat("dd/MM/yyyy", new Locale("ar")).format(new Date(now));
             }
 
+            // وقت الأذان القادم
             SimpleDateFormat sdf = new SimpleDateFormat("hh:mm a", Locale.US);
             String prayerTimeStr = "";
             if (nextTime != Long.MAX_VALUE) {
@@ -171,17 +194,16 @@ public class NotificationHelper {
                 bigText += "\nموعد الأذان: " + prayerTimeStr;
             }
 
-            // ✅ التعديلات الجديدة: الشعار واللون
+            // جلب شعار التطبيق
             android.graphics.Bitmap largeIcon = BitmapFactory.decodeResource(context.getResources(), R.mipmap.ic_launcher);
-            int appColor = Color.parseColor("#0a1f1a"); 
 
             NotificationCompat.Builder builder = new NotificationCompat.Builder(context, PERSISTENT_CHANNEL_ID)
                     .setContentTitle(titleText)
                     .setContentText(bodyText)
                     .setStyle(new NotificationCompat.BigTextStyle().bigText(bigText))
-                    .setSmallIcon(android.R.drawable.ic_lock_idle_alarm) // أيقونة النظام (تمنع الدائرة السوداء)
+                    .setSmallIcon(android.R.drawable.ic_lock_idle_alarm) // أيقونة النظام الصغيرة (تمنع الدائرة السوداء)
                     .setLargeIcon(largeIcon) // شعار التطبيق
-                    .setColor(appColor) // لون التطبيق الأخضر
+                    .setColor(APP_COLOR) // لون التطبيق
                     .setOngoing(true)
                     .setAutoCancel(false)
                     .setOnlyAlertOnce(true)
@@ -198,6 +220,9 @@ public class NotificationHelper {
         }
     }
 
+    // ==========================================
+    // 5. إشعار الأذان والتذكير
+    // ==========================================
     public static Notification buildPlaying(Context context, String title, String body) {
         Intent stopIntent = new Intent(context, AdhanReceiver.class);
         stopIntent.setAction("STOP_ADHAN_ACTION");
@@ -210,16 +235,17 @@ public class NotificationHelper {
         PendingIntent openAppPendingIntent = PendingIntent.getActivity(context, 0, openAppIntent, flags);
 
         android.graphics.Bitmap largeIcon = BitmapFactory.decodeResource(context.getResources(), R.mipmap.ic_launcher);
-        int appColor = Color.parseColor("#0a1f1a");
 
         return new NotificationCompat.Builder(context, CHANNEL_ID)
-                .setContentTitle(title).setContentText(body)
+                .setContentTitle(title)
+                .setContentText(body)
                 .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
                 .setLargeIcon(largeIcon)
-                .setColor(appColor)
+                .setColor(APP_COLOR)
                 .setPriority(NotificationCompat.PRIORITY_MAX)
                 .setCategory(NotificationCompat.CATEGORY_ALARM)
-                .setOngoing(true).setAutoCancel(false)
+                .setOngoing(true)
+                .setAutoCancel(false)
                 .setContentIntent(openAppPendingIntent)
                 .addAction(android.R.drawable.ic_media_pause, "إيقاف الأذان", stopPendingIntent)
                 .build();
@@ -232,15 +258,16 @@ public class NotificationHelper {
         PendingIntent pendingIntent = PendingIntent.getActivity(context, id, intent, flags);
 
         android.graphics.Bitmap largeIcon = BitmapFactory.decodeResource(context.getResources(), R.mipmap.ic_launcher);
-        int appColor = Color.parseColor("#0a1f1a");
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
-                .setContentTitle(title).setContentText(body)
+                .setContentTitle(title)
+                .setContentText(body)
                 .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
                 .setLargeIcon(largeIcon)
-                .setColor(appColor)
+                .setColor(APP_COLOR)
                 .setContentIntent(pendingIntent)
-                .setAutoCancel(true).setPriority(NotificationCompat.PRIORITY_HIGH);
+                .setAutoCancel(true)
+                .setPriority(NotificationCompat.PRIORITY_HIGH);
 
         NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
         if (manager != null) manager.notify(id, builder.build());

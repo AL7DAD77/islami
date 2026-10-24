@@ -5,6 +5,7 @@ import { Suspense } from 'react'
 import { SurahList } from '@/components/quran/surah-list'
 import { getSurahList } from '@/lib/quran'
 import { BookmarksCard } from '@/components/quran/bookmarks-card'
+import { KhatmahTracker } from '@/components/quran/khatmah-tracker' // ✅ استدعاء المكون الجديد
 import { SearchButton } from '@/components/search-button'
 
 export const metadata: Metadata = { title: 'القرآن الكريم | إسلامي' }
@@ -31,6 +32,9 @@ export default async function QuranPage() {
         <div className="empty:hidden">
           <BookmarksCard />
         </div>
+
+        {/* ✅ إضافة متتبع الختمة هنا */}
+        <KhatmahTracker />
 
         <div className="grid grid-cols-2 gap-4">
           <Link href="/quran/wird" className="relative overflow-hidden rounded-2xl bg-[#0a1f1a] p-4 text-white shadow-lg shadow-[#0a1f1a]/10 hover:bg-[#0a1f1a]/90 transition-colors">
