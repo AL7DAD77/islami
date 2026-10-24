@@ -1,3 +1,5 @@
+import { VersionBadge } from '@/components/version-badge'
+
 export default function AboutPage() {
   return (
     <main dir="rtl" className="min-h-screen bg-white px-6 py-10 dark:bg-zinc-900">
@@ -9,8 +11,9 @@ export default function AboutPage() {
           <h1 className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">
             إسلامي
           </h1>
-          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            الإصدار 1.0.5 (6)
+          {/* ✅ استخدمنا المكون الديناميكي هنا */}
+          <p className="mt-1">
+            <VersionBadge />
           </p>
         </div>
 
@@ -46,7 +49,6 @@ export default function AboutPage() {
               هدفنا نشر الفائدة والأجر بإذن الله.
             </p>
           </div>
-
 
           <div className="rounded-2xl border border-zinc-200 p-5 dark:border-zinc-800">
             <h2 className="mb-2 font-semibold text-zinc-800 dark:text-zinc-100">
