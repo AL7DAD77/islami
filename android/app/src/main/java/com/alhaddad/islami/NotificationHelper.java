@@ -10,9 +10,10 @@ import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.media.AudioAttributes;
 import android.os.Build;
+import android.os.SystemClock; // ✅ ضروري جداً لحل مشكلة المؤقت
 import android.provider.Settings;
 import android.util.Log;
-import android.widget.RemoteViews; // ✅ تمت إضافة هذا الاستيراد للتصميم المخصص
+import android.widget.RemoteViews;
 
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
@@ -96,11 +97,12 @@ public final class NotificationHelper {
         manager.createNotificationChannel(reminderChannel);
     }
 
-    /* ======================= الإشعار الدائم للمواقيت (المعدل) ======================= */
+    /* ======================= الإشعار الدائم للمواقيت ======================= */
 
     public static void updatePersistent(Context context) {
         try {
             long now = System.currentTimeMillis();
+            long elapsedRealtime = SystemClock.elapsedRealtime(); // ✅ وقت الهاتف منذ التشغيل
 
             PrayerTime next = findNextPrayer(context, now);
             PrayerTime previous = findPreviousPrayer(context, now);
@@ -109,22 +111,31 @@ public final class NotificationHelper {
 
             boolean showNext = next != null && (previous == null || next.at - now <= now - previous.at);
 
-            String title = showNext ? "متبقي على " + next.name : "مضى على " + previous.name;
-            String body = showNext ? "الوقت: " + formatTimeDiff(next.at - now) : "الوقت: " + formatTimeDiff(now - previous.at);
+            String title = "إسلامي | " + getHijriDate(now);
+            String body = showNext ? "متبقي على " + next.name + " " + formatTime(next.at) 
+                                   : "مضى على " + previous.name + " " + formatTime(previous.at);
 
-            // ✅ إعداد التصميم المخصص (RemoteViews)
             RemoteViews expandedView = new RemoteViews(context.getPackageName(), R.layout.notif_persistent);
             
             if (showNext) {
-                expandedView.setTextViewText(R.id.notif_prayer_name, next.name);
+                expandedView.setTextViewText(R.id.notif_prayer_name, "متبقي على " + next.name);
                 expandedView.setTextViewText(R.id.notif_prayer_time, formatTime(next.at) + " م");
             } else {
-                expandedView.setTextViewText(R.id.notif_prayer_name, previous.name);
+                expandedView.setTextViewText(R.id.notif_prayer_name, "مضى على " + previous.name);
                 expandedView.setTextViewText(R.id.notif_prayer_time, formatTime(previous.at) + " م");
             }
 
-            // ✅ إعداد المؤقت الحي (يعد تنازلياً إذا كانت الصلاة قادمة، وتصاعدياً إذا مضت)
-            long chronometerBase = showNext ? next.at : previous.at;
+            // ✅ المعادلة السحرية لحل مشكلة المؤقت
+            long targetTime = showNext ? next.at : previous.at;
+            long timeDiff = showNext ? (targetTime - now) : (now - targetTime);
+            
+            long chronometerBase;
+            if (showNext) {
+                chronometerBase = elapsedRealtime + timeDiff; // وقت الانتهاء بالنسبة للهاتف
+            } else {
+                chronometerBase = elapsedRealtime - timeDiff; // وقت البدء بالنسبة للهاتف
+            }
+
             expandedView.setChronometerCountDown(R.id.notif_chronometer, showNext);
             expandedView.setChronometer(R.id.notif_chronometer, chronometerBase, null, true);
 
@@ -139,8 +150,8 @@ public final class NotificationHelper {
                     .setPriority(NotificationCompat.PRIORITY_LOW)
                     .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                     .setContentIntent(openApp(context, 0))
-                    .setCustomBigContentView(expandedView) // ✅ ربط التصميم
-                    .setStyle(new NotificationCompat.DecoratedCustomViewStyle()) // ✅ تفعيل النمط
+                    .setCustomBigContentView(expandedView)
+                    .setStyle(new NotificationCompat.DecoratedCustomViewStyle())
                     .build();
 
             notifySafely(context, PERSISTENT_NOTIFICATION_ID, notification);
@@ -205,7 +216,6 @@ public final class NotificationHelper {
 
     /* ============================ دوال مساعدة ============================ */
 
-    // ✅ دالة الفلترة لحل مشكلة كلمة salawat
     private static boolean isValidPrayerItem(AdhanStore.Item item) {
         if (item == null || item.prayer == null) return false;
         String p = item.prayer.toLowerCase(Locale.US);
@@ -247,16 +257,30 @@ public final class NotificationHelper {
         }
     }
 
-    private static String formatTimeDiff(long diffMs) {
-        long hours = diffMs / HOUR_MS;
-        long minutes = (diffMs % HOUR_MS) / MINUTE_MS;
-        if (hours > 0) return hours + " ساعة و " + minutes + " دقيقة";
-        return minutes + " دقيقة";
-    }
-
-    // ✅ دالة تنسيق الوقت للتصميم
     private static String formatTime(long timeMs) {
         return new SimpleDateFormat("hh:mm", Locale.US).format(new Date(timeMs));
+    }
+
+    private static String getHijriDate(long timeMs) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
+            return new SimpleDateFormat("dd/MM/yyyy", new Locale("ar")).format(new Date(timeMs));
+        }
+        try {
+            android.icu.util.IslamicCalendar calendar = new android.icu.util.IslamicCalendar();
+            calendar.setTimeInMillis(timeMs);
+            int day = calendar.get(android.icu.util.Calendar.DAY_OF_MONTH);
+            int month = calendar.get(android.icu.util.Calendar.MONTH);
+            int year = calendar.get(android.icu.util.Calendar.YEAR);
+            return day + " " + getHijriMonthName(month) + " " + year + " هـ";
+        } catch (Exception e) {
+            return new SimpleDateFormat("dd/MM/yyyy", new Locale("ar")).format(new Date(timeMs));
+        }
+    }
+
+    private static String getHijriMonthName(int month) {
+        String[] months = {"محرم", "صفر", "ربيع الأول", "ربيع الآخر", "جمادى الأولى", "جمادى الآخرة", "رجب", "شعبان", "رمضان", "شوال", "ذو القعدة", "ذو الحجة"};
+        if (month < 0 || month >= months.length) return "";
+        return months[month];
     }
 
     private static android.graphics.Bitmap getAppIcon(Context context) {

@@ -131,10 +131,20 @@ export function MushafViewer({
   const bookmarkState = useBookmarkState()
   const player = useQuranPlayer()
 
-  const surahName = useMemo(
-    () => metaData?.surahNames[initialSurah - 1] || '',
-    [initialSurah, metaData]
-  )
+  // ✅ التعديل هنا: اسم السورة الآن يتغير ديناميكياً بناءً على رقم الصفحة الحالية
+  const surahName = useMemo(() => {
+    if (!metaData || !metaData.surahStartPage || !metaData.surahNames) return '';
+    
+    let surahIndex = 0;
+    for (let i = 0; i < metaData.surahStartPage.length; i++) {
+      if (currentPage >= metaData.surahStartPage[i]) {
+        surahIndex = i;
+      } else {
+        break;
+      }
+    }
+    return metaData.surahNames[surahIndex] || '';
+  }, [currentPage, metaData])
 
   const resetUiTimeout = useCallback(() => {
     if (uiTimeoutRef.current) clearTimeout(uiTimeoutRef.current)
@@ -550,14 +560,13 @@ export function MushafViewer({
         </div>
       </header>
 
-      {/* الشريط السفلي - تم رفعه قليلاً وإرجاع رقم الصفحة بتصميم أنيق */}
+      {/* الشريط السفلي (الأسهم + رقم الصفحة) */}
       <footer
         className={`absolute inset-x-0 bottom-4 z-50 flex items-center justify-between px-6 transition-opacity duration-300 ${
           showUi ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         }`}
         style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
       >
-        {/* زر الصفحة السابقة */}
         <button
           onClick={(e) => { e.stopPropagation(); handlePreviousPage(); }}
           disabled={currentPage === 1}
@@ -567,7 +576,6 @@ export function MushafViewer({
           <ChevronRight className="size-6" />
         </button>
 
-        {/* رقم الصفحة في المنتصف - تصميم زجاجي أنيق */}
         <div
           className="rounded-full px-5 py-1.5 text-sm font-bold shadow-sm border backdrop-blur-md"
           style={{
@@ -579,7 +587,6 @@ export function MushafViewer({
           صفحة {toArabicNumber(currentPage)}
         </div>
 
-        {/* زر الصفحة التالية */}
         <button
           onClick={(e) => { e.stopPropagation(); handleNextPage(); }}
           disabled={currentPage === TOTAL_PAGES}
