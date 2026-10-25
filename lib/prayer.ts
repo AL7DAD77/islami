@@ -45,8 +45,8 @@ function isCustomMethod(m: MethodKey): m is CustomMethodKey {
 }
 
 /**
- * ضبط دقيق للطرق المحلية.
- * الأردن: الفجر 18، العشاء 18، مع إضافة 5 دقائق للظهر والمغرب كما في التقويم الرسمي.
+ * طرق وطنية غير موجودة في مكتبة adhan، نبنيها فوق Other():
+ * - الأردن (وزارة الأوقاف): فجر 18° وعشاء 18° و+5 دقائق للظهر والمغرب.
  */
 function getCustomParams(method: CustomMethodKey) {
   const p = CalculationMethod.Other()
@@ -54,9 +54,8 @@ function getCustomParams(method: CustomMethodKey) {
     case 'JordanAwqaf':
       p.fajrAngle = 18
       p.ishaAngle = 18
-      // الأردن تضيف 5 دقائق للظهر و 5 دقائق للمغرب
-      p.adjustments.dhuhr = 5
       p.adjustments.maghrib = 5
+      p.adjustments.dhuhr = 5 
       break
     case 'AlgeriaMinistry':
       p.fajrAngle = 18
@@ -87,16 +86,7 @@ export function getPrayerTimes(settings: AppSettings, date = new Date()): DayTim
   const params = getParams(settings.method)
   params.madhab = settings.madhab === 'hanafi' ? Madhab.Hanafi : Madhab.Shafi
   const t = new PrayerTimes(coords, date, params)
-  
-  // نرجع التواريخ كما هي، ليقوم المتصفح بعرضها حسب التوقيت المحلي للجهاز
-  return { 
-    fajr: t.fajr, 
-    sunrise: t.sunrise, 
-    dhuhr: t.dhuhr, 
-    asr: t.asr, 
-    maghrib: t.maghrib, 
-    isha: t.isha 
-  }
+  return { fajr: t.fajr, sunrise: t.sunrise, dhuhr: t.dhuhr, asr: t.asr, maghrib: t.maghrib, isha: t.isha }
 }
 
 export const PRAYER_ORDER: PrayerKey[] = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']

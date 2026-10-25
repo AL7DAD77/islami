@@ -1,62 +1,161 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
+
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ChevronRight, Bookmark, Play, Pause, Headphones, Moon, Sun } from 'lucide-react'
-import { saveReadingPosition, useBookmarkState, toggleBookmark, isBookmarked } from '@/lib/bookmarks'
+
+import {
+  Bookmark,
+  ChevronRight,
+  Headphones,
+  Loader2,
+  Moon,
+  Pause,
+  Play,
+  Sun,
+} from 'lucide-react'
+
+import {
+  isBookmarked,
+  saveReadingPosition,
+  toggleBookmark,
+  useBookmarkState,
+} from '@/lib/bookmarks'
+
 import { toArabicNumber } from '@/lib/quran'
 import { useQuranPlayer } from '@/lib/quran-player'
 
-interface MetaData {
+/* ============================== الأنواع ============================== */
+
+interface MushafMetaData {
   surahNames: string[]
   surahStartPage: number[]
 }
 
-export function MushafViewer({ initialSurah }: { initialSurah: number }) {
+interface Point {
+  x: number
+  y: number
+}
+
+interface PinchState {
+  distance: number
+  scale: number
+}
+
+interface MushafTheme {
+  background: string
+  surface: string
+  border: string
+  text: string
+  accent: string
+  primary: string
+  primaryText: string
+}
+
+/* ============================== الثوابت ============================== */
+
+const TOTAL_PAGES = 604
+const MIN_SCALE = 1
+const MAX_SCALE = 4
+const DOUBLE_TAP_SCALE = 2
+const SWIPE_THRESHOLD = 45
+
+const META_URL = '/mushaf/meta.json'
+const PAGES_URL = '/mushaf/pages'
+
+const NIGHT_MODE_KEY = 'mushaf-night-mode'
+const RECITER_SERVER_KEY = 'selected_reciter_server'
+const RECITER_NAME_KEY = 'selected_reciter_name'
+
+const DEFAULT_RECITER_SERVER =
+  'https://server8.mp3quran.net/afs/'
+
+const DEFAULT_RECITER_NAME = 'مشاري العفاسي'
+
+/* ============================ دوال مساعدة ============================ */
+
+function getPageSource(page: number): string {
+  const paddedPage = String(page).padStart(3, '0')
+
+  return `${PAGES_URL}/${paddedPage}.webp`
+}
+
+function clampPage(page: number): number {
+  return Math.min(Math.max(page, 1), TOTAL_PAGES)
+}
+
+function vibrateDevice(duration = 10): void {
+  try {
+    if (
+      typeof navigator !== 'undefined' &&
+      'vibrate' in navigator
+    ) {
+      navigator.vibrate(duration)
+    }
+  } catch {
+    // الجهاز قد لا يدعم الاهتزاز
+  }
+}
+
+/* ============================== المكوّن ============================== */
+
+export function MushafViewer({
+  initialSurah,
+}: {
+  initialSurah: number
+}) {
   const router = useRouter()
   const searchParams = useSearchParams()
+
   const pageParam = Number(searchParams.get('page'))
   const initialPage = pageParam > 0 ? pageParam : undefined
 
-  const [currentPage, setCurrentPage] = useState<number>(initialPage || 1)
-  const [metaData, setMetaData] = useState<MetaData | null>(null)
-  const [loading, setLoading] = useState<boolean>(true)
-  
-  // ✅ تم حذف حالة showControls لأن الأزرار ستكون ثابتة
-  const [nightMode, setNightMode] = useState(false)
+  const [currentPage, setCurrentPage] = useState<number>(
+    initialPage || 1,
+  )
 
-  const [scale, setScale] = useState(1)
-  const [pan, setPan] = useState({ x: 0, y: 0 })
+  const [metaData, setMetaData] =
+    useState<MushafMetaData | null>(null)
 
-  const touchStartX = useRef<number | null>(null)
-  const touchStartY = useRef<number | null>(null)
-  const initialPinchDist = useRef<number | null>(null)
-  
+  const [isLoading, setIsLoading] = useState(true)
+  const [isPageLoading, setIsPageLoading] = useState(true)
+  const [hasError, setHasError] = useState(false)
+  const [isNightMode, setIsNightMode] = useState(false)
+
+  const [scale, setScale] = useState(MIN_SCALE)
+  const [pan, setPan] = useState<Point>({ x: 0, y: 0 })
+
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const imageRef = useRef<HTMLImageElement | null>(null)
+
+  const pointerStartRef = useRef<Point | null>(null)
+  const pinchStartRef = useRef<PinchState | null>(null)
+
   const bookmarkState = useBookmarkState()
   const player = useQuranPlayer()
 
-  const vibrate = (ms: number = 10) => {
-    try {
-      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-        navigator.vibrate(ms)
-      }
-    } catch (e) {}
-  }
+  // ✅ تم نقل تعريف surahName إلى هنا ليكون متاحاً للدوال التي تليه
+  const surahName = useMemo(
+    () => metaData?.surahNames[initialSurah - 1] || '',
+    [initialSurah, metaData]
+  )
+
+  /* ------------------------- الوضع الليلي ------------------------- */
 
   useEffect(() => {
-    const savedMode = localStorage.getItem('mushaf-night-mode')
-    if (savedMode === 'true') setNightMode(true)
+    const savedMode = localStorage.getItem(NIGHT_MODE_KEY)
+    if (savedMode === 'true') {
+      setIsNightMode(true)
+    }
   }, [])
 
-  const toggleNightMode = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    vibrate(10)
-    setNightMode(prev => {
-      const newMode = !prev
-      localStorage.setItem('mushaf-night-mode', String(newMode))
-      return newMode
-    })
-  }
+  /* ------------------------- وضع القراءة ------------------------- */
 
   useEffect(() => {
     document.body.classList.add('reading-fullscreen')
@@ -65,203 +164,451 @@ export function MushafViewer({ initialSurah }: { initialSurah: number }) {
     }
   }, [])
 
-  useEffect(() => {
-    setScale(1)
-    setPan({ x: 0, y: 0 })
-  }, [currentPage])
-
-  const handlePrev = () => { 
-    if (currentPage > 1) {
-      vibrate(15)
-      setCurrentPage(currentPage - 1) 
-    }
-  }
-  
-  const handleNext = () => { 
-    if (currentPage < 604) {
-      vibrate(15)
-      setCurrentPage(currentPage + 1) 
-    }
-  }
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    if (e.touches.length === 2) {
-      const dist = Math.hypot(
-        e.touches[0].clientX - e.touches[1].clientX,
-        e.touches[0].clientY - e.touches[1].clientY
-      )
-      initialPinchDist.current = dist
-    } else if (e.touches.length === 1) {
-      touchStartX.current = e.touches[0].clientX
-      touchStartY.current = e.touches[0].clientY
-    }
-  }
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (e.touches.length === 2 && initialPinchDist.current) {
-      const dist = Math.hypot(
-        e.touches[0].clientX - e.touches[1].clientX,
-        e.touches[0].clientY - e.touches[1].clientY
-      )
-      const newScale = Math.max(1, Math.min(dist / initialPinchDist.current, 3))
-      setScale(newScale)
-      if (newScale === 1) setPan({ x: 0, y: 0 })
-    } else if (e.touches.length === 1 && scale > 1) {
-      if (touchStartX.current !== null && touchStartY.current !== null) {
-        const dx = e.touches[0].clientX - touchStartX.current
-        const dy = e.touches[0].clientY - touchStartY.current
-        setPan(prev => ({ x: prev.x + dx, y: prev.y + dy }))
-        touchStartX.current = e.touches[0].clientX
-        touchStartY.current = e.touches[0].clientY
-      }
-    }
-  }
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (e.touches.length === 0) {
-      if (scale === 1 && touchStartX.current !== null) {
-        const distance = touchStartX.current - e.changedTouches[0].clientX
-        if (Math.abs(distance) > 50) {
-          if (distance > 0) handlePrev()
-          else handleNext()
-        }
-      }
-      initialPinchDist.current = null
-      touchStartX.current = null
-      touchStartY.current = null
-    }
-  }
+  /* --------------------------- بيانات المصحف --------------------------- */
 
   useEffect(() => {
-    async function loadMeta() {
+    let isActive = true
+
+    const loadMetaData = async () => {
       try {
-        const res = await fetch('/mushaf/meta.json')
-        const meta = await res.json()
-        setMetaData(meta)
+        const response = await fetch(META_URL)
+        if (!response.ok) {
+          throw new Error(
+            `تعذر تحميل بيانات المصحف: ${response.status}`,
+          )
+        }
+        const data: MushafMetaData = await response.json()
+
+        if (!isActive) return
+
+        setMetaData(data)
+
         if (!initialPage) {
-          const startPage = meta.surahStartPage[initialSurah - 1] || 1
-          setCurrentPage(startPage)
+          const startPage =
+            data.surahStartPage[initialSurah - 1] || 1
+          setCurrentPage(clampPage(startPage))
         }
       } catch (error) {
-        console.error("خطأ في جلب meta", error)
+        console.error('خطأ في تحميل بيانات المصحف:', error)
       } finally {
-        setLoading(false)
+        if (isActive) {
+          setIsLoading(false)
+        }
       }
     }
-    loadMeta()
-  }, [initialSurah, initialPage])
+
+    loadMetaData()
+
+    return () => {
+      isActive = false
+    }
+  }, [initialPage, initialSurah])
+
+  /* ---------------------- إعادة الضبط عند تغيير الصفحة ---------------------- */
 
   useEffect(() => {
-    if (currentPage && metaData) {
-      saveReadingPosition(initialSurah, metaData.surahNames[initialSurah - 1] || '', currentPage)
-    }
-  }, [currentPage, metaData, initialSurah])
+    setScale(MIN_SCALE)
+    setPan({ x: 0, y: 0 })
+    setIsPageLoading(true)
+    setHasError(false)
+  }, [currentPage])
 
-  const handlePlayToggle = () => {
+  /* --------------------------- تحميل مسبق --------------------------- */
+
+  useEffect(() => {
+    const previousPage = currentPage - 1
+    const nextPage = currentPage + 1
+    const preloadedImages: HTMLImageElement[] = []
+
+    if (previousPage >= 1) {
+      const image = new Image()
+      image.src = getPageSource(previousPage)
+      preloadedImages.push(image)
+    }
+
+    if (nextPage <= TOTAL_PAGES) {
+      const image = new Image()
+      image.src = getPageSource(nextPage)
+      preloadedImages.push(image)
+    }
+
+    return () => {
+      preloadedImages.forEach(image => {
+        image.src = ''
+      })
+    }
+  }, [currentPage])
+
+  /* --------------------------- حفظ الموضع --------------------------- */
+
+  useEffect(() => {
+    if (!currentPage || !metaData) return
+
+    saveReadingPosition(initialSurah, surahName, currentPage)
+  }, [currentPage, initialSurah, metaData, surahName])
+
+  /* ------------------------------ التنقل ------------------------------ */
+
+  const handlePreviousPage = useCallback(() => {
+    setCurrentPage(previousPage => {
+      if (previousPage <= 1) return previousPage
+      vibrateDevice(12)
+      return previousPage - 1
+    })
+  }, [])
+
+  const handleNextPage = useCallback(() => {
+    setCurrentPage(previousPage => {
+      if (previousPage >= TOTAL_PAGES) return previousPage
+      vibrateDevice(12)
+      return previousPage + 1
+    })
+  }, [])
+
+  /* ------------------------- التكبير والتحريك ------------------------- */
+
+  const clampPan = useCallback(
+    (nextPan: Point, nextScale: number): Point => {
+      const container = containerRef.current
+      const image = imageRef.current
+
+      if (!container || !image || nextScale <= MIN_SCALE) {
+        return { x: 0, y: 0 }
+      }
+
+      const containerRect = container.getBoundingClientRect()
+      const imageRect = image.getBoundingClientRect()
+
+      const overflowX = Math.max(0, imageRect.width * nextScale - containerRect.width) / 2
+      const overflowY = Math.max(0, imageRect.height * nextScale - containerRect.height) / 2
+
+      return {
+        x: Math.min(Math.max(nextPan.x, -overflowX), overflowX),
+        y: Math.min(Math.max(nextPan.y, -overflowY), overflowY),
+      }
+    },
+    [],
+  )
+
+  const handleTouchStart = useCallback(
+    (event: React.TouchEvent) => {
+      if (event.touches.length === 2) {
+        const firstTouch = event.touches[0]
+        const secondTouch = event.touches[1]
+
+        pinchStartRef.current = {
+          distance: Math.hypot(
+            firstTouch.clientX - secondTouch.clientX,
+            firstTouch.clientY - secondTouch.clientY,
+          ),
+          scale,
+        }
+
+        pointerStartRef.current = null
+        return
+      }
+
+      if (event.touches.length === 1) {
+        pointerStartRef.current = {
+          x: event.touches[0].clientX,
+          y: event.touches[0].clientY,
+        }
+      }
+    },
+    [scale],
+  )
+
+  const handleTouchMove = useCallback(
+    (event: React.TouchEvent) => {
+      if (event.touches.length === 2 && pinchStartRef.current) {
+        const firstTouch = event.touches[0]
+        const secondTouch = event.touches[1]
+
+        const currentDistance = Math.hypot(
+          firstTouch.clientX - secondTouch.clientX,
+          firstTouch.clientY - secondTouch.clientY,
+        )
+
+        const distanceRatio = currentDistance / pinchStartRef.current.distance
+        const nextScale = Math.min(
+          Math.max(pinchStartRef.current.scale * distanceRatio, MIN_SCALE),
+          MAX_SCALE,
+        )
+
+        setScale(nextScale)
+        setPan(previousPan => clampPan(previousPan, nextScale))
+        return
+      }
+
+      if (event.touches.length === 1 && scale > MIN_SCALE && pointerStartRef.current) {
+        const touch = event.touches[0]
+        const deltaX = touch.clientX - pointerStartRef.current.x
+        const deltaY = touch.clientY - pointerStartRef.current.y
+
+        pointerStartRef.current = {
+          x: touch.clientX,
+          y: touch.clientY,
+        }
+
+        setPan(previousPan =>
+          clampPan(
+            {
+              x: previousPan.x + deltaX,
+              y: previousPan.y + deltaY,
+            },
+            scale,
+          ),
+        )
+      }
+    },
+    [clampPan, scale],
+  )
+
+  const handleTouchEnd = useCallback(
+    (event: React.TouchEvent) => {
+      if (event.touches.length > 0) return
+
+      if (scale === MIN_SCALE && pointerStartRef.current) {
+        const startX = pointerStartRef.current.x
+        const endX = event.changedTouches[0].clientX
+        const swipeDistance = startX - endX
+
+        if (Math.abs(swipeDistance) > SWIPE_THRESHOLD) {
+          if (swipeDistance > 0) handlePreviousPage()
+          else handleNextPage()
+        }
+      }
+
+      pointerStartRef.current = null
+      pinchStartRef.current = null
+    },
+    [handleNextPage, handlePreviousPage, scale],
+  )
+
+  const handleDoubleClick = useCallback(() => {
+    vibrateDevice(15)
+    if (scale > MIN_SCALE) {
+      setScale(MIN_SCALE)
+      setPan({ x: 0, y: 0 })
+      return
+    }
+    setScale(DOUBLE_TAP_SCALE)
+    setPan({ x: 0, y: 0 })
+  }, [scale])
+
+  /* ------------------------------ التلاوة ------------------------------ */
+
+  const handlePlayToggle = useCallback(() => {
     if (player.playing && player.surah === initialSurah) {
-      vibrate(10)
+      vibrateDevice(10)
       player.toggle()
-    } else {
-      vibrate(10)
-      let server = 'https://server8.mp3quran.net/afs/';
-      let reciterName = 'مشاري العفاسي';
-      try {
-        server = localStorage.getItem('selected_reciter_server') || server;
-        reciterName = localStorage.getItem('selected_reciter_name') || reciterName;
-      } catch (e) {}
-
-      const defaultReciter = { id: 1, name: reciterName, featured: true, moshaf: [{ id: 1, name: 'حفص', server, surahs: [] }] };
-      
-      player.play(
-        initialSurah, 
-        metaData?.surahNames[initialSurah - 1] || '', 
-        player.reciter || defaultReciter, 
-        player.moshafServer || server
-      )
+      return
     }
-  }
 
-  const handleBookmark = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    vibrate(20)
-    toggleBookmark(initialSurah, surahName, currentPage)
-  }
+    vibrateDevice(10)
+    let server = DEFAULT_RECITER_SERVER
+    let reciterName = DEFAULT_RECITER_NAME
 
-  if (loading || !metaData) return <div className="h-screen flex items-center justify-center font-sans text-xl">جاري تحميل المصحف...</div>
+    try {
+      server = localStorage.getItem(RECITER_SERVER_KEY) || server
+      reciterName = localStorage.getItem(RECITER_NAME_KEY) || reciterName
+    } catch {}
 
-  const pageNumberPadded = String(currentPage).padStart(3, '0')
-  const surahName = metaData.surahNames[initialSurah - 1] || ''
-  const isMarked = isBookmarked(bookmarkState, initialSurah, currentPage)
+    const defaultReciter = {
+      id: 1,
+      name: reciterName,
+      featured: true,
+      moshaf: [{ id: 1, name: 'حفص', server, surahs: [] }],
+    }
+
+    player.play(
+      initialSurah,
+      surahName, // ✅ استخدام المتغير المعرّف بالأعلى
+      player.reciter || defaultReciter,
+      player.moshafServer || server,
+    )
+  }, [initialSurah, surahName, player])
+
+  /* ----------------------------- العلامة المرجعية ----------------------------- */
+
+  const handleBookmark = useCallback(
+    (event: React.MouseEvent) => {
+      event.stopPropagation()
+      vibrateDevice(18)
+      toggleBookmark(initialSurah, surahName, currentPage)
+    },
+    [currentPage, initialSurah, surahName],
+  )
+
+  const handleRetry = useCallback(() => {
+    setHasError(false)
+    setIsPageLoading(true)
+  }, [])
+
+  const handleNightModeToggle = useCallback(
+    (event: React.MouseEvent) => {
+      event.stopPropagation()
+      vibrateDevice(10)
+
+      setIsNightMode(previousMode => {
+        const nextMode = !previousMode
+        localStorage.setItem(NIGHT_MODE_KEY, String(nextMode))
+        return nextMode
+      })
+    },
+    [],
+  )
+
+  /* ------------------------------ قيم مشتقة ------------------------------ */
+
+  const pageSource = useMemo(() => getPageSource(currentPage), [currentPage])
+  
+  const isBookmarkedPage = isBookmarked(bookmarkState, initialSurah, currentPage)
   const isCurrentSurahPlaying = player.playing && player.surah === initialSurah
 
-  const bgColor = nightMode ? 'bg-[#1a1a1a]' : 'bg-[#fdfbf7]'
+  const theme: MushafTheme = isNightMode
+    ? {
+        background: '#101010',
+        surface: 'rgba(24, 24, 27, 0.88)',
+        border: 'rgba(63, 63, 70, 0.7)',
+        text: '#e4e4e7',
+        accent: '#d4af37',
+        primary: '#d4af37',
+        primaryText: '#101010',
+      }
+    : {
+        background: '#fdfbf7',
+        surface: 'rgba(255, 255, 255, 0.88)',
+        border: '#e8dccb',
+        text: '#5a3e1b',
+        accent: '#d4af37',
+        primary: '#0a1f1a',
+        primaryText: '#fdfbf7',
+      }
+
+  /* ------------------------------ شاشة التحميل ------------------------------ */
+
+  if (isLoading || !metaData) {
+    return (
+      // ✅ تعديل h-[100dvh] إلى h-dvh
+      <div dir="rtl" className="flex h-dvh w-full items-center justify-center bg-[#fdfbf7]">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="size-7 animate-spin text-[#5a3e1b]" />
+          <p className="text-lg font-semibold text-[#5a3e1b]">جاري تحميل المصحف...</p>
+        </div>
+      </div>
+    )
+  }
+
+  /* ------------------------------ الواجهة ------------------------------ */
 
   return (
-    <div 
-      className={`h-[100dvh] w-full ${bgColor} relative overflow-hidden select-none transition-colors duration-300 flex flex-col`} 
+    <div
       dir="rtl"
+      // ✅ تعديل h-[100dvh] إلى h-dvh
+      className="relative h-dvh w-full select-none overflow-hidden"
+      style={{ backgroundColor: theme.background, touchAction: 'none' }}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
-      
-      {/* ✅ الشريط العلوي: ثابت دائماً في الأعلى ولا يختفي */}
-      <div 
-        className={`w-full flex justify-between items-start p-3 shrink-0 z-50`}
-        style={{ background: nightMode ? '#1a1a1a' : '#fdfbf7' }}
+      {/* منطقة المصحف: تملأ الشاشة بالكامل */}
+      <div ref={containerRef} className="absolute inset-0 flex items-center justify-center overflow-hidden">
+        {isPageLoading && !hasError && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center">
+            <Loader2 className="size-7 animate-spin" style={{ color: theme.text }} />
+          </div>
+        )}
+
+        {hasError ? (
+          <div className="flex flex-col items-center gap-4 px-8 text-center">
+            <p className="text-lg font-semibold" style={{ color: theme.text }}>تعذر تحميل صفحة المصحف</p>
+            <button
+              type="button"
+              onClick={handleRetry}
+              className="rounded-full px-6 py-2 text-sm font-bold transition-opacity active:opacity-70"
+              style={{ backgroundColor: theme.primary, color: theme.primaryText }}
+            >
+              إعادة المحاولة
+            </button>
+          </div>
+        ) : (
+          <img
+            key={currentPage}
+            ref={imageRef}
+            src={pageSource}
+            alt={`صفحة ${toArabicNumber(currentPage)}`}
+            draggable={false}
+            decoding="async"
+            loading="eager"
+            onLoad={() => setIsPageLoading(false)}
+            onError={() => { setIsPageLoading(false); setHasError(true) }}
+            onDoubleClick={handleDoubleClick}
+            className="pointer-events-none block h-full w-full object-contain"
+            style={{
+              transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${scale})`,
+              transformOrigin: 'center center',
+              transition: scale === MIN_SCALE ? 'transform 180ms ease-out' : 'transform 60ms linear',
+              filter: isNightMode ? 'invert(0.94) hue-rotate(180deg) brightness(1.08) contrast(1.08)' : 'none',
+            }}
+          />
+        )}
+      </div>
+
+      {/* الشريط العلوي العائم */}
+      <header
+        className="absolute inset-x-0 top-0 z-50 flex items-start justify-between gap-3 p-3"
+        style={{
+          paddingTop: 'max(0.75rem, env(safe-area-inset-top))',
+          background: isNightMode
+            ? 'linear-gradient(to bottom, rgba(16,16,16,0.90), rgba(16,16,16,0))'
+            : 'linear-gradient(to bottom, rgba(253,251,247,0.92), rgba(253,251,247,0))',
+        }}
       >
-        <div className={`flex items-center gap-1 backdrop-blur-md rounded-full px-2 py-1 shadow-sm border ${nightMode ? 'bg-zinc-800/90 border-zinc-700' : 'bg-white/90 border-[#e8dccb]'}`}>
-          <button onClick={() => router.back()} className={`p-1.5 ${nightMode ? 'text-zinc-300' : 'text-[#5a3e1b]'}`}>
+        <div className="flex items-center gap-1 rounded-full border px-2 py-1 shadow-sm backdrop-blur-md" style={{ backgroundColor: theme.surface, borderColor: theme.border }}>
+          <button type="button" onClick={() => router.back()} className="rounded-full p-1.5 transition-opacity active:opacity-60" style={{ color: theme.text }} aria-label="رجوع">
             <ChevronRight className="size-5" />
           </button>
-          <span className={`font-bold text-sm pr-2 pl-1 ${nightMode ? 'text-zinc-300' : 'text-[#5a3e1b]'}`}>{surahName}</span>
+          <span className="pl-1 pr-2 text-sm font-bold" style={{ color: theme.text }}>{surahName}</span>
         </div>
-        
-        <div className={`flex items-center gap-2 backdrop-blur-md rounded-full px-2 py-1 shadow-sm border ${nightMode ? 'bg-zinc-800/90 border-zinc-700' : 'bg-white/90 border-[#e8dccb]'}`}>
-          <button onClick={toggleNightMode} className={`p-1.5 ${nightMode ? 'text-[#d4af37]' : 'text-[#5a3e1b]'}`} title="الوضع الليلي">
-            {nightMode ? <Sun className="size-5" /> : <Moon className="size-5" />}
-          </button>
 
-          <button onClick={() => router.push('/quran/reciters')} className={`flex items-center gap-1 text-[12px] font-bold px-2 ${nightMode ? 'text-zinc-300' : 'text-[#5a3e1b]'}`}>
-             <Headphones className="size-4" />
-             <span>القارئ</span>
+        <div className="flex items-center gap-1 rounded-full border px-2 py-1 shadow-sm backdrop-blur-md" style={{ backgroundColor: theme.surface, borderColor: theme.border }}>
+          <button type="button" onClick={handleNightModeToggle} className="rounded-full p-1.5 transition-opacity active:opacity-60" style={{ color: theme.accent }} aria-label={isNightMode ? 'الوضع النهاري' : 'الوضع الليلي'}>
+            {isNightMode ? <Sun className="size-5" /> : <Moon className="size-5" />}
           </button>
-          
-          <button onClick={handlePlayToggle} className={`p-1.5 rounded-full shadow-sm ${nightMode ? 'bg-[#d4af37] text-[#1a1a1a]' : 'bg-[#0a1f1a] text-[#fdfbf7]'}`}>
-             {isCurrentSurahPlaying ? <Pause className="size-4" fill="currentColor" /> : <Play className="size-4" fill="currentColor" />}
+          <button type="button" onClick={() => router.push('/quran/reciters')} className="flex items-center gap-1 rounded-full px-2 py-1.5 text-[12px] font-bold transition-opacity active:opacity-60" style={{ color: theme.text }}>
+            <Headphones className="size-4" />
+            <span>القارئ</span>
           </button>
-
-          <button onClick={handleBookmark} className={`p-1.5 ${isMarked ? 'text-[#d4af37]' : (nightMode ? 'text-zinc-300' : 'text-[#5a3e1b]')}`}>
-            <Bookmark className="size-5" fill={isMarked ? "currentColor" : "none"} />
+          <button type="button" onClick={handlePlayToggle} className="rounded-full p-2 shadow-sm transition-opacity active:opacity-70" style={{ backgroundColor: theme.primary, color: theme.primaryText }} aria-label={isCurrentSurahPlaying ? 'إيقاف التلاوة' : 'تشغيل التلاوة'}>
+            {isCurrentSurahPlaying ? <Pause className="size-4" fill="currentColor" /> : <Play className="size-4" fill="currentColor" />}
+          </button>
+          <button type="button" onClick={handleBookmark} className="rounded-full p-1.5 transition-opacity active:opacity-60" style={{ color: isBookmarkedPage ? theme.accent : theme.text }} aria-label="إضافة علامة مرجعية">
+            <Bookmark className="size-5" fill={isBookmarkedPage ? 'currentColor' : 'none'} />
           </button>
         </div>
-      </div>
+      </header>
 
-      {/* منطقة الصورة (تأخذ المساحة المتبقية) */}
-      <div className={`flex-1 w-full relative overflow-hidden ${bgColor}`} style={{ touchAction: 'none' }}>
-        <img 
-          key={currentPage}
-          src={`/mushaf/pages/${pageNumberPadded}.webp`} 
-          alt={`صفحة ${currentPage}`}
-          className={`w-full h-full object-contain pointer-events-none transition-transform duration-75 origin-center`}
-          style={{ 
-            transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
-            filter: nightMode ? 'invert(0.95) hue-rotate(180deg) brightness(1.2) contrast(1.2)' : 'none' 
-          }}
-          draggable={false}
-        />
-      </div>
-
-      {/* ✅ رقم الصفحة: ثابت دائماً في الأسفل */}
-      <div 
-        className={`w-full flex justify-center py-2 shrink-0 z-50`}
-        style={{ background: nightMode ? '#1a1a1a' : '#fdfbf7' }}
+      {/* رقم الصفحة العائم */}
+      <footer
+        className="absolute inset-x-0 bottom-0 z-50 flex justify-center pb-3 pt-6"
+        style={{
+          paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))',
+          background: isNightMode
+            ? 'linear-gradient(to top, rgba(16,16,16,0.90), rgba(16,16,16,0))'
+            : 'linear-gradient(to top, rgba(253,251,247,0.92), rgba(253,251,247,0))',
+        }}
       >
-        <div className={`text-xs font-bold px-5 py-2 rounded-full ${nightMode ? 'bg-[#d4af37]/90 text-[#1a1a1a]' : 'bg-[#0a1f1a]/80 text-white'}`}>
+        <div
+          className="rounded-full px-5 py-2 text-xs font-bold shadow-sm"
+          style={{
+            backgroundColor: isNightMode ? 'rgba(212, 175, 55, 0.92)' : 'rgba(10, 31, 26, 0.82)',
+            color: isNightMode ? '#101010' : '#ffffff',
+          }}
+        >
           صفحة {toArabicNumber(currentPage)}
         </div>
-      </div>
-
+      </footer>
     </div>
   )
 }

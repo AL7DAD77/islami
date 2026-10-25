@@ -6,14 +6,14 @@ export interface Bookmark {
   id: string
   surah: number
   surahName: string
-  page: number // تم التغيير من آية إلى صفحة
+  page: number
   createdAt: number
 }
 
 export interface ReadingPosition {
   surah: number
   surahName: string
-  page: number // تم التغيير
+  page: number
   updatedAt: number
 }
 
@@ -22,7 +22,7 @@ interface State {
   position: ReadingPosition | null
 }
 
-const KEY = 'islami-bookmarks-v2' // غيرنا الإصدار لمسح القديم
+const KEY = 'islami-bookmarks-v2'
 const POS_KEY = 'islami-reading-position-v2'
 
 const EMPTY: State = { bookmarks: [], position: null }

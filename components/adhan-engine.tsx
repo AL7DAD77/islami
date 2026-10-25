@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BellRing, X } from 'lucide-react'
+
 import { getSettings, useSettings } from '@/lib/settings'
 import { PRAYER_NAMES, PRAYER_ORDER, getPrayerTimes } from '@/lib/prayer'
 import { updateAutoLocation } from '@/lib/location'
@@ -17,116 +18,31 @@ import {
 } from '@/lib/native'
 import type { AppSettings } from '@/lib/settings'
 
+/* ============================== الثوابت ============================== */
+
 const SCHEDULE_DAYS = 15
+const LOCATION_UPDATE_INTERVAL = 30 * 60 * 1000
+const LOCATION_UPDATE_COOLDOWN = 60 * 1000
+const MIDNIGHT_EVENT_BASE_ID = 100000
+const PHASE_EVENT_BASE_ID = 200000
+const SALAWAT_EVENT_BASE_ID = 300000
+const ADHKAR_EVENT_BASE_ID = 400000
+
 const SHORT_ADHAN_FILE = 'takbeeratain.mp3'
+const ADHAN_SPEECH_RATE = 0.9
 
-function speak(text: string) {
-  try {
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.cancel()
-      const utterance = new SpeechSynthesisUtterance(text)
-      utterance.lang = 'ar-SA'
-      utterance.rate = 0.9
-      window.speechSynthesis.speak(utterance)
-    }
-  } catch (e) {}
+const MINUTE_MS = 60 * 1000
+
+/* ============================== الأنواع ============================== */
+
+type PrayerKey = keyof typeof PRAYER_NAMES
+
+interface ScheduleContext {
+  settings: AppSettings
+  now: number
 }
 
-function buildSchedule(s: AppSettings): ScheduledItem[] {
-  const items: ScheduledItem[] = []
-  const now = Date.now()
-  const timeline: number[] = []
-
-  // 1. جدولة الصلوات
-  for (let d = -1; d < SCHEDULE_DAYS; d++) {
-    const date = new Date()
-    date.setDate(date.getDate() + d)
-    const times = getPrayerTimes(s, date)
-
-    PRAYER_ORDER.forEach((key, idx) => {
-      const t = times[key].getTime()
-      timeline.push(t)
-      const enabled = s.adhanEnabled[key]
-      const name = PRAYER_NAMES[key]
-
-      if (!enabled || t <= now) {
-        items.push({ id: d * 10 + idx * 2 + 2, at: t, kind: 'phase', prayer: key, title: '', body: '' })
-        return
-      }
-      
-      if (s.reminderMinutes > 0 && t - s.reminderMinutes * 60000 > now) {
-        items.push({
-          id: d * 10 + idx * 2 + 1,
-          at: t - s.reminderMinutes * 60000,
-          kind: 'reminder',
-          prayer: key,
-          title: `اقتربت صلاة ${name}`,
-          body: `بعد ${s.reminderMinutes} دقائق - ${s.location.city}`,
-        })
-      }
-      
-      const voiceId = voiceIdFor(s, key)
-      const voice = getAdhanVoice(voiceId)
-      // الاعتماد فقط على اختيار المؤذن (إذا اختار تكبيرتان نستخدم الملف القصير)
-      const finalFile = voiceId === 'takbeeratain' ? SHORT_ADHAN_FILE : voice?.file;
-
-      items.push({
-        id: d * 10 + idx * 2 + 2,
-        at: t,
-        kind: 'adhan',
-        prayer: key,
-        title: `حان الآن موعد أذان ${name}`,
-        body: `حسب التوقيت المحلي لمدينة ${s.location.city}`,
-        file: finalFile,
-        volume: 1,
-      })
-    })
-  }
-
-  // 2. جدولة تذكيرات الصلاة على النبي
-  if (s.salawatEnabled && s.salawatInterval > 0) {
-    let nextTime = now + s.salawatInterval * 60000;
-    const totalReminders = Math.floor((SCHEDULE_DAYS * 24 * 60) / s.salawatInterval);
-    
-    for (let i = 1; i <= totalReminders; i++) {
-      items.push({
-        id: 300000 + i,
-        at: nextTime,
-        kind: 'reminder',
-        prayer: 'salawat',
-        title: 'صلِّ على النبي ﷺ',
-        body: 'اللهم صلِّ وسلم على نبينا محمد',
-      });
-      nextTime += s.salawatInterval * 60000;
-    }
-  }
-
-  // 3. جدولة تذكيرات الأذكار والقرآن
-  if (s.adhkarRemindersEnabled && s.adhkarRemindersInterval > 0) {
-    let nextTime = now + s.adhkarRemindersInterval * 60000;
-    const totalReminders = Math.floor((SCHEDULE_DAYS * 24 * 60) / s.adhkarRemindersInterval);
-
-    for (let i = 1; i <= totalReminders; i++) {
-      items.push({
-        id: 400000 + i,
-        at: nextTime,
-        kind: 'reminder',
-        prayer: 'adhkar',
-        title: 'تذكير بالأذكار',
-        body: 'لا تنسَ أذكار الصباح والمساء ووردك من القرآن',
-      });
-      nextTime += s.adhkarRemindersInterval * 60000;
-    }
-  }
-
-  timeline.sort((a, b) => a - b)
-  for (let i = 0; i < timeline.length - 1; i++) {
-    const mid = Math.round((timeline[i] + timeline[i + 1]) / 2)
-    if (mid > now) items.push({ id: 200000 + i, at: mid, kind: 'phase', prayer: '', title: '', body: '' })
-  }
-
-  return items.sort((a, b) => a.at - b.at)
-}
+/* ============================ أدوات الصوت ============================ */
 
 let globalAudio: HTMLAudioElement | null = null
 
@@ -135,78 +51,453 @@ function getGlobalAudio(): HTMLAudioElement {
     globalAudio = new Audio()
     globalAudio.preload = 'none'
   }
+
   return globalAudio
 }
 
-function stopAdhanAudio() {
+function stopAdhanAudio(): void {
   const audio = getGlobalAudio()
+
   if (!audio.paused) {
     audio.pause()
     audio.currentTime = 0
   }
 }
 
-async function notify(title: string, body: string) {
+function speak(text: string): void {
+  try {
+    if (
+      typeof window === 'undefined' ||
+      !('speechSynthesis' in window)
+    ) {
+      return
+    }
+
+    window.speechSynthesis.cancel()
+
+    const utterance = new SpeechSynthesisUtterance(text)
+    utterance.lang = 'ar-SA'
+    utterance.rate = ADHAN_SPEECH_RATE
+
+    window.speechSynthesis.speak(utterance)
+  } catch {
+    // تجاهل الأجهزة أو المتصفحات غير المدعومة
+  }
+}
+
+function cancelSpeech(): void {
+  try {
+    if (
+      typeof window !== 'undefined' &&
+      'speechSynthesis' in window
+    ) {
+      window.speechSynthesis.cancel()
+    }
+  } catch {
+    // تجاهل الأخطاء
+  }
+}
+
+async function notify(title: string, body: string): Promise<void> {
   await showNativeNotification(title, body)
 }
 
+/* ========================== بناء جدولة الأذان ========================== */
+
+function createMidnightEvents(
+  context: ScheduleContext,
+  items: ScheduledItem[],
+): void {
+  const { settings, now } = context
+
+  for (let dayOffset = -1; dayOffset < SCHEDULE_DAYS; dayOffset++) {
+    const date = new Date()
+    date.setDate(date.getDate() + dayOffset)
+
+    const midnight = new Date(date)
+    midnight.setHours(0, 0, 0, 0)
+
+    if (midnight.getTime() <= now) {
+      continue
+    }
+
+    items.push({
+      id: MIDNIGHT_EVENT_BASE_ID + dayOffset + 2,
+      at: midnight.getTime(),
+      kind: 'time',
+      prayer: '',
+      title: '',
+      body: '',
+    })
+  }
+
+  // يُستخدم لتحديث التاريخ الهجري في الإشعار الدائم
+  void settings
+}
+
+function createPrayerEvents(
+  context: ScheduleContext,
+  items: ScheduledItem[],
+): number[] {
+  const { settings, now } = context
+  const timeline: number[] = []
+
+  for (let dayOffset = -1; dayOffset < SCHEDULE_DAYS; dayOffset++) {
+    const date = new Date()
+    date.setDate(date.getDate() + dayOffset)
+
+    const times = getPrayerTimes(settings, date)
+
+    PRAYER_ORDER.forEach((key, index) => {
+      const prayerTime = times[key].getTime()
+      timeline.push(prayerTime)
+
+      const isAdhanEnabled = settings.adhanEnabled[key]
+      const prayerName = PRAYER_NAMES[key]
+
+      if (!isAdhanEnabled || prayerTime <= now) {
+        items.push({
+          id: dayOffset * 10 + index * 2 + 2,
+          at: prayerTime,
+          kind: 'phase',
+          prayer: key,
+          title: '',
+          body: '',
+        })
+
+        return
+      }
+
+      createReminderEvent(
+        context,
+        items,
+        key,
+        prayerName,
+        prayerTime,
+        dayOffset,
+        index,
+      )
+
+      createAdhanEvent(
+        context,
+        items,
+        key,
+        prayerName,
+        prayerTime,
+        dayOffset,
+        index,
+      )
+    })
+  }
+
+  return timeline
+}
+
+function createReminderEvent(
+  context: ScheduleContext,
+  items: ScheduledItem[],
+  prayerKey: PrayerKey,
+  prayerName: string,
+  prayerTime: number,
+  dayOffset: number,
+  prayerIndex: number,
+): void {
+  const { settings, now } = context
+
+  if (settings.reminderMinutes <= 0) {
+    return
+  }
+
+  const reminderTime =
+    prayerTime - settings.reminderMinutes * MINUTE_MS
+
+  if (reminderTime <= now) {
+    return
+  }
+
+  items.push({
+    id: dayOffset * 10 + prayerIndex * 2 + 1,
+    at: reminderTime,
+    kind: 'reminder',
+    prayer: prayerKey,
+    title: `اقتربت صلاة ${prayerName}`,
+    body: `بعد ${settings.reminderMinutes} دقائق - ${settings.location.city}`,
+  })
+}
+
+function createAdhanEvent(
+  context: ScheduleContext,
+  items: ScheduledItem[],
+  prayerKey: PrayerKey,
+  prayerName: string,
+  prayerTime: number,
+  dayOffset: number,
+  prayerIndex: number,
+): void {
+  const { settings } = context
+
+  const voiceId = voiceIdFor(settings, prayerKey)
+  const voice = getAdhanVoice(voiceId)
+
+  const audioFile =
+    voiceId === 'takbeeratain'
+      ? SHORT_ADHAN_FILE
+      : voice?.file
+
+  items.push({
+    id: dayOffset * 10 + prayerIndex * 2 + 2,
+    at: prayerTime,
+    kind: 'adhan',
+    prayer: prayerKey,
+    title: `حان الآن موعد أذان ${prayerName}`,
+    body: `حسب التوقيت المحلي لمدينة ${settings.location.city}`,
+    file: audioFile,
+    volume: 1,
+  })
+}
+
+function createPhaseEvents(
+  timeline: number[],
+  now: number,
+  items: ScheduledItem[],
+): void {
+  const sortedTimeline = [...timeline].sort((a, b) => a - b)
+
+  for (let index = 0; index < sortedTimeline.length - 1; index++) {
+    const current = sortedTimeline[index]
+    const next = sortedTimeline[index + 1]
+
+    const middleTime = Math.round((current + next) / 2)
+
+    if (middleTime <= now) {
+      continue
+    }
+
+    items.push({
+      id: PHASE_EVENT_BASE_ID + index,
+      at: middleTime,
+      kind: 'phase',
+      prayer: '',
+      title: '',
+      body: '',
+    })
+  }
+}
+
+function createRepeatedReminderEvents(
+  context: ScheduleContext,
+  items: ScheduledItem[],
+): void {
+  const { settings, now } = context
+
+  if (settings.salawatEnabled && settings.salawatInterval > 0) {
+    createRepeatedEvents({
+      items,
+      now,
+      baseId: SALAWAT_EVENT_BASE_ID,
+      intervalMinutes: settings.salawatInterval,
+      prayerKey: 'salawat',
+      title: 'صلِّ على النبي ﷺ',
+      body: 'اللهم صلِّ وسلم على نبينا محمد',
+    })
+  }
+
+  if (
+    settings.adhkarRemindersEnabled &&
+    settings.adhkarRemindersInterval > 0
+  ) {
+    createRepeatedEvents({
+      items,
+      now,
+      baseId: ADHKAR_EVENT_BASE_ID,
+      intervalMinutes: settings.adhkarRemindersInterval,
+      prayerKey: 'adhkar',
+      title: 'تذكير بالأذكار',
+      body: 'لا تنسَ أذكار الصباح والمساء ووردك من القرآن',
+    })
+  }
+}
+
+function createRepeatedEvents(options: {
+  items: ScheduledItem[]
+  now: number
+  baseId: number
+  intervalMinutes: number
+  prayerKey: string
+  title: string
+  body: string
+}): void {
+  const {
+    items,
+    now,
+    baseId,
+    intervalMinutes,
+    prayerKey,
+    title,
+    body,
+  } = options
+
+  const intervalMs = intervalMinutes * MINUTE_MS
+  const totalDurationMs = SCHEDULE_DAYS * 24 * 60 * MINUTE_MS
+
+  const totalReminders = Math.floor(totalDurationMs / intervalMs)
+
+  let nextTime = now + intervalMs
+
+  for (let index = 1; index <= totalReminders; index++) {
+    items.push({
+      id: baseId + index,
+      at: nextTime,
+      kind: 'reminder',
+      prayer: prayerKey,
+      title,
+      body,
+    })
+
+    nextTime += intervalMs
+  }
+}
+
+function buildSchedule(settings: AppSettings): ScheduledItem[] {
+  const now = Date.now()
+  const context: ScheduleContext = { settings, now }
+
+  const items: ScheduledItem[] = []
+
+  createMidnightEvents(context, items)
+
+  const timeline = createPrayerEvents(context, items)
+
+  createPhaseEvents(timeline, now, items)
+  createRepeatedReminderEvents(context, items)
+
+  return items.sort((a, b) => a.at - b.at)
+}
+
+/* ============================ مكوّن المحرك ============================ */
+
 export function AdhanEngine() {
   const [settings] = useSettings()
+
+  const [playing, setPlaying] = useState<PrayerKey | null>(null)
+
   const firedRef = useRef<Set<string>>(new Set())
-  const [playing, setPlaying] = useState<string | null>(null)
+
+  /* ------------------------- تهيئة أولية ------------------------- */
 
   useEffect(() => {
+    let isMounted = true
+
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(() => {})
+      navigator.serviceWorker
+        .register('/sw.js')
+        .catch(error => {
+          console.warn('تعذر تسجيل Service Worker:', error)
+        })
     }
 
     const audio = getGlobalAudio()
-    audio.onended = () => setPlaying(null)
 
-    requestNativeNotificationPermission().catch(() => {})
-
-    return () => {
-      audio.onended = null
-      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-        window.speechSynthesis.cancel()
+    const handleAudioEnd = () => {
+      if (isMounted) {
+        setPlaying(null)
       }
     }
+
+    audio.addEventListener('ended', handleAudioEnd)
+
+    requestNativeNotificationPermission().catch(() => {
+      // المستخدم قد يرفض الإذن، لا حاجة لإظهار خطأ
+    })
+
+    return () => {
+      isMounted = false
+      audio.removeEventListener('ended', handleAudioEnd)
+      cancelSpeech()
+    }
   }, [])
+
+  /* --------------------- مزامنة حالة التشغيل --------------------- */
 
   useEffect(() => {
     const cleanup = registerAppStateListener(() => {
       const audio = getGlobalAudio()
+
       if (audio.paused && playing) {
         setPlaying(null)
       }
     })
+
     return cleanup
   }, [playing])
 
-  useEffect(() => {
-    if (!settings.location.auto) return
-    let asked = false
-    let lastRun = 0
+  /* ------------------------- تحديث الموقع ------------------------- */
 
-    const run = async (force = false) => {
-      if (!force && Date.now() - lastRun < 60_000) return
-      lastRun = Date.now()
-      const result = await updateAutoLocation({ askPermission: !asked })
-      asked = true
-      if (result === 'denied' || result === 'error') return
+  useEffect(() => {
+    if (!settings.location.auto) {
+      return
     }
 
-    run(true)
-    const id = setInterval(() => run(true), 30 * 60 * 1000)
-    const off = registerAppStateListener(() => run())
+    let permissionAsked = false
+    let lastRunAt = 0
+
+    const updateLocation = async (force = false): Promise<void> => {
+      const elapsed = Date.now() - lastRunAt
+
+      if (!force && elapsed < LOCATION_UPDATE_COOLDOWN) {
+        return
+      }
+
+      lastRunAt = Date.now()
+
+      const result = await updateAutoLocation({
+        askPermission: !permissionAsked,
+      })
+
+      permissionAsked = true
+
+      if (result === 'denied' || result === 'error') {
+        return
+      }
+    }
+
+    updateLocation(true)
+
+    const intervalId = setInterval(() => {
+      updateLocation(true)
+    }, LOCATION_UPDATE_INTERVAL)
+
+    const removeListener = registerAppStateListener(() => {
+      updateLocation()
+    })
+
     return () => {
-      clearInterval(id)
-      off()
+      clearInterval(intervalId)
+      removeListener()
     }
   }, [settings.location.auto])
 
-  // مفاتيح الجدولة (تمت إزالة adhanType)
-  const scheduleKey = JSON.stringify([
+  /* ------------------------ جدولة الأذان ------------------------ */
+
+  const scheduleKey = useMemo(() => {
+    return JSON.stringify([
+      settings.location.lat,
+      settings.location.lng,
+      settings.location.city,
+      settings.method,
+      settings.madhab,
+      settings.adhanEnabled,
+      settings.adhanVoice,
+      settings.fajrVoice,
+      settings.prayerVoices,
+      settings.reminderMinutes,
+      settings.persistentNotification,
+      settings.salawatEnabled,
+      settings.salawatInterval,
+      settings.adhkarRemindersEnabled,
+      settings.adhkarRemindersInterval,
+    ])
+  }, [
     settings.location.lat,
     settings.location.lng,
     settings.location.city,
@@ -215,7 +506,7 @@ export function AdhanEngine() {
     settings.adhanEnabled,
     settings.adhanVoice,
     settings.fajrVoice,
-    JSON.stringify(settings.prayerVoices),
+    settings.prayerVoices,
     settings.reminderMinutes,
     settings.persistentNotification,
     settings.salawatEnabled,
@@ -225,105 +516,63 @@ export function AdhanEngine() {
   ])
 
   useEffect(() => {
-    if (!isAdhanSchedulerAvailable()) return
-    const run = () => {
-      const s = getSettings()
-      scheduleNativeAdhans(buildSchedule(s), s.persistentNotification, s.location.city)
+    if (!isAdhanSchedulerAvailable()) {
+      return
     }
-    run()
-    return registerAppStateListener(run)
+
+    const scheduleAdhans = (): void => {
+      const currentSettings = getSettings()
+
+      scheduleNativeAdhans(
+        buildSchedule(currentSettings),
+        currentSettings.persistentNotification,
+        currentSettings.location.city,
+      )
+    }
+
+    scheduleAdhans()
+
+    return registerAppStateListener(scheduleAdhans)
   }, [scheduleKey])
 
-  useEffect(() => {
-    const tick = () => {
-      if (isAdhanSchedulerAvailable()) return
-      const s = getSettings()
-      const now = new Date()
-      const times = getPrayerTimes(s, now)
-      const day = now.toDateString()
+  /* --------------------------- إيقاف الأذان --------------------------- */
 
-      for (const key of PRAYER_ORDER) {
-        const t = times[key].getTime()
-        const diff = now.getTime() - t
-        const reminderAt = t - s.reminderMinutes * 60000
-        const remKey = `${day}-${key}-rem`
-
-        if (
-          s.reminderMinutes > 0 &&
-          now.getTime() >= reminderAt &&
-          now.getTime() < t &&
-          !firedRef.current.has(remKey)
-        ) {
-          firedRef.current.add(remKey)
-          notify(`اقتربت صلاة ${PRAYER_NAMES[key]}`, `بعد ${s.reminderMinutes} دقائق - ${s.location.city}`)
-          speak(`اقتربت صلاة ${PRAYER_NAMES[key]}، بعد ${s.reminderMinutes} دقائق.`)
-        }
-
-        const adhanKey = `${day}-${key}`
-        if (diff >= 0 && diff < 90000 && !firedRef.current.has(adhanKey)) {
-          firedRef.current.add(adhanKey)
-          if (!s.adhanEnabled[key]) continue
-
-          notify(`حان الآن موعد أذان ${PRAYER_NAMES[key]}`, `حسب التوقيت المحلي لمدينة ${s.location.city}`)
-
-          const audio = getGlobalAudio()
-          const voiceId = voiceIdFor(s, key)
-          const voice = getAdhanVoice(voiceId)
-          const finalFile = voiceId === 'takbeeratain' ? SHORT_ADHAN_FILE : voice?.file;
-
-          if (finalFile) {
-            stopAdhanAudio()
-            if (typeof window !== 'undefined' && (window as any).__stopQuran) {
-              ;(window as any).__stopQuran()
-            }
-            window.dispatchEvent(new Event('adhan-started'))
-
-            audio.src = `/audio/adhans/${finalFile}`
-            audio.volume = 1
-            audio
-              .play()
-              .then(() => setPlaying(key))
-              .catch((e) => console.warn('Adhan play failed:', e))
-          }
-        }
-      }
-    }
-
-    tick()
-    const id = window.setInterval(tick, 10000)
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') tick()
-    }
-    document.addEventListener('visibilitychange', onVisible)
-
-    return () => {
-      window.clearInterval(id)
-      document.removeEventListener('visibilitychange', onVisible)
-    }
+  const handleStopAdhan = useCallback(() => {
+    stopAdhanAudio()
+    stopNativeAdhan()
+    setPlaying(null)
   }, [])
 
-  if (!playing) return null
+  /* ------------------------------ الواجهة ------------------------------ */
+
+  if (!playing) {
+    return null
+  }
 
   return (
     <div
       role="status"
       className="fixed inset-x-3 top-3 z-50 mx-auto flex max-w-sm items-center gap-2 rounded-xl bg-primary px-3 py-2 text-primary-foreground shadow-lg"
     >
-      <BellRing className="size-5 shrink-0 animate-pulse" aria-hidden="true" />
+      <BellRing
+        className="size-5 shrink-0 animate-pulse"
+        aria-hidden="true"
+      />
+
       <div className="flex-1">
         <p className="text-sm font-bold leading-tight">
-          {`أذان ${PRAYER_NAMES[playing as keyof typeof PRAYER_NAMES]}`}
+          {`أذان ${PRAYER_NAMES[playing]}`}
         </p>
-        <p className="text-xs opacity-80">{'حيّ على الصلاة، حيّ على الفلاح'}</p>
+
+        <p className="text-xs opacity-80">
+          {'حيّ على الصلاة، حيّ على الفلاح'}
+        </p>
       </div>
+
       <button
         type="button"
-        onClick={() => {
-          stopAdhanAudio()
-          stopNativeAdhan()
-          setPlaying(null)
-        }}
-        className="rounded-full bg-primary-foreground/15 p-2 hover:bg-primary-foreground/25"
+        onClick={handleStopAdhan}
+        className="rounded-full bg-primary-foreground/15 p-2 transition-colors hover:bg-primary-foreground/25"
         aria-label="إيقاف الأذان"
       >
         <X className="size-5" />

@@ -16,7 +16,6 @@ export function RecitersBrowser({ reciters }: { reciters: any[] }) {
   });
 
   const handleSelectReciter = (reciter: any) => {
-    // ضمان وجود / في نهاية الرابط
     let serverUrl = reciter?.moshaf?.[0]?.server || reciter?.Server || reciter?.server || reciter?.server_url || 'https://server8.mp3quran.net/afs/';
     if (!serverUrl.endsWith('/')) serverUrl += '/';
 

@@ -1,11 +1,11 @@
-'use client';
+'use client'
 
-import { useState, Suspense } from 'react'; // ✅ أضفنا Suspense
-import { MushafViewer } from '@/components/mushaf/mushaf-viewer';
+import { useState, Suspense } from 'react'
+import { MushafViewer } from '@/components/mushaf/mushaf-viewer'
 
 export default function DailyWirdPage() {
-  const [startPage] = useState<number>(5);
-  const [endPage] = useState<number>(8);
+  const [startPage] = useState<number>(5)
+  const [endPage] = useState<number>(8)
 
   return (
     <div className="min-h-screen bg-[#1c1510] flex flex-col items-center">
@@ -22,10 +22,10 @@ export default function DailyWirdPage() {
 
       {/* عرض الورد باستخدام عارض المصحف مع تغليفه بـ Suspense */}
       <div className="w-full grow flex items-center justify-center">
-        <Suspense fallback={<div className="text-white p-10">جاري تحميل المصحف...</div>}>
+        <Suspense fallback={<div className="text-white p-10 font-sans">جاري تحميل المصحف...</div>}>
           <MushafViewer initialSurah={2} />
         </Suspense>
       </div>
     </div>
-  );
+  )
 }

@@ -12,7 +12,8 @@ export default function RemindersPage() {
   if (!hydrated) return null
 
   return (
-    <div className="min-h-[100dvh] bg-[#f7f3ea] pb-24" dir="rtl">
+    // ✅ تم تعديل min-h-[100dvh] إلى min-h-dvh
+    <div className="min-h-dvh bg-[#f7f3ea] pb-24" dir="rtl">
       <div className="container mx-auto px-4 py-4 max-w-3xl space-y-6">
         <PageHeader 
           title="التذكيرات الذكية" 
@@ -29,7 +30,7 @@ export default function RemindersPage() {
               </span>
               <div>
                 <h3 className="font-bold text-[#0a1f1a]">الصلاة على النبي ﷺ</h3>
-                <p className="text-xs text-muted-foreground">تذكير صوتي بالصلاة على الحبيب</p>
+                <p className="text-xs text-muted-foreground">تذكير بالصلاة على الحبيب</p>
               </div>
             </div>
             <button
@@ -40,7 +41,8 @@ export default function RemindersPage() {
                 settings.salawatEnabled ? 'bg-emerald-600' : 'bg-zinc-300'
               )}
             >
-              <span className={cn('absolute top-0.5 size-5 rounded-full bg-white transition-all', settings.salawatEnabled ? 'right-0.5' : 'right-[1.375rem]')} />
+              {/* ✅ تم تعديل right-[1.375rem] إلى right-[22px] */}
+              <span className={cn('absolute top-0.5 size-5 rounded-full bg-white transition-all', settings.salawatEnabled ? 'right-0.5' : 'right-5.5')} />
             </button>
           </div>
 
@@ -87,7 +89,8 @@ export default function RemindersPage() {
                 settings.adhkarRemindersEnabled ? 'bg-emerald-600' : 'bg-zinc-300'
               )}
             >
-              <span className={cn('absolute top-0.5 size-5 rounded-full bg-white transition-all', settings.adhkarRemindersEnabled ? 'right-0.5' : 'right-[1.375rem]')} />
+              {/* ✅ تم تعديل right-[1.375rem] إلى right-[22px] */}
+              <span className={cn('absolute top-0.5 size-5 rounded-full bg-white transition-all', settings.adhkarRemindersEnabled ? 'right-0.5' : 'right-[22px]')} />
             </button>
           </div>
 

@@ -3,12 +3,56 @@ package com.alhaddad.islami;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.util.Log;
 
-/** يعيد جدولة الأذان بعد إعادة تشغيل الهاتف أو تحديث التطبيق أو تغيير الوقت/المنطقة الزمنية. */
-public class BootReceiver extends BroadcastReceiver {
+/**
+ * BootReceiver
+ *
+ * يستيقظ عند إعادة تشغيل الهاتف أو تحديث التطبيق أو تغيير الوقت/المنطقة الزمنية.
+ * يقوم بإعادة جدولة جميع التنبيهات لضمان عدم تفويت أي صلاة.
+ */
+public final class BootReceiver extends BroadcastReceiver {
+
+    private static final String TAG = "BootReceiver";
+
     @Override
     public void onReceive(Context context, Intent intent) {
-        AdhanScheduler.scheduleAll(context);
-        NotificationHelper.updatePersistent(context);
+        if (context == null || intent == null) {
+            return;
+        }
+
+        String action = intent.getAction();
+
+        if (action == null) {
+            return;
+        }
+
+        // التحقق من سبب الاستيقاظ
+        boolean isBoot = Intent.ACTION_BOOT_COMPLETED.equals(action);
+        boolean isAppUpdate = Intent.ACTION_MY_PACKAGE_REPLACED.equals(action);
+        boolean isTimeChange = Intent.ACTION_TIME_CHANGED.equals(action);
+        boolean isTimezoneChange = Intent.ACTION_TIMEZONE_CHANGED.equals(action);
+
+        if (!isBoot && !isAppUpdate && !isTimeChange && !isTimezoneChange) {
+            return;
+        }
+
+        try {
+            Log.i(TAG, "استيقظ مستقبل الإقلاع للسبب: " + action);
+
+            // 1. التأكد من وجود قنوات الإشعارات
+            NotificationHelper.ensureChannels(context);
+
+            // 2. تحديث الإشعار الدائم
+            NotificationHelper.updatePersistent(context);
+
+            // 3. إعادة جدولة جميع التنبيهات المخزنة
+            int scheduledCount = AdhanScheduler.scheduleAll(context);
+            
+            Log.i(TAG, "تمت إعادة جدولة " + scheduledCount + " تنبيه بنجاح بعد الإقلاع/التحديث");
+
+        } catch (Exception e) {
+            Log.e(TAG, "خطأ فادح أثناء إعادة الجدولة بعد الإقلاع", e);
+        }
     }
 }

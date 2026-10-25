@@ -231,7 +231,7 @@ export function PrayerSettings() {
               type="range"
               min={0}
               max={30}
-              step={1} // ✅ تم التعديل ليعمل بالدقيقة
+              step={1}
               value={settings.reminderMinutes}
               onChange={(e) => update({ reminderMinutes: Number(e.target.value) })}
               className="w-full accent-emerald-600"
@@ -255,7 +255,7 @@ export function PrayerSettings() {
         </div>
       </section>
 
-      {/* الإشعارات - تم تنظيفها تماماً كما طلبت */}
+      {/* الإشعارات - نظيفة تماماً */}
       <section className="rounded-2xl bg-card p-4 shadow-sm ring-1 ring-border">
         <div className="mb-3 flex items-center gap-2">
           <span className="flex size-8 items-center justify-center rounded-xl bg-accent text-accent-foreground">
@@ -264,7 +264,6 @@ export function PrayerSettings() {
           <h3 className="font-bold text-zinc-800 dark:text-zinc-100">الإشعارات</h3>
         </div>
         
-        {/* ✅ لا يوجد نصوص حالة ولا أزرار تفعيل، فقط المفتاح الدائم */}
         <div className="flex items-center justify-between gap-3 rounded-xl bg-muted/50 p-3">
           <div className="flex-1">
             <p className="font-medium text-zinc-800 dark:text-zinc-100">إشعار دائم بالصلاة القادمة</p>
@@ -281,7 +280,7 @@ export function PrayerSettings() {
             }}
             className={cn('relative h-6 w-11 shrink-0 rounded-full transition-colors', settings.persistentNotification ? 'bg-emerald-600' : 'bg-zinc-400')}
           >
-            <span className={cn('absolute top-0.5 size-5 rounded-full bg-white transition-all', settings.persistentNotification ? 'right-0.5' : 'right-[1.375rem]')} />
+            <span className={cn('absolute top-0.5 size-5 rounded-full bg-white transition-all', settings.persistentNotification ? 'right-0.5' : 'right-5.5')} />
           </button>
         </div>
       </section>

@@ -2,185 +2,251 @@ package com.alhaddad.islami;
 
 import android.app.Notification;
 import android.app.Service;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ServiceInfo;
-import android.content.res.AssetFileDescriptor;
 import android.media.AudioAttributes;
-import android.media.AudioFocusRequest;
-import android.media.AudioManager;
 import android.media.MediaPlayer;
-import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.IBinder;
-import android.os.PowerManager;
 import android.util.Log;
 
 import androidx.annotation.Nullable;
-import androidx.core.app.ServiceCompat;
 
 /**
- * خدمة أمامية (نوع mediaPlayback) تشغّل ملف الأذان من داخل التطبيق،
- * فيعمل الأذان كاملاً حتى لو كان التطبيق مغلقاً.
+ * AdhanService
+ *
+ * خدمة أمامية مسؤولة عن تشغيل صوت الأذان.
  */
-public class AdhanService extends Service {
-    private static final String TAG = "AdhanService";
-    static final String ACTION_STOP = "com.alhaddad.islami.ACTION_STOP_ADHAN";
-    private static final String ASSET_DIR = "public/audio/adhans/";
+public final class AdhanService extends Service {
 
-    private MediaPlayer player;
-    private AudioManager audioManager;
-    private AudioFocusRequest focusRequest;
-    private AudioAttributes attrs;
+    private static final String TAG = "AdhanService";
+
+    public static final String ACTION_STOP_ADHAN =
+            "com.alhaddad.islami.STOP_ADHAN";
+
+    private static final String EXTRA_FILE = "file";
+    private static final String EXTRA_VOLUME = "volume";
+    private static final String EXTRA_TITLE = "title";
+    private static final String EXTRA_BODY = "body";
+
+    private static final String ADHAN_ASSETS_PATH =
+            "file:///android_asset/public/audio/adhans/";
+
+    private static final String DEFAULT_TITLE =
+            "حان وقت الأذان";
+
+    private static final String DEFAULT_BODY =
+            "حي على الصلاة، حي على الفلاح";
+
+    private MediaPlayer mediaPlayer;
 
     @Override
-    public int onStartCommand(Intent intent, int flags, int startId) {
-        if (intent != null && ACTION_STOP.equals(intent.getAction())) {
-            finishPlayback();
+    public void onCreate() {
+        super.onCreate();
+        mediaPlayer = createMediaPlayer();
+    }
+
+    @Override
+    public int onStartCommand(
+            Intent intent,
+            int flags,
+            int startId
+    ) {
+        if (intent == null) {
+            stopPlayback();
             return START_NOT_STICKY;
         }
 
-        String title = intent != null ? intent.getStringExtra("title") : null;
-        String body = intent != null ? intent.getStringExtra("body") : null;
-        String file = intent != null ? intent.getStringExtra("file") : null;
-        
-        // استقبال مستوى الصوت من الـ React (القيمة الافتراضية 0.9)
-        float volume = intent != null ? intent.getFloatExtra("volume", 0.9f) : 0.9f;
-        
-        if (title == null) title = "حان وقت الأذان";
-        if (body == null) body = "";
+        String action = intent.getAction();
 
-        // يجب استدعاؤها فوراً بعد startForegroundService
-        Notification n = NotificationHelper.buildPlaying(this, title, body);
-        try {
-            ServiceCompat.startForeground(
-                    this,
-                    NotificationHelper.ID_PLAYING,
-                    n,
-                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
-                            ? ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
-                            : 0);
-        } catch (Exception e) {
-            stopSelf();
+        if (ACTION_STOP_ADHAN.equals(action)) {
+            stopPlayback();
             return START_NOT_STICKY;
         }
 
-        play(file, Math.max(0f, Math.min(1f, volume)));
+        String fileName = intent.getStringExtra(EXTRA_FILE);
+        float volume = intent.getFloatExtra(EXTRA_VOLUME, 1.0f);
+
+        String title = intent.getStringExtra(EXTRA_TITLE);
+        String body = intent.getStringExtra(EXTRA_BODY);
+
+        if (fileName == null || fileName.trim().isEmpty()) {
+            Log.e(TAG, "لم يتم توفير ملف صوتي للأذان");
+            stopPlayback();
+            return START_NOT_STICKY;
+        }
+
+        Notification notification = NotificationHelper.buildPlaying(
+                this,
+                title == null || title.trim().isEmpty()
+                        ? DEFAULT_TITLE
+                        : title,
+                body == null || body.trim().isEmpty()
+                        ? DEFAULT_BODY
+                        : body
+        );
+
+        startForegroundWithType(notification);
+
+        playAdhan(fileName, volume);
+
         return START_NOT_STICKY;
     }
 
-    private void play(String file, float volume) {
-        releasePlayer();
-        attrs = new AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_ALARM)
-                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                .build();
-        requestFocus();
+    /* ============================ تشغيل الأذان ============================ */
 
-        MediaPlayer mp = new MediaPlayer();
+    private void playAdhan(
+            String fileName,
+            float volume
+    ) {
         try {
-            mp.setAudioAttributes(attrs);
-            mp.setWakeMode(getApplicationContext(), PowerManager.PARTIAL_WAKE_LOCK);
+            if (mediaPlayer == null) {
+                mediaPlayer = createMediaPlayer();
+            }
 
-            boolean set = false;
-            if (file != null && !file.isEmpty()) {
+            mediaPlayer.reset();
+
+            String audioUrl = ADHAN_ASSETS_PATH + fileName;
+            Uri audioUri = Uri.parse(audioUrl);
+
+            mediaPlayer.setDataSource(
+                    getApplicationContext(),
+                    audioUri
+            );
+
+            mediaPlayer.setVolume(volume, volume);
+
+            mediaPlayer.setOnPreparedListener(player -> {
                 try {
-                    AssetFileDescriptor afd = getAssets().openFd(ASSET_DIR + file);
-                    mp.setDataSource(afd.getFileDescriptor(), afd.getStartOffset(), afd.getLength());
-                    afd.close();
-                    set = true;
-                } catch (Exception ignored) {
-                    // الملف غير موجود داخل التطبيق: نستخدم صوت تنبيه النظام بدلاً من الصمت
+                    player.start();
+                } catch (Exception e) {
+                    Log.e(
+                            TAG,
+                            "تعذر بدء تشغيل الأذان",
+                            e
+                    );
+                    stopPlayback();
                 }
-            }
-            if (!set) {
-                Uri fallback = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
-                if (fallback == null) fallback = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
-                mp.setDataSource(getApplicationContext(), fallback);
-            }
+            });
 
-            // ضبط مستوى الصوت بناءً على القيمة القادمة من التطبيق
-            mp.setVolume(volume, volume);
-            
-            // ⚠️ هذا السطر الهام يسمح لأزرار الصوت الجانبية في الهاتف بالتحكم في صوت الأذان
-           // setVolumeControlStream(AudioManager.STREAM_ALARM);
+            mediaPlayer.setOnCompletionListener(player -> {
+                Log.i(TAG, "انتهى تشغيل الأذان");
+                stopPlayback();
+            });
 
-            mp.setOnCompletionListener(m -> finishPlayback());
-            mp.setOnErrorListener((m, what, extra) -> {
-                finishPlayback();
+            mediaPlayer.setOnErrorListener((player, what, extra) -> {
+                Log.e(
+                        TAG,
+                        "خطأ في مشغل الأذان: what=" +
+                        what +
+                        ", extra=" +
+                        extra
+                );
+                stopPlayback();
                 return true;
             });
-            mp.prepare();
-            mp.start();
-            player = mp;
+
+            mediaPlayer.prepareAsync();
+
         } catch (Exception e) {
-            try {
-                mp.release();
-            } catch (Exception ignored) {
-            }
-            finishPlayback();
+            Log.e(
+                    TAG,
+                    "خطأ في تحميل ملف الأذان: " + fileName,
+                    e
+            );
+            stopPlayback();
         }
     }
 
-    private void requestFocus() {
-        audioManager = (AudioManager) getSystemService(AUDIO_SERVICE);
-        if (audioManager == null) return;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            focusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
-                    .setAudioAttributes(attrs)
-                    .build();
-            audioManager.requestAudioFocus(focusRequest);
-        } else {
-            audioManager.requestAudioFocus(null, AudioManager.STREAM_ALARM, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT);
-        }
-    }
+    /* ============================ إيقاف الأذان ============================ */
 
-    private void abandonFocus() {
-        if (audioManager == null) return;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            if (focusRequest != null) audioManager.abandonAudioFocusRequest(focusRequest);
-        } else {
-            audioManager.abandonAudioFocus(null);
-        }
-    }
-
-    private void releasePlayer() {
-        if (player != null) {
-            try {
-                if (player.isPlaying()) player.stop();
-            } catch (Exception ignored) {
-            }
-            try {
-                player.release();
-            } catch (Exception ignored) {
-            }
-            player = null;
-        }
-    }
-
-    private void finishPlayback() {
-        releasePlayer();
-        abandonFocus();
-        stopForeground(STOP_FOREGROUND_REMOVE);
-        stopSelf();
-        
-        // بعد انتهاء الأذان يُحدَّث الإشعار الدائم إلى الصلاة التالية
-        NotificationHelper.updatePersistent(getApplicationContext());
-        
-        // ⚠️ الأهم: إعادة جدولة الصلاة القادمة بعد انتهاء الأذان تلقائياً أو إيقافه
+    private void stopPlayback() {
         try {
-            // تأكد من أن هذا الكلاس موجود في مشروعك ويحتوي على هذه الدالة
-            AdhanScheduler.scheduleNextAdhan(getApplicationContext());
+            if (mediaPlayer != null) {
+                mediaPlayer.setOnCompletionListener(null);
+                mediaPlayer.setOnErrorListener(null);
+                mediaPlayer.setOnPreparedListener(null);
+
+                if (mediaPlayer.isPlaying()) {
+                    mediaPlayer.stop();
+                }
+
+                mediaPlayer.reset();
+            }
         } catch (Exception e) {
-            Log.e(TAG, "خطأ في إعادة جدولة الأذان القادم", e);
+            Log.w(TAG, "خطأ أثناء إيقاف مشغل الأذان", e);
+        } finally {
+            stopForegroundService();
+            stopSelf();
+            NotificationHelper.updatePersistent(this);
         }
     }
+
+    private void stopForegroundService() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            stopForeground(STOP_FOREGROUND_REMOVE);
+        } else {
+            stopForeground(true);
+        }
+    }
+
+    /* ============================ الخدمة الأمامية ============================ */
+
+    private void startForegroundWithType(Notification notification) {
+        if (
+            Build.VERSION.SDK_INT >=
+            Build.VERSION_CODES.UPSIDE_DOWN_CAKE
+        ) {
+            startForeground(
+                    NotificationHelper.ID_PLAYING,
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+            );
+
+            return;
+        }
+
+        startForeground(
+                NotificationHelper.ID_PLAYING,
+                notification
+        );
+    }
+
+    /* ============================ إنشاء المشغل ============================ */
+
+    private MediaPlayer createMediaPlayer() {
+        MediaPlayer player = new MediaPlayer();
+        player.setAudioAttributes(
+                new AudioAttributes.Builder()
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .build()
+        );
+        return player;
+    }
+
+    /* ============================ دورة الحياة ============================ */
 
     @Override
     public void onDestroy() {
-        releasePlayer();
-        abandonFocus();
+        releaseMediaPlayer();
+        stopForegroundService();
         super.onDestroy();
+    }
+
+    private void releaseMediaPlayer() {
+        if (mediaPlayer == null) {
+            return;
+        }
+        try {
+            mediaPlayer.release();
+        } catch (Exception e) {
+            Log.w(TAG, "خطأ أثناء تحرير مشغل الأذان", e);
+        } finally {
+            mediaPlayer = null;
+        }
     }
 
     @Nullable

@@ -173,7 +173,6 @@ export function QuranPlayerProvider({ children }: { children: ReactNode }) {
     return () => { mountedRef.current = false }
   }, [])
 
-  // ✅ ميزة شاشة القفل (Media Session API)
   useEffect(() => {
     if (nativePlayerAvailable()) return
     if (!reciter || !surahName || !('mediaSession' in navigator)) return
@@ -187,29 +186,20 @@ export function QuranPlayerProvider({ children }: { children: ReactNode }) {
         artwork: [{ src: '/icon-512.png', sizes: '512x512', type: 'image/png' }],
       })
 
-      // ربط أزرار شاشة القفل بالوظائف
       navigator.mediaSession.setActionHandler('play', () => {
         const audio = audioRef.current
-        if (audio && audio.paused) {
-          setLoading(true)
-          audio.play().catch(() => setLoading(false))
-        }
+        if (audio && audio.paused) { setLoading(true); audio.play().catch(() => setLoading(false)); }
       })
-      
       navigator.mediaSession.setActionHandler('pause', () => {
         const audio = audioRef.current
-        if (audio && !audio.paused) {
-          audio.pause()
-        }
+        if (audio && !audio.paused) audio.pause()
       })
-
       navigator.mediaSession.setActionHandler('nexttrack', () => {
         const current = selectionRef.current
         if (current && current.surah < 114) {
            playRef.current(current.surah + 1, `السورة رقم ${current.surah + 1}`, current.reciter, current.server)
         }
       })
-
       navigator.mediaSession.setActionHandler('previoustrack', () => {
         const current = selectionRef.current
         if (current && current.surah > 1) {

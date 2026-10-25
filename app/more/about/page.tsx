@@ -11,7 +11,6 @@ export default function AboutPage() {
           <h1 className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">
             إسلامي
           </h1>
-          {/* المكون الديناميكي لرقم الإصدار */}
           <p className="mt-1">
             <VersionBadge />
           </p>

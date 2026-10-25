@@ -6,7 +6,7 @@ export const metadata: Metadata = { title: 'دعاء ختم القرآن | إس�
 
 export default function KhatmahDuaPage() {
   return (
-    <div className="min-h-[100dvh] bg-[#f7f3ea] pb-24" dir="rtl">
+    <div className="min-h-dvh bg-[#f7f3ea] pb-24" dir="rtl">
       <div className="container mx-auto px-4 py-6 max-w-4xl space-y-6">
         
         {/* الترويسة */}

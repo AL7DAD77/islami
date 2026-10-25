@@ -6,7 +6,6 @@ import { getReciters, type Reciter } from '@/lib/quran'
 export const metadata: Metadata = { title: 'القراء والتلاوات | إسلامي' }
 
 export default async function RecitersPage() {
-  // تحديد نوع المصفوفة بشكل صريح لمنع خطأ TypeScript
   let reciters: Reciter[] = []
   
   try {

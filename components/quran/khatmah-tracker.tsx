@@ -50,7 +50,7 @@ export function KhatmahTracker() {
         </div>
       </Link>
 
-      {/* ✅ التصميم الجديد الفخم لزر دعاء الختمة (أصبح واضحاً وكبيراً) */}
+      {/* زر دعاء الختمة */}
       <Link
         href="/quran/khatmah-dua"
         className="group relative flex items-center gap-4 overflow-hidden rounded-3xl bg-white p-4 shadow-sm border border-[#e8dccb] transition-all hover:shadow-md hover:border-[#d4af37]/50"

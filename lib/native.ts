@@ -2,9 +2,107 @@
 
 import { Capacitor, registerPlugin } from '@capacitor/core'
 
-// ============ Platform Detection ============
+/* ============================== الأنواع ============================== */
+
+export type LocationResult =
+  | {
+      status: 'granted'
+      lat: number
+      lng: number
+    }
+  | {
+      status: 'denied'
+    }
+  | {
+      status: 'error'
+      message: string
+    }
+
+export interface LocationOptions {
+  askPermission?: boolean
+  highAccuracy?: boolean
+}
+
+export type NotifPermission =
+  | 'granted'
+  | 'denied'
+  | 'prompt'
+  | 'unsupported'
+
+export type ScheduledItemKind =
+  | 'adhan'
+  | 'reminder'
+  | 'time'
+  | 'phase'
+
+export interface ScheduledItem {
+  id: number
+  at: number
+  kind: ScheduledItemKind
+  prayer: string
+  title: string
+  body: string
+  file?: string
+  volume?: number
+}
+
+export interface NativeAlarmStatus {
+  exactAlarmAllowed: boolean
+  notificationsEnabled: boolean
+  persistent: boolean
+}
+
+export interface ScheduleNativeResult {
+  scheduled: number
+  exactAlarmAllowed: boolean
+}
+
+interface AdhanSchedulerPlugin {
+  schedule(options: {
+    items: ScheduledItem[]
+    persistent: boolean
+    city: string
+  }): Promise<ScheduleNativeResult>
+
+  status(): Promise<NativeAlarmStatus>
+
+  requestExactAlarm(): Promise<void>
+
+  setPersistent(options: {
+    enabled: boolean
+  }): Promise<void>
+
+  stopAdhan(): Promise<void>
+
+  testAdhan(options: {
+    seconds: number
+    file: string
+    volume: number
+  }): Promise<void>
+
+  cancelAll(): Promise<void>
+}
+
+/* ============================== الثوابت ============================== */
+
+const LOCATION_TIMEOUT_MS = 20_000
+const LOCATION_MAX_AGE_MS = 10 * 60 * 1000
+
+const NOTIFICATION_DELAY_MS = 500
+const ADHAN_PLUGIN_NAME = 'AdhanScheduler'
+
+const NATIVE_NOTIFICATION_ICON = 'ic_stat_adhan'
+const NATIVE_NOTIFICATION_COLOR = '#065F46'
+
+const WEB_NOTIFICATION_ICON = '/icon-512.png'
+
+/* ========================== كشف المنصة ========================== */
+
 export function isNativePlatform(): boolean {
-  if (typeof window === 'undefined') return false
+  if (typeof window === 'undefined') {
+    return false
+  }
+
   try {
     return Capacitor.isNativePlatform()
   } catch {
@@ -12,264 +110,434 @@ export function isNativePlatform(): boolean {
   }
 }
 
-// ============ Geolocation ============
-export type LocationResult =
-  | { status: 'granted'; lat: number; lng: number }
-  | { status: 'denied' }
-  | { status: 'error'; message: string }
+/* ============================ تحديد الموقع ============================ */
 
-export interface LocationOptions {
-  /** هل يُسمح بإظهار نافذة طلب الإذن؟ (نمنعها في التحديثات الدورية حتى لا يتكرر الطلب) */
-  askPermission?: boolean
-  /** دقة عالية (GPS) تستهلك البطارية؛ للمدن يكفي الموقع التقريبي */
-  highAccuracy?: boolean
+export async function getNativeLocation(
+  options: LocationOptions = {},
+): Promise<LocationResult> {
+  const {
+    askPermission = true,
+    highAccuracy = true,
+  } = options
+
+  if (isNativePlatform()) {
+    return getDeviceLocation({
+      askPermission,
+      highAccuracy,
+    })
+  }
+
+  return getBrowserLocation({
+    askPermission,
+    highAccuracy,
+  })
 }
 
-export async function getNativeLocation(opts: LocationOptions = {}): Promise<LocationResult> {
-  const { askPermission = true, highAccuracy = true } = opts
-  const isNative = isNativePlatform()
+async function getDeviceLocation(
+  options: Required<LocationOptions>,
+): Promise<LocationResult> {
+  const { askPermission, highAccuracy } = options
 
-  // === APK ===
-  if (isNative) {
-    try {
-      const { Geolocation } = await import('@capacitor/geolocation')
-      const perm = await Geolocation.checkPermissions()
+  try {
+    const { Geolocation } = await import('@capacitor/geolocation')
 
-      if (perm.location !== 'granted' && perm.coarseLocation !== 'granted') {
-        if (!askPermission) return { status: 'denied' }
-        const requested = await Geolocation.requestPermissions()
-        if (requested.location !== 'granted' && requested.coarseLocation !== 'granted') {
-          return { status: 'denied' }
-        }
+    const currentPermission = await Geolocation.checkPermissions()
+
+    const hasPermission =
+      currentPermission.location === 'granted' ||
+      currentPermission.coarseLocation === 'granted'
+
+    if (!hasPermission) {
+      if (!askPermission) {
+        return { status: 'denied' }
       }
 
-      const pos = await Geolocation.getCurrentPosition({
-        enableHighAccuracy: highAccuracy,
-        timeout: 20000,
-        maximumAge: highAccuracy ? 0 : 10 * 60 * 1000,
-      })
+      const requestedPermission =
+        await Geolocation.requestPermissions()
 
-      return {
-        status: 'granted',
-        lat: pos.coords.latitude,
-        lng: pos.coords.longitude,
+      const granted =
+        requestedPermission.location === 'granted' ||
+        requestedPermission.coarseLocation === 'granted'
+
+      if (!granted) {
+        return { status: 'denied' }
       }
-    } catch (e) {
-      return {
-        status: 'error',
-        message: e instanceof Error ? e.message : 'Native location failed',
-      }
+    }
+
+    const position = await Geolocation.getCurrentPosition({
+      enableHighAccuracy: highAccuracy,
+      timeout: LOCATION_TIMEOUT_MS,
+      maximumAge: highAccuracy ? 0 : LOCATION_MAX_AGE_MS,
+    })
+
+    return {
+      status: 'granted',
+      lat: position.coords.latitude,
+      lng: position.coords.longitude,
+    }
+  } catch (error) {
+    return {
+      status: 'error',
+      message:
+        error instanceof Error
+          ? error.message
+          : 'تعذر تحديد الموقع على الجهاز',
+    }
+  }
+}
+
+async function getBrowserLocation(
+  options: Required<LocationOptions>,
+): Promise<LocationResult> {
+  const { askPermission, highAccuracy } = options
+
+  if (
+    typeof navigator === 'undefined' ||
+    !('geolocation' in navigator)
+  ) {
+    return {
+      status: 'error',
+      message: 'المتصفح لا يدعم تحديد الموقع',
     }
   }
 
-  // === Web ===
-  if (typeof navigator === 'undefined' || !('geolocation' in navigator)) {
-    return { status: 'error', message: 'المتصفح لا يدعم تحديد الموقع' }
+  const permissionState = await getBrowserLocationPermission()
+
+  if (permissionState === 'denied') {
+    return { status: 'denied' }
   }
 
-  // ⚠️ إذا رُفض سابقاً
-  if (typeof navigator.permissions !== 'undefined') {
-    try {
-      const perm = await navigator.permissions.query({ name: 'geolocation' as PermissionName })
-      if (perm.state === 'denied') {
-        return { status: 'denied' }
-      }
-      if (perm.state === 'prompt' && !askPermission) {
-        return { status: 'denied' }
-      }
-    } catch {
-      // بعض المتصفحات لا تدعم استعلام الأذونات
-    }
+  if (permissionState === 'prompt' && !askPermission) {
+    return { status: 'denied' }
   }
 
-  return new Promise<LocationResult>((resolve) => {
+  return new Promise<LocationResult>(resolve => {
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
+      position => {
         resolve({
           status: 'granted',
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
         })
       },
-      (err) => {
-        if (err.code === 1) {
+      error => {
+        if (error.code === 1) {
           resolve({ status: 'denied' })
-        } else if (err.code === 2) {
-          resolve({ status: 'error', message: 'الموقع غير متوفر' })
-        } else if (err.code === 3) {
-          resolve({ status: 'error', message: 'انتهت مدة الانتظار' })
-        } else {
-          resolve({ status: 'error', message: 'خطأ غير معروف' })
+          return
         }
+
+        resolve({
+          status: 'error',
+          message: getBrowserLocationErrorMessage(error.code),
+        })
       },
-      { enableHighAccuracy: highAccuracy, timeout: 20000, maximumAge: 10 * 60 * 1000 }
+      {
+        enableHighAccuracy: highAccuracy,
+        timeout: LOCATION_TIMEOUT_MS,
+        maximumAge: LOCATION_MAX_AGE_MS,
+      },
     )
   })
 }
 
-// ============ Notifications ============
-export type NotifPermission = 'granted' | 'denied' | 'prompt' | 'unsupported'
-
-export function getNotificationStatus(): NotifPermission {
-  // === APK ===
-  if (isNativePlatform()) {
-    // لا يمكن معرفة الحالة بدون async
+async function getBrowserLocationPermission(): Promise<
+  'granted' | 'denied' | 'prompt' | 'unsupported'
+> {
+  if (
+    typeof navigator === 'undefined' ||
+    typeof navigator.permissions === 'undefined'
+  ) {
     return 'prompt'
   }
 
-  // === Web ===
-  if (typeof Notification === 'undefined') return 'unsupported'
+  try {
+    const permission = await navigator.permissions.query({
+      name: 'geolocation' as PermissionName,
+    })
+
+    return permission.state as
+      | 'granted'
+      | 'denied'
+      | 'prompt'
+  } catch {
+    return 'prompt'
+  }
+}
+
+function getBrowserLocationErrorMessage(errorCode: number): string {
+  switch (errorCode) {
+    case 2:
+      return 'الموقع غير متوفر حاليًا'
+
+    case 3:
+      return 'انتهت مدة الانتظار أثناء تحديد الموقع'
+
+    default:
+      return 'حدث خطأ غير معروف أثناء تحديد الموقع'
+  }
+}
+
+/* ============================ الإشعارات ============================ */
+
+export function getNotificationStatus(): NotifPermission {
+  if (isNativePlatform()) {
+    return 'prompt'
+  }
+
+  if (typeof Notification === 'undefined') {
+    return 'unsupported'
+  }
+
   return Notification.permission as NotifPermission
 }
 
-/** الحالة الفعلية للصلاحية (في التطبيق تُقرأ من النظام، وفي المتصفح من Notification) */
 export async function getNotificationStatusAsync(): Promise<NotifPermission> {
   if (isNativePlatform()) {
-    try {
-      const { LocalNotifications } = await import('@capacitor/local-notifications')
-      const perm = await LocalNotifications.checkPermissions()
-      if (perm.display === 'granted') return 'granted'
-      if (perm.display === 'denied') return 'denied'
-      return 'prompt'
-    } catch {
-      return 'prompt'
-    }
+    return getDeviceNotificationStatus()
   }
+
   return getNotificationStatus()
 }
 
-export async function requestNativeNotificationPermission(): Promise<NotifPermission> {
-  const isNative = isNativePlatform()
+async function getDeviceNotificationStatus(): Promise<NotifPermission> {
+  try {
+    const { LocalNotifications } = await import(
+      '@capacitor/local-notifications'
+    )
 
-  // === APK ===
-  if (isNative) {
-    try {
-      const { LocalNotifications } = await import('@capacitor/local-notifications')
-      const perm = await LocalNotifications.checkPermissions()
+    const permission = await LocalNotifications.checkPermissions()
 
-      if (perm.display === 'granted') return 'granted'
+    if (permission.display === 'granted') {
+      return 'granted'
+    }
 
-      const requested = await LocalNotifications.requestPermissions()
-      return requested.display === 'granted' ? 'granted' : 'denied'
-    } catch (e) {
-      console.warn('Native notification failed:', e)
+    if (permission.display === 'denied') {
       return 'denied'
     }
+
+    return 'prompt'
+  } catch (error) {
+    console.warn('تعذر فحص إذن الإشعارات:', error)
+    return 'prompt'
+  }
+}
+
+export async function requestNativeNotificationPermission(): Promise<NotifPermission> {
+  if (isNativePlatform()) {
+    return requestDeviceNotificationPermission()
   }
 
-  // === Web ===
-  if (typeof Notification === 'undefined') return 'unsupported'
-  if (Notification.permission === 'granted') return 'granted'
-  if (Notification.permission === 'denied') return 'denied'
+  return requestBrowserNotificationPermission()
+}
 
+async function requestDeviceNotificationPermission(): Promise<NotifPermission> {
   try {
-    const result = await Notification.requestPermission()
-    return result as NotifPermission
-  } catch {
+    const { LocalNotifications } = await import(
+      '@capacitor/local-notifications'
+    )
+
+    const currentPermission =
+      await LocalNotifications.checkPermissions()
+
+    if (currentPermission.display === 'granted') {
+      return 'granted'
+    }
+
+    const requestedPermission =
+      await LocalNotifications.requestPermissions()
+
+    return requestedPermission.display === 'granted'
+      ? 'granted'
+      : 'denied'
+  } catch (error) {
+    console.warn('تعذر طلب إذن الإشعارات:', error)
     return 'denied'
   }
 }
 
-export async function showNativeNotification(title: string, body: string): Promise<void> {
-  const isNative = isNativePlatform()
-
-  // === APK ===
-  if (isNative) {
-    try {
-      const { LocalNotifications } = await import('@capacitor/local-notifications')
-      await LocalNotifications.schedule({
-        notifications: [
-          {
-            id: Math.floor(Math.random() * 100000),
-            title,
-            body,
-            schedule: { at: new Date(Date.now() + 500) },
-            smallIcon: 'ic_stat_adhan',
-            iconColor: '#065F46',
-          },
-        ],
-      })
-      return
-    } catch (e) {
-      console.warn('Native notification failed:', e)
-    }
+async function requestBrowserNotificationPermission(): Promise<NotifPermission> {
+  if (typeof Notification === 'undefined') {
+    return 'unsupported'
   }
 
-  // === Web ===
-  if (typeof Notification === 'undefined') return
-  if (Notification.permission !== 'granted') return
+  if (Notification.permission === 'granted') {
+    return 'granted'
+  }
+
+  if (Notification.permission === 'denied') {
+    return 'denied'
+  }
+
+  try {
+    const result = await Notification.requestPermission()
+
+    return result as NotifPermission
+  } catch (error) {
+    console.warn('تعذر طلب إذن إشعارات المتصفح:', error)
+    return 'denied'
+  }
+}
+
+export async function showNativeNotification(
+  title: string,
+  body: string,
+): Promise<void> {
+  if (isNativePlatform()) {
+    await showDeviceNotification(title, body)
+    return
+  }
+
+  showBrowserNotification(title, body)
+}
+
+async function showDeviceNotification(
+  title: string,
+  body: string,
+): Promise<void> {
+  try {
+    const { LocalNotifications } = await import(
+      '@capacitor/local-notifications'
+    )
+
+    await LocalNotifications.schedule({
+      notifications: [
+        {
+          id: generateNotificationId(),
+          title,
+          body,
+          schedule: {
+            at: new Date(Date.now() + NOTIFICATION_DELAY_MS),
+          },
+          smallIcon: NATIVE_NOTIFICATION_ICON,
+          iconColor: NATIVE_NOTIFICATION_COLOR,
+        },
+      ],
+    })
+  } catch (error) {
+    console.warn('تعذر إظهار إشعار الجهاز:', error)
+  }
+}
+
+function showBrowserNotification(
+  title: string,
+  body: string,
+): void {
+  if (
+    typeof Notification === 'undefined' ||
+    Notification.permission !== 'granted'
+  ) {
+    return
+  }
 
   try {
     new Notification(title, {
       body,
-      icon: '/icon-512.png',
+      icon: WEB_NOTIFICATION_ICON,
       dir: 'rtl',
       lang: 'ar',
     })
-  } catch (e) {
-    console.warn('Web notification failed:', e)
+  } catch (error) {
+    console.warn('تعذر إظهار إشعار المتصفح:', error)
   }
 }
 
-// ============ App State ============
-export function registerAppStateListener(onResume: () => void): () => void {
-  let cleanup: (() => void) | null = null
+function generateNotificationId(): number {
+  return Math.floor(Math.random() * 100_000)
+}
+
+/* ============================ حالة التطبيق ============================ */
+
+export function registerAppStateListener(
+  onResume: () => void,
+): () => void {
+  if (typeof window === 'undefined') {
+    return () => {}
+  }
+
+  let isCleanedUp = false
+  let removeDeviceListener: (() => void) | null = null
+
+  const handleVisibilityChange = () => {
+    if (document.visibilityState === 'visible') {
+      onResume()
+    }
+  }
+
+  document.addEventListener(
+    'visibilitychange',
+    handleVisibilityChange,
+  )
 
   if (isNativePlatform()) {
-    import('@capacitor/app').then(({ App }) => {
-      App.addListener('appStateChange', ({ isActive }) => {
-        if (isActive) onResume()
-      }).then((listener) => {
-        cleanup = () => listener.remove()
-      })
-    })
-  }
+    registerDeviceAppStateListener(onResume)
+      .then(removeListener => {
+        if (isCleanedUp) {
+          removeListener?.()
+          return
+        }
 
-  const handleVisibility = () => {
-    if (document.visibilityState === 'visible') onResume()
+        removeDeviceListener = removeListener
+      })
+      .catch(error => {
+        console.warn('تعذر الاستماع لتغير حالة التطبيق:', error)
+      })
   }
-  document.addEventListener('visibilitychange', handleVisibility)
 
   return () => {
-    document.removeEventListener('visibilitychange', handleVisibility)
-    if (cleanup) cleanup()
+    isCleanedUp = true
+
+    document.removeEventListener(
+      'visibilitychange',
+      handleVisibilityChange,
+    )
+
+    removeDeviceListener?.()
+    removeDeviceListener = null
   }
 }
 
-// ============ Native Adhan Scheduler (Android) ============
-export interface ScheduledItem {
-  id: number
-  at: number // epoch ms
-  kind: 'adhan' | 'reminder' | 'time' | 'phase'
-  prayer: string
-  title: string
-  body: string
-  file?: string // اسم ملف الأذان داخل public/audio/adhans
-  volume?: number // 0..1
+async function registerDeviceAppStateListener(
+  onResume: () => void,
+): Promise<() => void> {
+  const { App } = await import('@capacitor/app')
+
+  const listener = await App.addListener(
+    'appStateChange',
+    ({ isActive }) => {
+      if (isActive) {
+        onResume()
+      }
+    },
+  )
+
+  return () => {
+    listener.remove()
+  }
 }
 
-interface AdhanSchedulerPlugin {
-  schedule(opts: { items: ScheduledItem[]; persistent: boolean; city: string }): Promise<{
-    scheduled: number
-    exactAlarmAllowed: boolean
-  }>
-  status(): Promise<{ exactAlarmAllowed: boolean; notificationsEnabled: boolean; persistent: boolean }>
-  requestExactAlarm(): Promise<void>
-  setPersistent(opts: { enabled: boolean }): Promise<void>
-  stopAdhan(): Promise<void>
-  testAdhan(opts: { seconds: number; file: string; volume: number }): Promise<void>
-  cancelAll(): Promise<void>
-}
+/* ======================= جدولة الأذان الأصلية ======================= */
 
 let schedulerPlugin: AdhanSchedulerPlugin | null = null
 
 function getScheduler(): AdhanSchedulerPlugin | null {
-  if (!isNativePlatform()) return null
+  if (!isNativePlatform()) {
+    return null
+  }
+
   try {
-    if (!Capacitor.isPluginAvailable('AdhanScheduler')) return null // نسخة قديمة من التطبيق بلا الإضافة
-    if (!schedulerPlugin) schedulerPlugin = registerPlugin<AdhanSchedulerPlugin>('AdhanScheduler')
+    if (!Capacitor.isPluginAvailable(ADHAN_PLUGIN_NAME)) {
+      return null
+    }
+
+    if (!schedulerPlugin) {
+      schedulerPlugin = registerPlugin<AdhanSchedulerPlugin>(
+        ADHAN_PLUGIN_NAME,
+      )
+    }
+
     return schedulerPlugin
-  } catch {
+  } catch (error) {
+    console.warn('تعذر تحميل إضافة جدولة الأذان:', error)
     return null
   }
 }
@@ -278,70 +546,126 @@ export function isAdhanSchedulerAvailable(): boolean {
   return getScheduler() !== null
 }
 
-export async function scheduleNativeAdhans(items: ScheduledItem[], persistent: boolean, city: string) {
-  const p = getScheduler()
-  if (!p) return null
+export async function scheduleNativeAdhans(
+  items: ScheduledItem[],
+  persistent: boolean,
+  city: string,
+): Promise<ScheduleNativeResult | null> {
+  const scheduler = getScheduler()
+
+  if (!scheduler) {
+    return null
+  }
+
   try {
-    return await p.schedule({ items, persistent, city })
-  } catch (e) {
-    console.warn('scheduleNativeAdhans failed:', e)
+    return await scheduler.schedule({
+      items,
+      persistent,
+      city,
+    })
+  } catch (error) {
+    console.warn('تعذر جدولة الأذان على الجهاز:', error)
     return null
   }
 }
 
-export async function getNativeAlarmStatus() {
-  const p = getScheduler()
-  if (!p) return null
+export async function getNativeAlarmStatus(): Promise<NativeAlarmStatus | null> {
+  const scheduler = getScheduler()
+
+  if (!scheduler) {
+    return null
+  }
+
   try {
-    return await p.status()
-  } catch {
+    return await scheduler.status()
+  } catch (error) {
+    console.warn('تعذر جلب حالة جدولة الأذان:', error)
     return null
   }
 }
 
-export async function requestExactAlarmPermission() {
-  const p = getScheduler()
-  if (!p) return
+export async function requestExactAlarmPermission(): Promise<void> {
+  const scheduler = getScheduler()
+
+  if (!scheduler) {
+    return
+  }
+
   try {
-    await p.requestExactAlarm()
-  } catch {}
+    await scheduler.requestExactAlarm()
+  } catch (error) {
+    console.warn('تعذر طلب إذن التنبيهات الدقيقة:', error)
+  }
 }
 
-export async function setPersistentNotification(enabled: boolean) {
-  const p = getScheduler()
-  if (!p) return
+export async function setPersistentNotification(
+  enabled: boolean,
+): Promise<void> {
+  const scheduler = getScheduler()
+
+  if (!scheduler) {
+    return
+  }
+
   try {
-    await p.setPersistent({ enabled })
-  } catch {}
+    await scheduler.setPersistent({ enabled })
+  } catch (error) {
+    console.warn('تعذر تحديث الإشعار الدائم:', error)
+  }
 }
 
-export async function testNativeAdhan(seconds: number, file: string, volume: number): Promise<boolean> {
-  const p = getScheduler()
-  if (!p) return false
+export async function testNativeAdhan(
+  seconds: number,
+  file: string,
+  volume: number,
+): Promise<boolean> {
+  const scheduler = getScheduler()
+
+  if (!scheduler) {
+    return false
+  }
+
   try {
-    await p.testAdhan({ seconds, file, volume })
+    await scheduler.testAdhan({
+      seconds,
+      file,
+      volume,
+    })
+
     return true
-  } catch {
+  } catch (error) {
+    console.warn('تعذر تشغيل اختبار الأذان:', error)
     return false
   }
 }
 
-export async function stopNativeAdhan() {
-  const p = getScheduler()
-  if (!p) return
+export async function stopNativeAdhan(): Promise<void> {
+  const scheduler = getScheduler()
+
+  if (!scheduler) {
+    return
+  }
+
   try {
-    await p.stopAdhan()
-  } catch {}
+    await scheduler.stopAdhan()
+  } catch (error) {
+    console.warn('تعذر إيقاف الأذان:', error)
+  }
 }
 
-// ============ Exit / Back ============
+/* ============================ إنهاء التطبيق ============================ */
+
 export async function exitNativeApp(): Promise<void> {
-  if (!isNativePlatform()) return
+  if (!isNativePlatform()) {
+    return
+  }
+
   try {
     await stopNativeAdhan()
+
     const { App } = await import('@capacitor/app')
     await App.exitApp()
-  } catch (e) {
-    console.warn('exitApp failed:', e)
+  } catch (error) {
+    console.warn('تعذر إنهاء التطبيق:', error)
   }
 }

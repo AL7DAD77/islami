@@ -52,7 +52,7 @@ export async function getSurah(id: number): Promise<{ meta: SurahMeta; ayahs: Ay
 }
 
 export async function getReciters(): Promise<Reciter[]> {
-  // ✅ التعديل الأول: أضفنا limit=300 لجلب جميع القراء وليس 15 فقط
+  // ✅ التعديل: أضفنا limit=300 لجلب جميع القراء وليس 15 فقط
   const res = await fetch('https://www.mp3quran.net/api/v3/reciters?language=ar&limit=300', {
     next: { revalidate: 60 * 60 * 24 },
   })
@@ -67,7 +67,7 @@ export async function getReciters(): Promise<Reciter[]> {
       moshaf: r.moshaf.map((m) => ({
         id: m.id,
         name: m.name.replace(/\s+/g, ' ').trim(),
-        // ✅ التعديل الثاني: تأمين أن كل رابط سيرفر ينتهي بـ / 
+        // ✅ التعديل: تأمين أن كل رابط سيرفر ينتهي بـ / 
         server: m.server.endsWith('/') ? m.server : `${m.server}/`,
         surahs: m.surah_list.split(',').map(Number),
       })),

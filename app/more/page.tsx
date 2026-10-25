@@ -147,7 +147,6 @@ export default function MorePage() {
             <span id="support">المساعدة والدعم</span>
           </SectionTitle>
           <div className="grid grid-cols-2 gap-3">
-            {/* ✅ تم حذف زر الإبلاغ المكرر، والاكتفاء بصفحة الدعم الشاملة */}
             <TileLink layout="stack" href="/more/support" title="الدعم والتواصل" subtitle="أرسل ملاحظتك أو بلاغك" icon={<LifeBuoy className="size-5" />} />
           </div>
         </section>
