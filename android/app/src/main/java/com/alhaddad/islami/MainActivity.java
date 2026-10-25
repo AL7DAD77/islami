@@ -14,18 +14,18 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
 
-        // تسجيل إضافة جدولة الأذان والتذكيرات
+        // 1. تسجيل الإضافات قبل super.onCreate - ضروري جداً
         registerPlugin(AdhanSchedulerPlugin.class);
-
-        // تسجيل إضافة تشغيل القرآن - ضرورية جداً
         registerPlugin(QuranPlayerPlugin.class);
 
-        // إنشاء قنوات الإشعارات مبكراً
+        // 2. تشغيل Capacitor
+        super.onCreate(savedInstanceState);
+
+        // 3. إنشاء قنوات الإشعارات
         NotificationHelper.ensureChannels(this);
 
-        // طلب إذن الإشعارات في Android 13+
+        // 4. طلب إذن الإشعارات في Android 13+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(
                     this,
@@ -40,7 +40,7 @@ public class MainActivity extends BridgeActivity {
             }
         }
 
-        // تشغيل شبكة أمان جدولة الأذان
+        // 5. تشغيل شبكة أمان جدولة الأذان
         try {
             AdhanMaintenanceWorker.schedule(this);
         } catch (Exception e) {
