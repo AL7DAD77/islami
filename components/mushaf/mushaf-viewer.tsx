@@ -82,7 +82,6 @@ const DEFAULT_RECITER_NAME = 'مشاري العفاسي'
 
 function getPageSource(page: number): string {
   const paddedPage = String(page).padStart(3, '0')
-
   return `${PAGES_URL}/${paddedPage}.webp`
 }
 
@@ -98,9 +97,7 @@ function vibrateDevice(duration = 10): void {
     ) {
       navigator.vibrate(duration)
     }
-  } catch {
-    // الجهاز قد لا يدعم الاهتزاز
-  }
+  } catch {}
 }
 
 /* ============================== المكوّن ============================== */
@@ -120,13 +117,15 @@ export function MushafViewer({
     initialPage || 1,
   )
 
-  const [metaData, setMetaData] =
-    useState<MushafMetaData | null>(null)
-
+  const [metaData, setMetaData] = useState<MushafMetaData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isPageLoading, setIsPageLoading] = useState(true)
   const [hasError, setHasError] = useState(false)
   const [isNightMode, setIsNightMode] = useState(false)
+
+  // ✅ حالة جديدة للتحكم في ظهور الأزرار (وضع القراءة الغامر)
+  const [showUi, setShowUi] = useState(true)
+  const uiTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const [scale, setScale] = useState(MIN_SCALE)
   const [pan, setPan] = useState<Point>({ x: 0, y: 0 })
@@ -140,11 +139,35 @@ export function MushafViewer({
   const bookmarkState = useBookmarkState()
   const player = useQuranPlayer()
 
-  // ✅ تم نقل تعريف surahName إلى هنا ليكون متاحاً للدوال التي تليه
   const surahName = useMemo(
     () => metaData?.surahNames[initialSurah - 1] || '',
     [initialSurah, metaData]
   )
+
+  // ✅ دالة إخفاء الأزرار بعد 3 ثواني
+  const resetUiTimeout = useCallback(() => {
+    if (uiTimeoutRef.current) clearTimeout(uiTimeoutRef.current)
+    uiTimeoutRef.current = setTimeout(() => {
+      setShowUi(false)
+    }, 3000)
+  }, [])
+
+  useEffect(() => {
+    resetUiTimeout()
+    return () => {
+      if (uiTimeoutRef.current) clearTimeout(uiTimeoutRef.current)
+    }
+  }, [resetUiTimeout])
+
+  const handleToggleUi = useCallback((e: React.MouseEvent) => {
+    // إذا كان المستخدم يضغط على زر، لا نخفي الواجهة
+    if ((e.target as HTMLElement).closest('button')) return;
+    
+    setShowUi(prev => !prev)
+    if (!showUi) {
+      resetUiTimeout()
+    }
+  }, [showUi, resetUiTimeout])
 
   /* ------------------------- الوضع الليلي ------------------------- */
 
@@ -211,7 +234,9 @@ export function MushafViewer({
     setPan({ x: 0, y: 0 })
     setIsPageLoading(true)
     setHasError(false)
-  }, [currentPage])
+    setShowUi(true) // إظهار الأزرار عند تغيير الصفحة
+    resetUiTimeout()
+  }, [currentPage, resetUiTimeout])
 
   /* --------------------------- تحميل مسبق --------------------------- */
 
@@ -243,7 +268,6 @@ export function MushafViewer({
 
   useEffect(() => {
     if (!currentPage || !metaData) return
-
     saveReadingPosition(initialSurah, surahName, currentPage)
   }, [currentPage, initialSurah, metaData, surahName])
 
@@ -398,7 +422,11 @@ export function MushafViewer({
 
   /* ------------------------------ التلاوة ------------------------------ */
 
-  const handlePlayToggle = useCallback(() => {
+  const handlePlayToggle = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    setShowUi(true)
+    resetUiTimeout()
+
     if (player.playing && player.surah === initialSurah) {
       vibrateDevice(10)
       player.toggle()
@@ -423,21 +451,23 @@ export function MushafViewer({
 
     player.play(
       initialSurah,
-      surahName, // ✅ استخدام المتغير المعرّف بالأعلى
+      surahName,
       player.reciter || defaultReciter,
       player.moshafServer || server,
     )
-  }, [initialSurah, surahName, player])
+  }, [initialSurah, surahName, player, resetUiTimeout])
 
   /* ----------------------------- العلامة المرجعية ----------------------------- */
 
   const handleBookmark = useCallback(
     (event: React.MouseEvent) => {
       event.stopPropagation()
+      setShowUi(true)
+      resetUiTimeout()
       vibrateDevice(18)
       toggleBookmark(initialSurah, surahName, currentPage)
     },
-    [currentPage, initialSurah, surahName],
+    [currentPage, initialSurah, surahName, resetUiTimeout],
   )
 
   const handleRetry = useCallback(() => {
@@ -448,6 +478,8 @@ export function MushafViewer({
   const handleNightModeToggle = useCallback(
     (event: React.MouseEvent) => {
       event.stopPropagation()
+      setShowUi(true)
+      resetUiTimeout()
       vibrateDevice(10)
 
       setIsNightMode(previousMode => {
@@ -456,7 +488,7 @@ export function MushafViewer({
         return nextMode
       })
     },
-    [],
+    [resetUiTimeout],
   )
 
   /* ------------------------------ قيم مشتقة ------------------------------ */
@@ -490,7 +522,6 @@ export function MushafViewer({
 
   if (isLoading || !metaData) {
     return (
-      // ✅ تعديل h-[100dvh] إلى h-dvh
       <div dir="rtl" className="flex h-dvh w-full items-center justify-center bg-[#fdfbf7]">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="size-7 animate-spin text-[#5a3e1b]" />
@@ -505,12 +536,12 @@ export function MushafViewer({
   return (
     <div
       dir="rtl"
-      // ✅ تعديل h-[100dvh] إلى h-dvh
-      className="relative h-dvh w-full select-none overflow-hidden"
+      className="relative h-dvh w-full select-none overflow-hidden cursor-pointer"
       style={{ backgroundColor: theme.background, touchAction: 'none' }}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
+      onClick={handleToggleUi} // ✅ إضافة حدث الضغط لإظهار/إخفاء الأزرار
     >
       {/* منطقة المصحف: تملأ الشاشة بالكامل */}
       <div ref={containerRef} className="absolute inset-0 flex items-center justify-center overflow-hidden">
@@ -555,18 +586,15 @@ export function MushafViewer({
         )}
       </div>
 
-      {/* الشريط العلوي العائم */}
+      {/* الشريط العلوي العائم - ✅ يختفي ويظهر بسلاسة */}
       <header
-        className="absolute inset-x-0 top-0 z-50 flex items-start justify-between gap-3 p-3"
-        style={{
-          paddingTop: 'max(0.75rem, env(safe-area-inset-top))',
-          background: isNightMode
-            ? 'linear-gradient(to bottom, rgba(16,16,16,0.90), rgba(16,16,16,0))'
-            : 'linear-gradient(to bottom, rgba(253,251,247,0.92), rgba(253,251,247,0))',
-        }}
+        className={`absolute inset-x-0 top-0 z-50 flex items-start justify-between gap-3 p-3 transition-opacity duration-300 ${
+          showUi ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        }`}
+        style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
       >
         <div className="flex items-center gap-1 rounded-full border px-2 py-1 shadow-sm backdrop-blur-md" style={{ backgroundColor: theme.surface, borderColor: theme.border }}>
-          <button type="button" onClick={() => router.back()} className="rounded-full p-1.5 transition-opacity active:opacity-60" style={{ color: theme.text }} aria-label="رجوع">
+          <button type="button" onClick={(e) => { e.stopPropagation(); router.back(); }} className="rounded-full p-1.5 transition-opacity active:opacity-60" style={{ color: theme.text }} aria-label="رجوع">
             <ChevronRight className="size-5" />
           </button>
           <span className="pl-1 pr-2 text-sm font-bold" style={{ color: theme.text }}>{surahName}</span>
@@ -576,7 +604,7 @@ export function MushafViewer({
           <button type="button" onClick={handleNightModeToggle} className="rounded-full p-1.5 transition-opacity active:opacity-60" style={{ color: theme.accent }} aria-label={isNightMode ? 'الوضع النهاري' : 'الوضع الليلي'}>
             {isNightMode ? <Sun className="size-5" /> : <Moon className="size-5" />}
           </button>
-          <button type="button" onClick={() => router.push('/quran/reciters')} className="flex items-center gap-1 rounded-full px-2 py-1.5 text-[12px] font-bold transition-opacity active:opacity-60" style={{ color: theme.text }}>
+          <button type="button" onClick={(e) => { e.stopPropagation(); router.push('/quran/reciters'); }} className="flex items-center gap-1 rounded-full px-2 py-1.5 text-[12px] font-bold transition-opacity active:opacity-60" style={{ color: theme.text }}>
             <Headphones className="size-4" />
             <span>القارئ</span>
           </button>
@@ -589,15 +617,12 @@ export function MushafViewer({
         </div>
       </header>
 
-      {/* رقم الصفحة العائم */}
+      {/* رقم الصفحة العائم - ✅ يختفي ويظهر بسلاسة */}
       <footer
-        className="absolute inset-x-0 bottom-0 z-50 flex justify-center pb-3 pt-6"
-        style={{
-          paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))',
-          background: isNightMode
-            ? 'linear-gradient(to top, rgba(16,16,16,0.90), rgba(16,16,16,0))'
-            : 'linear-gradient(to top, rgba(253,251,247,0.92), rgba(253,251,247,0))',
-        }}
+        className={`absolute inset-x-0 bottom-0 z-50 flex justify-center pb-3 pt-6 transition-opacity duration-300 ${
+          showUi ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        }`}
+        style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
       >
         <div
           className="rounded-full px-5 py-2 text-xs font-bold shadow-sm"

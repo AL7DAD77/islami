@@ -18,7 +18,7 @@ import {
   Share2,
   ShieldCheck,
   Star,
-  BellRing,
+  Heart, // ✅ تم استبدال BellRing بـ Heart
 } from 'lucide-react'
 import { PageHeader } from '@/components/page-header'
 import { TileLink, SectionTitle } from '@/components/ui-kit'
@@ -94,7 +94,16 @@ export default function MorePage() {
           <div className="grid grid-cols-2 gap-3">
             <TileLink layout="stack" href="/ibadati" title="عباداتي" subtitle="متابعة يومية" icon={<ClipboardCheck className="size-5" />} />
             <TileLink layout="stack" href="/search" title="البحث" subtitle="في محتوى التطبيق" icon={<Search className="size-5" />} />
-            <TileLink layout="stack" href="/more/reminders" title="التذكيرات" subtitle="الصلاة على النبي" icon={<BellRing className="size-5" />} />
+            
+            {/* ✅ التعديل هنا: تغيير الاسم والوصف والأيقونة */}
+            <TileLink 
+              layout="stack" 
+              href="/more/reminders" 
+              title="الصلاة على النبي ﷺ" 
+              subtitle="حصن نفسك بالصلاة على الحبيب" 
+              icon={<Heart className="size-5" />} 
+            />
+            
           </div>
         </section>
 

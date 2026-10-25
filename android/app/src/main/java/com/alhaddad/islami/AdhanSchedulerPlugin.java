@@ -212,6 +212,34 @@ public final class AdhanSchedulerPlugin extends Plugin {
         call.resolve();
     }
 
+    /* ======================= دوال التذكيرات (جديد) ======================= */
+
+    @PluginMethod
+    public void scheduleReminder(PluginCall call) {
+        Context context = getContext();
+        if (context == null) { call.reject("Context غير متاح"); return; }
+        
+        int id = call.getInt("id", 777);
+        long intervalMillis = call.getLong("intervalMillis", 3600000L);
+        String title = call.getString("title", "تذكير");
+        String body = call.getString("body", "");
+        
+        AdhanScheduler.scheduleReminderAlarm(context, id, intervalMillis, title, body);
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void cancelReminder(PluginCall call) {
+        Context context = getContext();
+        if (context == null) { call.reject("Context غير متاح"); return; }
+        
+        int id = call.getInt("id", 777);
+        AdhanScheduler.cancelReminder(context, id);
+        call.resolve();
+    }
+
+    /* ============================ دوال مساعدة ============================ */
+
     private List<AdhanStore.Item> parseScheduledItems(JSArray itemsArray) {
         List<AdhanStore.Item> items = new ArrayList<>();
         if (itemsArray == null) return items;

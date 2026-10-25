@@ -9,22 +9,13 @@ import androidx.core.content.ContextCompat;
 
 /**
  * AdhanReceiver
- *
  * يستقبل تنبيهات النظام المجدولة، حتى عندما يكون التطبيق مغلقًا.
- *
- * الأنواع المدعومة:
- * - adhan: تشغيل الأذان.
- * - reminder: إشعار تذكير قبل الأذان أو للتذكيرات العامة.
- * - phase: تحديث الإشعار الدائم فقط.
- * - time: حدث صامت لتحديث التاريخ الهجري والإشعار الدائم.
  */
 public final class AdhanReceiver extends BroadcastReceiver {
 
     private static final String TAG = "AdhanReceiver";
 
-    // ✅ اسم مخصص وفريد لتجنب التعارض مع تطبيقات أخرى
-    public static final String ACTION_STOP_ADHAN =
-            "com.alhaddad.islami.STOP_ADHAN";
+    public static final String ACTION_STOP_ADHAN = "com.alhaddad.islami.STOP_ADHAN";
 
     private static final String EXTRA_KIND = "kind";
     private static final String EXTRA_ID = "id";
@@ -49,6 +40,19 @@ public final class AdhanReceiver extends BroadcastReceiver {
             return;
         }
 
+        /* ======================= استقبال التذكيرات (جديد) ======================= */
+        if ("com.alhaddad.islami.ACTION_REMINDER_ALARM".equals(action)) {
+            int id = intent.getIntExtra("id", 777); 
+            String title = intent.getStringExtra("title");
+            String body = intent.getStringExtra("body");
+            
+            NotificationHelper.showReminder(context, id, 
+                title != null ? title : "تذكير", 
+                body != null ? body : ""
+            );
+            return;
+        }
+
         final String kind = intent.getStringExtra(EXTRA_KIND);
 
         if (kind == null || kind.trim().isEmpty()) {
@@ -58,21 +62,17 @@ public final class AdhanReceiver extends BroadcastReceiver {
 
         switch (kind) {
             case KIND_TIME:
-                handleSilentTimeEvent(context);
+                NotificationHelper.updatePersistent(context);
                 break;
-
             case KIND_ADHAN:
                 handleAdhanEvent(context, intent);
                 break;
-
             case KIND_REMINDER:
                 handleReminderEvent(context, intent);
                 break;
-
             case KIND_PHASE:
-                handlePhaseEvent(context);
+                NotificationHelper.updatePersistent(context);
                 break;
-
             default:
                 Log.w(TAG, "نوع حدث غير معروف: " + kind);
                 break;
@@ -83,32 +83,13 @@ public final class AdhanReceiver extends BroadcastReceiver {
 
     private void handleStopAdhan(Context context) {
         try {
-            Intent serviceIntent =
-                    new Intent(context, AdhanService.class);
-
+            Intent serviceIntent = new Intent(context, AdhanService.class);
             context.stopService(serviceIntent);
-
             NotificationHelper.cancelAdhanNotification(context);
             NotificationHelper.updatePersistent(context);
-
             AdhanScheduler.scheduleNextAdhan(context);
-
         } catch (Exception e) {
             Log.e(TAG, "خطأ في إيقاف الأذان وإعادة الجدولة", e);
-        }
-    }
-
-    /* ======================== حدث منتصف الليل ======================== */
-
-    /**
-     * حدث صامت يُستخدم لتحديث التاريخ الهجري والإشعار الدائم،
-     * دون تشغيل صوت أو إظهار إشعار جديد.
-     */
-    private void handleSilentTimeEvent(Context context) {
-        try {
-            NotificationHelper.updatePersistent(context);
-        } catch (Exception e) {
-            Log.e(TAG, "خطأ في تحديث الإشعار الدائم عند منتصف الليل", e);
         }
     }
 
@@ -120,28 +101,18 @@ public final class AdhanReceiver extends BroadcastReceiver {
         final String body = intent.getStringExtra(EXTRA_BODY);
 
         try {
-            Intent serviceIntent =
-                    new Intent(context, AdhanService.class);
-
+            Intent serviceIntent = new Intent(context, AdhanService.class);
             serviceIntent.putExtras(intent);
-
-            ContextCompat.startForegroundService(
-                    context,
-                    serviceIntent
-            );
-
+            ContextCompat.startForegroundService(context, serviceIntent);
         } catch (Exception e) {
             Log.e(TAG, "تعذر تشغيل خدمة الأذان، سيتم إظهار إشعار بديل", e);
-
             NotificationHelper.showReminder(
-                    context,
-                    id,
+                    context, id,
                     title != null ? title : "حان وقت الأذان",
                     body != null ? body : ""
             );
         }
-
-        updatePersistentNotification(context);
+        NotificationHelper.updatePersistent(context);
     }
 
     /* ============================ إشعار تذكير ============================ */
@@ -153,29 +124,13 @@ public final class AdhanReceiver extends BroadcastReceiver {
 
         try {
             NotificationHelper.showReminder(
-                    context,
-                    id,
+                    context, id,
                     title != null ? title : "اقتربت الصلاة",
                     body != null ? body : ""
             );
         } catch (Exception e) {
             Log.e(TAG, "خطأ في إظهار إشعار التذكير", e);
         }
-
-        updatePersistentNotification(context);
-    }
-
-    /* ======================== تحديث الإشعار الدائم ======================== */
-
-    private void handlePhaseEvent(Context context) {
-        updatePersistentNotification(context);
-    }
-
-    private void updatePersistentNotification(Context context) {
-        try {
-            NotificationHelper.updatePersistent(context);
-        } catch (Exception e) {
-            Log.e(TAG, "خطأ في تحديث الإشعار الدائم", e);
-        }
+        NotificationHelper.updatePersistent(context);
     }
 }

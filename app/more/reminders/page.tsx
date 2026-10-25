@@ -4,20 +4,48 @@ import { PageHeader } from '@/components/page-header'
 import { useSettings, useHydrated } from '@/lib/settings'
 import { Heart, BookOpen, Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Capacitor } from '@capacitor/core'
 
 export default function RemindersPage() {
   const [settings, update] = useSettings()
   const hydrated = useHydrated()
 
+  const handleReminderToggle = async (type: 'salawat' | 'adhkar', enabled: boolean, minutes: number) => {
+    if (Capacitor.getPlatform() === 'android') {
+      try {
+        // @ts-ignore
+        const plugin = (window as any).Capacitor.Plugins.AdhanScheduler;
+        
+        // تحديد معرف مختلف لكل نوع
+        const reminderId = type === 'salawat' ? 777 : 888;
+        
+        if (enabled) {
+          const title = type === 'salawat' ? 'الصلاة على النبي ﷺ' : 'تذكير بوردك';
+          const body = type === 'salawat' ? 'صل على الحبيب.. اجعل لسانك رطباً بذكره' : 'هل قرأت وردك من القرآن والأذكار اليوم؟';
+          
+          await plugin.scheduleReminder({
+            id: reminderId,
+            intervalMillis: minutes * 60 * 1000,
+            title: title,
+            body: body
+          });
+        } else {
+          await plugin.cancelReminder({ id: reminderId }); 
+        }
+      } catch (error) {
+        console.error('خطأ في جدولة التذكيرات:', error);
+      }
+    }
+  };
+
   if (!hydrated) return null
 
   return (
-    // ✅ تم تعديل min-h-[100dvh] إلى min-h-dvh
     <div className="min-h-dvh bg-[#f7f3ea] pb-24" dir="rtl">
       <div className="container mx-auto px-4 py-4 max-w-3xl space-y-6">
         <PageHeader 
-          title="التذكيرات الذكية" 
-          subtitle="اجعل يومك مليئاً بالذكر والصلاة على النبي" 
+          title="الصلاة على النبي ﷺ" 
+          subtitle="اجعل يومك مليئاً بالذكر والصلاة على الحبيب" 
           backHref="/more" 
         />
 
@@ -35,13 +63,16 @@ export default function RemindersPage() {
             </div>
             <button
               type="button"
-              onClick={() => update({ salawatEnabled: !settings.salawatEnabled })}
+              onClick={() => {
+                const newState = !settings.salawatEnabled;
+                update({ salawatEnabled: newState });
+                handleReminderToggle('salawat', newState, settings.salawatInterval);
+              }}
               className={cn(
                 'relative h-6 w-11 shrink-0 rounded-full transition-colors',
                 settings.salawatEnabled ? 'bg-emerald-600' : 'bg-zinc-300'
               )}
             >
-              {/* ✅ تم تعديل right-[1.375rem] إلى right-[22px] */}
               <span className={cn('absolute top-0.5 size-5 rounded-full bg-white transition-all', settings.salawatEnabled ? 'right-0.5' : 'right-5.5')} />
             </button>
           </div>
@@ -55,7 +86,10 @@ export default function RemindersPage() {
                 {[30, 60, 120, 180].map((min) => (
                   <button
                     key={min}
-                    onClick={() => update({ salawatInterval: min })}
+                    onClick={() => {
+                      update({ salawatInterval: min });
+                      handleReminderToggle('salawat', true, min); 
+                    }}
                     className={cn(
                       'flex-1 rounded-xl py-2 text-sm font-medium transition',
                       settings.salawatInterval === min ? 'bg-[#0a1f1a] text-white' : 'bg-[#f4ece1] text-[#5a3e1b]'
@@ -83,14 +117,17 @@ export default function RemindersPage() {
             </div>
             <button
               type="button"
-              onClick={() => update({ adhkarRemindersEnabled: !settings.adhkarRemindersEnabled })}
+              onClick={() => {
+                const newState = !settings.adhkarRemindersEnabled;
+                update({ adhkarRemindersEnabled: newState });
+                handleReminderToggle('adhkar', newState, settings.adhkarRemindersInterval);
+              }}
               className={cn(
                 'relative h-6 w-11 shrink-0 rounded-full transition-colors',
                 settings.adhkarRemindersEnabled ? 'bg-emerald-600' : 'bg-zinc-300'
               )}
             >
-              {/* ✅ تم تعديل right-[1.375rem] إلى right-[22px] */}
-              <span className={cn('absolute top-0.5 size-5 rounded-full bg-white transition-all', settings.adhkarRemindersEnabled ? 'right-0.5' : 'right-[22px]')} />
+              <span className={cn('absolute top-0.5 size-5 rounded-full bg-white transition-all', settings.adhkarRemindersEnabled ? 'right-0.5' : 'right-5.5')} />
             </button>
           </div>
 
@@ -103,7 +140,10 @@ export default function RemindersPage() {
                 {[60, 180, 360, 720].map((min) => (
                   <button
                     key={min}
-                    onClick={() => update({ adhkarRemindersInterval: min })}
+                    onClick={() => {
+                      update({ adhkarRemindersInterval: min });
+                      handleReminderToggle('adhkar', true, min);
+                    }}
                     className={cn(
                       'flex-1 rounded-xl py-2 text-sm font-medium transition',
                       settings.adhkarRemindersInterval === min ? 'bg-[#0a1f1a] text-white' : 'bg-[#f4ece1] text-[#5a3e1b]'
