@@ -116,7 +116,6 @@ export function MushafViewer({
   const [hasError, setHasError] = useState(false)
   const [isNightMode, setIsNightMode] = useState(false)
 
-  // ✅ حالة التحكم في ظهور وإخفاء الأزرار
   const [showUi, setShowUi] = useState(true)
   const uiTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -137,7 +136,6 @@ export function MushafViewer({
     [initialSurah, metaData]
   )
 
-  // ✅ دالة إخفاء الأزرار بعد 3 ثوانٍ
   const resetUiTimeout = useCallback(() => {
     if (uiTimeoutRef.current) clearTimeout(uiTimeoutRef.current)
     uiTimeoutRef.current = setTimeout(() => {
@@ -152,9 +150,7 @@ export function MushafViewer({
     }
   }, [resetUiTimeout])
 
-  // ✅ دالة إظهار/إخفاء الأزرار عند الضغط على الشاشة
   const handleToggleUi = useCallback((e: React.MouseEvent) => {
-    // إذا كان المستخدم يضغط على زر، لا نخفي الواجهة
     if ((e.target as HTMLElement).closest('button')) return;
     
     setShowUi(prev => !prev)
@@ -163,8 +159,6 @@ export function MushafViewer({
     }
   }, [showUi, resetUiTimeout])
 
-  /* ------------------------- الوضع الليلي ------------------------- */
-
   useEffect(() => {
     const savedMode = localStorage.getItem(NIGHT_MODE_KEY)
     if (savedMode === 'true') {
@@ -172,16 +166,12 @@ export function MushafViewer({
     }
   }, [])
 
-  /* ------------------------- وضع القراءة ------------------------- */
-
   useEffect(() => {
     document.body.classList.add('reading-fullscreen')
     return () => {
       document.body.classList.remove('reading-fullscreen')
     }
   }, [])
-
-  /* --------------------------- بيانات المصحف --------------------------- */
 
   useEffect(() => {
     let isActive = true
@@ -211,18 +201,14 @@ export function MushafViewer({
     return () => { isActive = false }
   }, [initialPage, initialSurah])
 
-  /* ---------------------- إعادة الضبط عند تغيير الصفحة ---------------------- */
-
   useEffect(() => {
     setScale(MIN_SCALE)
     setPan({ x: 0, y: 0 })
     setIsPageLoading(true)
     setHasError(false)
-    setShowUi(true) // إظهار الأزرار عند تغيير الصفحة
+    setShowUi(true)
     resetUiTimeout()
   }, [currentPage, resetUiTimeout])
-
-  /* --------------------------- تحميل مسبق --------------------------- */
 
   useEffect(() => {
     const previousPage = currentPage - 1
@@ -246,14 +232,10 @@ export function MushafViewer({
     }
   }, [currentPage])
 
-  /* --------------------------- حفظ الموضع --------------------------- */
-
   useEffect(() => {
     if (!currentPage || !metaData) return
     saveReadingPosition(initialSurah, surahName, currentPage)
   }, [currentPage, initialSurah, metaData, surahName])
-
-  /* ------------------------------ التنقل ------------------------------ */
 
   const handlePreviousPage = useCallback(() => {
     setCurrentPage(previousPage => {
@@ -270,8 +252,6 @@ export function MushafViewer({
       return previousPage + 1
     })
   }, [])
-
-  /* ------------------------- التكبير والتحريك ------------------------- */
 
   const clampPan = useCallback(
     (nextPan: Point, nextScale: number): Point => {
@@ -392,8 +372,6 @@ export function MushafViewer({
     setPan({ x: 0, y: 0 })
   }, [scale])
 
-  /* ------------------------------ التلاوة ------------------------------ */
-
   const handlePlayToggle = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
     setShowUi(true)
@@ -424,8 +402,6 @@ export function MushafViewer({
     player.play(initialSurah, surahName, player.reciter || defaultReciter, player.moshafServer || server)
   }, [initialSurah, surahName, player, resetUiTimeout])
 
-  /* ----------------------------- العلامة المرجعية ----------------------------- */
-
   const handleBookmark = useCallback(
     (event: React.MouseEvent) => {
       event.stopPropagation()
@@ -455,8 +431,6 @@ export function MushafViewer({
     })
   }, [resetUiTimeout])
 
-  /* ------------------------------ قيم مشتقة ------------------------------ */
-
   const pageSource = useMemo(() => getPageSource(currentPage), [currentPage])
   const isBookmarkedPage = isBookmarked(bookmarkState, initialSurah, currentPage)
   const isCurrentSurahPlaying = player.playing && player.surah === initialSurah
@@ -481,8 +455,6 @@ export function MushafViewer({
         primaryText: '#fdfbf7',
       }
 
-  /* ------------------------------ شاشة التحميل ------------------------------ */
-
   if (isLoading || !metaData) {
     return (
       <div dir="rtl" className="flex h-dvh w-full items-center justify-center bg-[#fdfbf7]">
@@ -494,8 +466,6 @@ export function MushafViewer({
     )
   }
 
-  /* ------------------------------ الواجهة ------------------------------ */
-
   return (
     <div
       dir="rtl"
@@ -506,7 +476,7 @@ export function MushafViewer({
       onTouchEnd={handleTouchEnd}
       onClick={handleToggleUi}
     >
-      {/* منطقة المصحف: الحجم الأصلي 100% بدون تصغير */}
+      {/* منطقة المصحف */}
       <div ref={containerRef} className="absolute inset-0 flex items-center justify-center overflow-hidden">
         {isPageLoading && !hasError && (
           <div className="absolute inset-0 z-10 flex items-center justify-center">
@@ -549,7 +519,7 @@ export function MushafViewer({
         )}
       </div>
 
-      {/* الشريط العلوي - ✅ يختفي ويظهر بسلاسة */}
+      {/* الشريط العلوي */}
       <header
         className={`absolute inset-x-0 top-0 z-50 flex items-start justify-between gap-3 p-3 transition-opacity duration-300 ${
           showUi ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
@@ -580,29 +550,30 @@ export function MushafViewer({
         </div>
       </header>
 
-      {/* الشريط السفلي - ✅ يختفي ويظهر بسلاسة ومعه أزرار التنقل */}
+      {/* الشريط السفلي - تم رفعه قليلاً وإرجاع رقم الصفحة بتصميم أنيق */}
       <footer
-        className={`absolute inset-x-0 bottom-0 z-50 flex items-center justify-between px-4 pb-4 pt-6 transition-opacity duration-300 ${
+        className={`absolute inset-x-0 bottom-4 z-50 flex items-center justify-between px-6 transition-opacity duration-300 ${
           showUi ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         }`}
-        style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
+        style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
       >
         {/* زر الصفحة السابقة */}
         <button
           onClick={(e) => { e.stopPropagation(); handlePreviousPage(); }}
           disabled={currentPage === 1}
-          className="flex size-10 items-center justify-center rounded-full shadow-md transition-transform active:scale-90 disabled:opacity-30"
+          className="flex size-11 items-center justify-center rounded-full shadow-lg border backdrop-blur-md transition-transform active:scale-90 disabled:opacity-30"
           style={{ backgroundColor: theme.surface, color: theme.text, borderColor: theme.border }}
         >
           <ChevronRight className="size-6" />
         </button>
 
-        {/* رقم الصفحة */}
+        {/* رقم الصفحة في المنتصف - تصميم زجاجي أنيق */}
         <div
-          className="rounded-full px-5 py-2 text-sm font-bold shadow-md"
+          className="rounded-full px-5 py-1.5 text-sm font-bold shadow-sm border backdrop-blur-md"
           style={{
-            backgroundColor: isNightMode ? 'rgba(212, 175, 55, 0.95)' : 'rgba(10, 31, 26, 0.9)',
-            color: isNightMode ? '#101010' : '#ffffff',
+            backgroundColor: theme.surface,
+            borderColor: theme.border,
+            color: theme.text,
           }}
         >
           صفحة {toArabicNumber(currentPage)}
@@ -612,7 +583,7 @@ export function MushafViewer({
         <button
           onClick={(e) => { e.stopPropagation(); handleNextPage(); }}
           disabled={currentPage === TOTAL_PAGES}
-          className="flex size-10 items-center justify-center rounded-full shadow-md transition-transform active:scale-90 disabled:opacity-30"
+          className="flex size-11 items-center justify-center rounded-full shadow-lg border backdrop-blur-md transition-transform active:scale-90 disabled:opacity-30"
           style={{ backgroundColor: theme.surface, color: theme.text, borderColor: theme.border }}
         >
           <ChevronLeft className="size-6" />

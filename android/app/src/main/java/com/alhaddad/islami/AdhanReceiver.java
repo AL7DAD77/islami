@@ -7,14 +7,9 @@ import android.util.Log;
 
 import androidx.core.content.ContextCompat;
 
-/**
- * AdhanReceiver
- * يستقبل تنبيهات النظام المجدولة، حتى عندما يكون التطبيق مغلقًا.
- */
 public final class AdhanReceiver extends BroadcastReceiver {
 
     private static final String TAG = "AdhanReceiver";
-
     public static final String ACTION_STOP_ADHAN = "com.alhaddad.islami.STOP_ADHAN";
 
     private static final String EXTRA_KIND = "kind";
@@ -22,115 +17,65 @@ public final class AdhanReceiver extends BroadcastReceiver {
     private static final String EXTRA_TITLE = "title";
     private static final String EXTRA_BODY = "body";
 
-    private static final String KIND_ADHAN = "adhan";
-    private static final String KIND_REMINDER = "reminder";
-    private static final String KIND_PHASE = "phase";
-    private static final String KIND_TIME = "time";
-
     @Override
     public void onReceive(Context context, Intent intent) {
-        if (context == null || intent == null) {
-            return;
-        }
+        if (context == null || intent == null) return;
 
         final String action = intent.getAction();
 
+        // 1. إيقاف الأذان
         if (ACTION_STOP_ADHAN.equals(action)) {
-            handleStopAdhan(context);
+            try {
+                context.stopService(new Intent(context, AdhanService.class));
+                NotificationHelper.cancelAdhanNotification(context);
+                NotificationHelper.updatePersistent(context);
+                AdhanScheduler.scheduleNextAdhan(context);
+            } catch (Exception e) {
+                Log.e(TAG, "خطأ في إيقاف الأذان", e);
+            }
             return;
         }
 
-        /* ======================= استقبال التذكيرات (جديد) ======================= */
+        // 2. استقبال التذكيرات (الأذكار والصلاة على النبي)
         if ("com.alhaddad.islami.ACTION_REMINDER_ALARM".equals(action)) {
-            int id = intent.getIntExtra("id", 777); 
-            String title = intent.getStringExtra("title");
-            String body = intent.getStringExtra("body");
-            
-            NotificationHelper.showReminder(context, id, 
-                title != null ? title : "تذكير", 
-                body != null ? body : ""
-            );
+            try {
+                int id = intent.getIntExtra("id", 777);
+                String title = intent.getStringExtra("title");
+                String body = intent.getStringExtra("body");
+                long intervalMillis = intent.getLongExtra("intervalMillis", 3600000L);
+
+                // إظهار الإشعار
+                NotificationHelper.showReminder(context, id, 
+                    title != null ? title : "تذكير", 
+                    body != null ? body : ""
+                );
+
+                // إعادة جدولة التذكير للمرة القادمة تلقائياً
+                AdhanScheduler.scheduleReminderAlarm(context, id, intervalMillis, title, body);
+            } catch (Exception e) {
+                Log.e(TAG, "خطأ في معالجة التذكير، تم منع انهيار التطبيق", e);
+            }
             return;
         }
 
+        // 3. استقبال الأذان العادي
         final String kind = intent.getStringExtra(EXTRA_KIND);
+        if (kind == null) return;
 
-        if (kind == null || kind.trim().isEmpty()) {
-            Log.w(TAG, "تم استقبال بث بدون نوع حدث صالح");
-            return;
-        }
-
-        switch (kind) {
-            case KIND_TIME:
+        try {
+            if ("adhan".equals(kind)) {
+                Intent serviceIntent = new Intent(context, AdhanService.class);
+                serviceIntent.putExtras(intent);
+                ContextCompat.startForegroundService(context, serviceIntent);
                 NotificationHelper.updatePersistent(context);
-                break;
-            case KIND_ADHAN:
-                handleAdhanEvent(context, intent);
-                break;
-            case KIND_REMINDER:
-                handleReminderEvent(context, intent);
-                break;
-            case KIND_PHASE:
+            } else if ("reminder".equals(kind)) {
+                NotificationHelper.showReminder(context, intent.getIntExtra(EXTRA_ID, 0), 
+                    intent.getStringExtra(EXTRA_TITLE), intent.getStringExtra(EXTRA_BODY));
+            } else if ("time".equals(kind) || "phase".equals(kind)) {
                 NotificationHelper.updatePersistent(context);
-                break;
-            default:
-                Log.w(TAG, "نوع حدث غير معروف: " + kind);
-                break;
-        }
-    }
-
-    /* ========================== إيقاف الأذان ========================== */
-
-    private void handleStopAdhan(Context context) {
-        try {
-            Intent serviceIntent = new Intent(context, AdhanService.class);
-            context.stopService(serviceIntent);
-            NotificationHelper.cancelAdhanNotification(context);
-            NotificationHelper.updatePersistent(context);
-            AdhanScheduler.scheduleNextAdhan(context);
+            }
         } catch (Exception e) {
-            Log.e(TAG, "خطأ في إيقاف الأذان وإعادة الجدولة", e);
+            Log.e(TAG, "خطأ في استقبال المنبه، تم منع الانهيار", e);
         }
-    }
-
-    /* ============================ تشغيل الأذان ============================ */
-
-    private void handleAdhanEvent(Context context, Intent intent) {
-        final int id = intent.getIntExtra(EXTRA_ID, 0);
-        final String title = intent.getStringExtra(EXTRA_TITLE);
-        final String body = intent.getStringExtra(EXTRA_BODY);
-
-        try {
-            Intent serviceIntent = new Intent(context, AdhanService.class);
-            serviceIntent.putExtras(intent);
-            ContextCompat.startForegroundService(context, serviceIntent);
-        } catch (Exception e) {
-            Log.e(TAG, "تعذر تشغيل خدمة الأذان، سيتم إظهار إشعار بديل", e);
-            NotificationHelper.showReminder(
-                    context, id,
-                    title != null ? title : "حان وقت الأذان",
-                    body != null ? body : ""
-            );
-        }
-        NotificationHelper.updatePersistent(context);
-    }
-
-    /* ============================ إشعار تذكير ============================ */
-
-    private void handleReminderEvent(Context context, Intent intent) {
-        final int id = intent.getIntExtra(EXTRA_ID, 0);
-        final String title = intent.getStringExtra(EXTRA_TITLE);
-        final String body = intent.getStringExtra(EXTRA_BODY);
-
-        try {
-            NotificationHelper.showReminder(
-                    context, id,
-                    title != null ? title : "اقتربت الصلاة",
-                    body != null ? body : ""
-            );
-        } catch (Exception e) {
-            Log.e(TAG, "خطأ في إظهار إشعار التذكير", e);
-        }
-        NotificationHelper.updatePersistent(context);
     }
 }

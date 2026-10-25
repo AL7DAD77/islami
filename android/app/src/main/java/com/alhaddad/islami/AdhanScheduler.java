@@ -10,18 +10,12 @@ import android.util.Log;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
-/**
- * AdhanScheduler
- * <p>
- * مسؤول عن جدولة تنبيهات الأذان والتذكيرات وتحديثات منتصف الليل.
- */
 public final class AdhanScheduler {
 
     private static final String TAG = "AdhanScheduler";
-
-    public static final String ACTION_ALARM =
-            "com.alhaddad.islami.ACTION_ADHAN_ALARM";
+    public static final String ACTION_ALARM = "com.alhaddad.islami.ACTION_ADHAN_ALARM";
 
     private static final String URI_SCHEME = "adhan";
     private static final String URI_HOST = "alarm";
@@ -35,34 +29,24 @@ public final class AdhanScheduler {
     private static final String EXTRA_VOLUME = "volume";
 
     private static final int TEST_ALARM_ID = 90001;
-    private static final int MIN_TEST_DELAY_SECONDS = 5;
 
-    private AdhanScheduler() {
-        // منع إنشاء كائن من هذا الكلاس
-    }
+    private AdhanScheduler() {}
 
     /* ============================ فحص الصلاحيات ============================ */
 
     public static boolean canScheduleExactAlarms(Context context) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
-            return true;
-        }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return true;
         AlarmManager alarmManager = getAlarmManager(context);
         return alarmManager != null && alarmManager.canScheduleExactAlarms();
     }
 
-    /* ============================== الجدولة ============================== */
+    /* ============================== الجدولة الأساسية (للأذان) ============================== */
 
     public static int scheduleAll(Context context) {
         AlarmManager alarmManager = getAlarmManager(context);
-
-        if (alarmManager == null) {
-            Log.w(TAG, "AlarmManager غير متاح");
-            return 0;
-        }
+        if (alarmManager == null) return 0;
 
         cancelScheduledAlarms(context, alarmManager);
-
         long now = System.currentTimeMillis();
         List<Integer> scheduledIds = new ArrayList<>();
         List<AdhanStore.Item> items = AdhanStore.load(context);
@@ -73,33 +57,26 @@ public final class AdhanScheduler {
         }
 
         for (AdhanStore.Item item : items) {
-            if (!isValidItem(item) || item.at <= now) {
-                continue;
-            }
+            // ✅ استخدام الفلتر لمنع التذكيرات من الدخول هنا
+            if (!isValidPrayerItem(item) || item.at <= now) continue;
+            
             PendingIntent pendingIntent = createAlarmPendingIntent(context, item);
-            if (pendingIntent == null) {
-                continue;
-            }
-            if (setAlarm(context, alarmManager, item.at, pendingIntent)) {
+            if (pendingIntent != null && setAlarm(context, alarmManager, item.at, pendingIntent)) {
                 scheduledIds.add(item.id);
             }
         }
-
         AdhanStore.saveScheduledIds(context, scheduledIds);
-        Log.i(TAG, "تمت جدولة " + scheduledIds.size() + " حدثًا بنجاح");
         return scheduledIds.size();
     }
 
     public static void scheduleNextAdhan(Context context) {
         AlarmManager alarmManager = getAlarmManager(context);
         if (alarmManager == null) return;
-
+        
         AdhanStore.Item nextItem = findNextItem(context);
-        if (nextItem == null) return;
-
-        PendingIntent pendingIntent = createAlarmPendingIntent(context, nextItem);
-        if (pendingIntent != null) {
-            setAlarm(context, alarmManager, nextItem.at, pendingIntent);
+        if (nextItem != null) {
+            PendingIntent pendingIntent = createAlarmPendingIntent(context, nextItem);
+            if (pendingIntent != null) setAlarm(context, alarmManager, nextItem.at, pendingIntent);
         }
     }
 
@@ -107,34 +84,22 @@ public final class AdhanScheduler {
         AlarmManager alarmManager = getAlarmManager(context);
         if (alarmManager == null) return;
 
-        long triggerAtMillis = System.currentTimeMillis() + Math.max(MIN_TEST_DELAY_SECONDS, seconds) * 1000L;
-
+        long triggerAtMillis = System.currentTimeMillis() + Math.max(5, seconds) * 1000L;
         AdhanStore.Item testItem = new AdhanStore.Item();
         testItem.id = TEST_ALARM_ID;
         testItem.at = triggerAtMillis;
         testItem.kind = "adhan";
-        testItem.prayer = "";
+        testItem.prayer = "fajr"; // نعطيها اسم صلاة صريح لكي تعمل
         testItem.title = "تجربة الأذان";
         testItem.body = "هذا تنبيه تجريبي - الأذان يعمل بنجاح";
         testItem.file = file == null ? "" : file;
         testItem.volume = volume;
 
         PendingIntent pendingIntent = createAlarmPendingIntent(context, testItem);
-        if (pendingIntent != null) {
-            setAlarm(context, alarmManager, triggerAtMillis, pendingIntent);
-        }
+        if (pendingIntent != null) setAlarm(context, alarmManager, triggerAtMillis, pendingIntent);
     }
 
-    /* ============================== الإلغاء ============================== */
-
-    public static void cancelAll(Context context) {
-        AlarmManager alarmManager = getAlarmManager(context);
-        if (alarmManager != null) {
-            cancelScheduledAlarms(context, alarmManager);
-        }
-    }
-
-    /* ======================= جدولة التذكيرات (جديد) ======================= */
+    /* ======================= جدولة التذكيرات (مستقلة تماماً) ======================= */
 
     public static void scheduleReminderAlarm(Context context, int id, long intervalMillis, String title, String body) {
         AlarmManager alarmManager = getAlarmManager(context);
@@ -142,23 +107,26 @@ public final class AdhanScheduler {
 
         Intent intent = new Intent(context, AdhanReceiver.class);
         intent.setAction("com.alhaddad.islami.ACTION_REMINDER_ALARM");
-        intent.setData(Uri.parse("reminder://alarm/" + id)); // مسار مستقل
+        intent.setData(Uri.parse("reminder://alarm/" + id));
         intent.putExtra("id", id);
         intent.putExtra("title", title);
         intent.putExtra("body", body);
+        intent.putExtra("intervalMillis", intervalMillis);
 
         PendingIntent pendingIntent = PendingIntent.getBroadcast(
                 context, id, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
-
         long triggerAt = System.currentTimeMillis() + intervalMillis;
 
-        if (canScheduleExactAlarms(context)) {
-            alarmManager.setRepeating(AlarmManager.RTC_WAKEUP, triggerAt, intervalMillis, pendingIntent);
-        } else {
-            alarmManager.setInexactRepeating(AlarmManager.RTC_WAKEUP, triggerAt, intervalMillis, pendingIntent);
+        try {
+            if (canScheduleExactAlarms(context)) {
+                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent);
+            } else {
+                alarmManager.setAlarmClock(new AlarmManager.AlarmClockInfo(triggerAt, pendingIntent), pendingIntent);
+            }
+        } catch (SecurityException e) {
+            alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent);
         }
-        Log.i(TAG, "تمت جدولة التذكير رقم " + id + " كل " + (intervalMillis / 60000) + " دقيقة");
     }
 
     public static void cancelReminder(Context context, int id) {
@@ -176,8 +144,14 @@ public final class AdhanScheduler {
         if (pendingIntent != null) {
             alarmManager.cancel(pendingIntent);
             pendingIntent.cancel();
-            Log.i(TAG, "تم إلغاء التذكير رقم " + id);
         }
+    }
+
+    /* ============================== الإلغاء ============================== */
+
+    public static void cancelAll(Context context) {
+        AlarmManager alarmManager = getAlarmManager(context);
+        if (alarmManager != null) cancelScheduledAlarms(context, alarmManager);
     }
 
     /* ============================ دوال مساعدة ============================ */
@@ -186,24 +160,23 @@ public final class AdhanScheduler {
         return (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
     }
 
-    private static AdhanStore.Item findNextItem(Context context) {
-        List<AdhanStore.Item> items = AdhanStore.load(context);
-        if (items == null || items.isEmpty()) return null;
-
-        long now = System.currentTimeMillis();
-        AdhanStore.Item nextItem = null;
-
-        for (AdhanStore.Item item : items) {
-            if (!isValidItem(item) || item.at <= now) continue;
-            if (nextItem == null || item.at < nextItem.at) {
-                nextItem = item;
-            }
-        }
-        return nextItem;
+    // ✅ فلتر لمنع أي شيء ليس صلاة من الدخول في مواقيت الصلاة
+    private static boolean isValidPrayerItem(AdhanStore.Item item) {
+        if (item == null || item.id <= 0 || item.at <= 0 || item.prayer == null) return false;
+        String p = item.prayer.toLowerCase(Locale.US);
+        return p.equals("fajr") || p.equals("dhuhr") || p.equals("asr") || p.equals("maghrib") || p.equals("isha") || p.equals("sunrise");
     }
 
-    private static boolean isValidItem(AdhanStore.Item item) {
-        return item != null && item.id > 0 && item.at > 0 && item.kind != null && !item.kind.trim().isEmpty();
+    private static AdhanStore.Item findNextItem(Context context) {
+        List<AdhanStore.Item> items = AdhanStore.load(context);
+        if (items == null) return null;
+        long now = System.currentTimeMillis();
+        AdhanStore.Item nextItem = null;
+        for (AdhanStore.Item item : items) {
+            if (!isValidPrayerItem(item) || item.at <= now) continue;
+            if (nextItem == null || item.at < nextItem.at) nextItem = item;
+        }
+        return nextItem;
     }
 
     private static boolean setAlarm(Context context, AlarmManager alarmManager, long triggerAtMillis, PendingIntent operation) {
@@ -212,35 +185,12 @@ public final class AdhanScheduler {
                 alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, operation);
                 return true;
             }
-            return setAlarmClockFallback(context, alarmManager, triggerAtMillis, operation);
-        } catch (SecurityException e) {
-            Log.w(TAG, "تم رفض التنبيه الدقيق، سيتم استخدام البديل", e);
-            return setAlarmClockFallback(context, alarmManager, triggerAtMillis, operation);
-        } catch (Exception e) {
-            Log.e(TAG, "خطأ غير متوقع أثناء جدولة التنبيه", e);
-            return false;
-        }
-    }
-
-    private static boolean setAlarmClockFallback(Context context, AlarmManager alarmManager, long triggerAtMillis, PendingIntent operation) {
-        try {
-            AlarmManager.AlarmClockInfo alarmClockInfo = new AlarmManager.AlarmClockInfo(
-                    triggerAtMillis, NotificationHelper.openApp(context, 0)
-            );
-            alarmManager.setAlarmClock(alarmClockInfo, operation);
+            alarmManager.setAlarmClock(new AlarmManager.AlarmClockInfo(triggerAtMillis, NotificationHelper.openApp(context, 0)), operation);
             return true;
-        } catch (Exception e) {
-            Log.w(TAG, "فشل setAlarmClock، سيتم استخدام جدولة احتياطية", e);
-            return setInexactFallback(alarmManager, triggerAtMillis, operation);
-        }
-    }
-
-    private static boolean setInexactFallback(AlarmManager alarmManager, long triggerAtMillis, PendingIntent operation) {
-        try {
+        } catch (SecurityException e) {
             alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, operation);
             return true;
         } catch (Exception e) {
-            Log.e(TAG, "فشلت كل طرق جدولة التنبيه", e);
             return false;
         }
     }
@@ -262,33 +212,21 @@ public final class AdhanScheduler {
             intent.putExtra(EXTRA_BODY, item.body == null ? "" : item.body);
             intent.putExtra(EXTRA_FILE, item.file == null ? "" : item.file);
             intent.putExtra(EXTRA_VOLUME, item.volume);
-
-            return PendingIntent.getBroadcast(
-                    context, item.id, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
-            );
-        } catch (Exception e) {
-            Log.e(TAG, "خطأ في إنشاء PendingIntent للحدث رقم " + item.id, e);
-            return null;
-        }
+            return PendingIntent.getBroadcast(context, item.id, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        } catch (Exception e) { return null; }
     }
 
     private static void cancelScheduledAlarms(Context context, AlarmManager alarmManager) {
         List<Integer> scheduledIds = AdhanStore.scheduledIds(context);
-        if (scheduledIds == null || scheduledIds.isEmpty()) return;
-
+        if (scheduledIds == null) return;
         for (Integer id : scheduledIds) {
-            if (id == null || id <= 0) continue;
-            try {
+            if (id != null && id > 0) {
                 Intent intent = createAlarmIntent(context, id);
-                PendingIntent pendingIntent = PendingIntent.getBroadcast(
-                        context, id, intent, PendingIntent.FLAG_NO_CREATE | PendingIntent.FLAG_IMMUTABLE
-                );
+                PendingIntent pendingIntent = PendingIntent.getBroadcast(context, id, intent, PendingIntent.FLAG_NO_CREATE | PendingIntent.FLAG_IMMUTABLE);
                 if (pendingIntent != null) {
                     alarmManager.cancel(pendingIntent);
                     pendingIntent.cancel();
                 }
-            } catch (Exception e) {
-                Log.w(TAG, "تعذر إلغاء التنبيه رقم " + id, e);
             }
         }
         AdhanStore.saveScheduledIds(context, new ArrayList<Integer>());
