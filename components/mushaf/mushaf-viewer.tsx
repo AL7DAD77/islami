@@ -13,6 +13,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import {
   Bookmark,
   ChevronRight,
+  ChevronLeft,
   Headphones,
   Loader2,
   Moon,
@@ -73,9 +74,7 @@ const NIGHT_MODE_KEY = 'mushaf-night-mode'
 const RECITER_SERVER_KEY = 'selected_reciter_server'
 const RECITER_NAME_KEY = 'selected_reciter_name'
 
-const DEFAULT_RECITER_SERVER =
-  'https://server8.mp3quran.net/afs/'
-
+const DEFAULT_RECITER_SERVER = 'https://server8.mp3quran.net/afs/'
 const DEFAULT_RECITER_NAME = 'مشاري العفاسي'
 
 /* ============================ دوال مساعدة ============================ */
@@ -91,10 +90,7 @@ function clampPage(page: number): number {
 
 function vibrateDevice(duration = 10): void {
   try {
-    if (
-      typeof navigator !== 'undefined' &&
-      'vibrate' in navigator
-    ) {
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
       navigator.vibrate(duration)
     }
   } catch {}
@@ -113,17 +109,14 @@ export function MushafViewer({
   const pageParam = Number(searchParams.get('page'))
   const initialPage = pageParam > 0 ? pageParam : undefined
 
-  const [currentPage, setCurrentPage] = useState<number>(
-    initialPage || 1,
-  )
-
+  const [currentPage, setCurrentPage] = useState<number>(initialPage || 1)
   const [metaData, setMetaData] = useState<MushafMetaData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isPageLoading, setIsPageLoading] = useState(true)
   const [hasError, setHasError] = useState(false)
   const [isNightMode, setIsNightMode] = useState(false)
 
-  // ✅ حالة جديدة للتحكم في ظهور الأزرار (وضع القراءة الغامر)
+  // ✅ حالة التحكم في ظهور وإخفاء الأزرار
   const [showUi, setShowUi] = useState(true)
   const uiTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -144,7 +137,7 @@ export function MushafViewer({
     [initialSurah, metaData]
   )
 
-  // ✅ دالة إخفاء الأزرار بعد 3 ثواني
+  // ✅ دالة إخفاء الأزرار بعد 3 ثوانٍ
   const resetUiTimeout = useCallback(() => {
     if (uiTimeoutRef.current) clearTimeout(uiTimeoutRef.current)
     uiTimeoutRef.current = setTimeout(() => {
@@ -159,6 +152,7 @@ export function MushafViewer({
     }
   }, [resetUiTimeout])
 
+  // ✅ دالة إظهار/إخفاء الأزرار عند الضغط على الشاشة
   const handleToggleUi = useCallback((e: React.MouseEvent) => {
     // إذا كان المستخدم يضغط على زر، لا نخفي الواجهة
     if ((e.target as HTMLElement).closest('button')) return;
@@ -195,11 +189,7 @@ export function MushafViewer({
     const loadMetaData = async () => {
       try {
         const response = await fetch(META_URL)
-        if (!response.ok) {
-          throw new Error(
-            `تعذر تحميل بيانات المصحف: ${response.status}`,
-          )
-        }
+        if (!response.ok) throw new Error(`تعذر التحميل: ${response.status}`)
         const data: MushafMetaData = await response.json()
 
         if (!isActive) return
@@ -207,24 +197,18 @@ export function MushafViewer({
         setMetaData(data)
 
         if (!initialPage) {
-          const startPage =
-            data.surahStartPage[initialSurah - 1] || 1
+          const startPage = data.surahStartPage[initialSurah - 1] || 1
           setCurrentPage(clampPage(startPage))
         }
       } catch (error) {
         console.error('خطأ في تحميل بيانات المصحف:', error)
       } finally {
-        if (isActive) {
-          setIsLoading(false)
-        }
+        if (isActive) setIsLoading(false)
       }
     }
 
     loadMetaData()
-
-    return () => {
-      isActive = false
-    }
+    return () => { isActive = false }
   }, [initialPage, initialSurah])
 
   /* ---------------------- إعادة الضبط عند تغيير الصفحة ---------------------- */
@@ -258,9 +242,7 @@ export function MushafViewer({
     }
 
     return () => {
-      preloadedImages.forEach(image => {
-        image.src = ''
-      })
+      preloadedImages.forEach(image => { image.src = '' })
     }
   }, [currentPage])
 
@@ -327,7 +309,6 @@ export function MushafViewer({
           ),
           scale,
         }
-
         pointerStartRef.current = null
         return
       }
@@ -369,19 +350,10 @@ export function MushafViewer({
         const deltaX = touch.clientX - pointerStartRef.current.x
         const deltaY = touch.clientY - pointerStartRef.current.y
 
-        pointerStartRef.current = {
-          x: touch.clientX,
-          y: touch.clientY,
-        }
+        pointerStartRef.current = { x: touch.clientX, y: touch.clientY }
 
         setPan(previousPan =>
-          clampPan(
-            {
-              x: previousPan.x + deltaX,
-              y: previousPan.y + deltaY,
-            },
-            scale,
-          ),
+          clampPan({ x: previousPan.x + deltaX, y: previousPan.y + deltaY }, scale)
         )
       }
     },
@@ -449,12 +421,7 @@ export function MushafViewer({
       moshaf: [{ id: 1, name: 'حفص', server, surahs: [] }],
     }
 
-    player.play(
-      initialSurah,
-      surahName,
-      player.reciter || defaultReciter,
-      player.moshafServer || server,
-    )
+    player.play(initialSurah, surahName, player.reciter || defaultReciter, player.moshafServer || server)
   }, [initialSurah, surahName, player, resetUiTimeout])
 
   /* ----------------------------- العلامة المرجعية ----------------------------- */
@@ -475,26 +442,22 @@ export function MushafViewer({
     setIsPageLoading(true)
   }, [])
 
-  const handleNightModeToggle = useCallback(
-    (event: React.MouseEvent) => {
-      event.stopPropagation()
-      setShowUi(true)
-      resetUiTimeout()
-      vibrateDevice(10)
-
-      setIsNightMode(previousMode => {
-        const nextMode = !previousMode
-        localStorage.setItem(NIGHT_MODE_KEY, String(nextMode))
-        return nextMode
-      })
-    },
-    [resetUiTimeout],
-  )
+  const handleNightModeToggle = useCallback((event: React.MouseEvent) => {
+    event.stopPropagation()
+    setShowUi(true)
+    resetUiTimeout()
+    vibrateDevice(10)
+    
+    setIsNightMode(prev => {
+      const next = !prev
+      localStorage.setItem(NIGHT_MODE_KEY, String(next))
+      return next
+    })
+  }, [resetUiTimeout])
 
   /* ------------------------------ قيم مشتقة ------------------------------ */
 
   const pageSource = useMemo(() => getPageSource(currentPage), [currentPage])
-  
   const isBookmarkedPage = isBookmarked(bookmarkState, initialSurah, currentPage)
   const isCurrentSurahPlaying = player.playing && player.surah === initialSurah
 
@@ -541,9 +504,9 @@ export function MushafViewer({
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
-      onClick={handleToggleUi} // ✅ إضافة حدث الضغط لإظهار/إخفاء الأزرار
+      onClick={handleToggleUi}
     >
-      {/* منطقة المصحف: تملأ الشاشة بالكامل */}
+      {/* منطقة المصحف: الحجم الأصلي 100% بدون تصغير */}
       <div ref={containerRef} className="absolute inset-0 flex items-center justify-center overflow-hidden">
         {isPageLoading && !hasError && (
           <div className="absolute inset-0 z-10 flex items-center justify-center">
@@ -586,7 +549,7 @@ export function MushafViewer({
         )}
       </div>
 
-      {/* الشريط العلوي العائم - ✅ يختفي ويظهر بسلاسة */}
+      {/* الشريط العلوي - ✅ يختفي ويظهر بسلاسة */}
       <header
         className={`absolute inset-x-0 top-0 z-50 flex items-start justify-between gap-3 p-3 transition-opacity duration-300 ${
           showUi ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
@@ -617,22 +580,43 @@ export function MushafViewer({
         </div>
       </header>
 
-      {/* رقم الصفحة العائم - ✅ يختفي ويظهر بسلاسة */}
+      {/* الشريط السفلي - ✅ يختفي ويظهر بسلاسة ومعه أزرار التنقل */}
       <footer
-        className={`absolute inset-x-0 bottom-0 z-50 flex justify-center pb-3 pt-6 transition-opacity duration-300 ${
+        className={`absolute inset-x-0 bottom-0 z-50 flex items-center justify-between px-4 pb-4 pt-6 transition-opacity duration-300 ${
           showUi ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         }`}
-        style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+        style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
       >
+        {/* زر الصفحة السابقة */}
+        <button
+          onClick={(e) => { e.stopPropagation(); handlePreviousPage(); }}
+          disabled={currentPage === 1}
+          className="flex size-10 items-center justify-center rounded-full shadow-md transition-transform active:scale-90 disabled:opacity-30"
+          style={{ backgroundColor: theme.surface, color: theme.text, borderColor: theme.border }}
+        >
+          <ChevronRight className="size-6" />
+        </button>
+
+        {/* رقم الصفحة */}
         <div
-          className="rounded-full px-5 py-2 text-xs font-bold shadow-sm"
+          className="rounded-full px-5 py-2 text-sm font-bold shadow-md"
           style={{
-            backgroundColor: isNightMode ? 'rgba(212, 175, 55, 0.92)' : 'rgba(10, 31, 26, 0.82)',
+            backgroundColor: isNightMode ? 'rgba(212, 175, 55, 0.95)' : 'rgba(10, 31, 26, 0.9)',
             color: isNightMode ? '#101010' : '#ffffff',
           }}
         >
           صفحة {toArabicNumber(currentPage)}
         </div>
+
+        {/* زر الصفحة التالية */}
+        <button
+          onClick={(e) => { e.stopPropagation(); handleNextPage(); }}
+          disabled={currentPage === TOTAL_PAGES}
+          className="flex size-10 items-center justify-center rounded-full shadow-md transition-transform active:scale-90 disabled:opacity-30"
+          style={{ backgroundColor: theme.surface, color: theme.text, borderColor: theme.border }}
+        >
+          <ChevronLeft className="size-6" />
+        </button>
       </footer>
     </div>
   )

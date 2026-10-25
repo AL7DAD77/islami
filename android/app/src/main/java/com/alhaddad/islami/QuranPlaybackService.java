@@ -1,6 +1,9 @@
 package com.alhaddad.islami;
 
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.content.Intent;
+import android.os.Build;
 import android.util.Log;
 
 import androidx.annotation.Nullable;
@@ -19,6 +22,9 @@ public class QuranPlaybackService extends MediaSessionService {
 
     private static final String TAG = "QuranPlayback";
 
+    public static final String CHANNEL_ID = "quran_playback";
+    public static final int NOTIFICATION_ID = 830021;
+
     private ExoPlayer player;
     private MediaSession mediaSession;
 
@@ -26,11 +32,12 @@ public class QuranPlaybackService extends MediaSessionService {
     public void onCreate() {
         super.onCreate();
 
-        // قناة ومعرّف مستقلان عن إشعارات الأذان.
+        createPlaybackChannel();
+
         DefaultMediaNotificationProvider notificationProvider =
                 new DefaultMediaNotificationProvider.Builder(this)
-                        .setChannelId("quran_playback")
-                        .setNotificationId(830021)
+                        .setChannelId(CHANNEL_ID)
+                        .setNotificationId(NOTIFICATION_ID)
                         .build();
 
         setMediaNotificationProvider(notificationProvider);
@@ -51,11 +58,24 @@ public class QuranPlaybackService extends MediaSessionService {
         player.addListener(
                 new Player.Listener() {
                     @Override
+                    public void onIsPlayingChanged(boolean isPlaying) {
+                        Log.d(
+                                TAG,
+                                "isPlaying: " + isPlaying
+                        );
+                    }
+
+                    @Override
                     public void onPlayWhenReadyChanged(
                             boolean playWhenReady,
                             int reason
                     ) {
-                        // لا يستأنف القرآن تلقائيًا بعد مقاطعة صوتية.
+                        Log.d(
+                                TAG,
+                                "playWhenReady: " + playWhenReady
+                                        + ", reason: " + reason
+                        );
+
                         if (!playWhenReady
                                 && reason
                                 == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS) {
@@ -77,6 +97,32 @@ public class QuranPlaybackService extends MediaSessionService {
         mediaSession =
                 new MediaSession.Builder(this, player)
                         .build();
+    }
+
+    private void createPlaybackChannel() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            return;
+        }
+
+        NotificationManager manager =
+                getSystemService(NotificationManager.class);
+
+        if (manager == null) {
+            return;
+        }
+
+        NotificationChannel channel = new NotificationChannel(
+                CHANNEL_ID,
+                "تشغيل القرآن",
+                NotificationManager.IMPORTANCE_LOW
+        );
+
+        channel.setDescription("إشعار تشغيل تلاوات القرآن في الخلفية");
+        channel.setSound(null, null);
+        channel.enableVibration(false);
+        channel.setShowBadge(false);
+
+        manager.createNotificationChannel(channel);
     }
 
     @Nullable
