@@ -58,6 +58,9 @@ export interface AppSettings {
   salawatInterval: number
   adhkarRemindersEnabled: boolean
   adhkarRemindersInterval: number
+  
+  // ✅ إضافة التحكم في الاهتزاز
+  vibrationEnabled: boolean
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -89,6 +92,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   salawatInterval: 120, // كل ساعتين
   adhkarRemindersEnabled: false,
   adhkarRemindersInterval: 180, // كل 3 ساعات
+  
+  // ✅ الاهتزاز مفعل افتراضياً
+  vibrationEnabled: true,
 }
 
 const KEY = 'noor-settings-v1'

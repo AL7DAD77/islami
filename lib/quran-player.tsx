@@ -14,6 +14,22 @@ import type { Reciter } from '@/lib/quran'
 import { surahAudioUrl } from '@/lib/quran'
 import { saveLastPlayed } from '@/lib/last-played'
 
+// ✅ مصفوفة أسماء السور لضمان ظهور الاسم الصحيح في الإشعار
+const SURAH_NAMES = [
+  "الفاتحة", "البقرة", "آل عمران", "النساء", "المائدة", "الأنعام", "الأعراف", "الأنفال", "التوبة", "يونس",
+  "هود", "يوسف", "الرعد", "إبراهيم", "الحجر", "النحل", "الإسراء", "الكهف", "مريم", "طه",
+  "الأنبياء", "الحج", "المؤمنون", "النور", "الفرقان", "الشعراء", "النمل", "القصص", "العنكبوت", "الروم",
+  "لقمان", "السجدة", "الأحزاب", "سبأ", "فاطر", "يس", "الصافات", "ص", "الزمر", "غافر",
+  "فصلت", "الشورى", "الزخرف", "الدخان", "الجاثية", "الأحقاف", "محمد", "الفتح", "الحجرات", "ق",
+  "الذاريات", "الطور", "النجم", "القمر", "الرحمن", "الواقعة", "الحديد", "المجادلة", "الحشر", "الممتحنة",
+  "الصف", "الجمعة", "المنافقون", "التغابن", "الطلاق", "التحريم", "الملك", "القلم", "الحاقة", "المعارج",
+  "نوح", "الجن", "المزمل", "المدثر", "القيامة", "الإنسان", "المرسلات", "النبأ", "النازعات", "عبس",
+  "التكوير", "الانفطار", "المطففين", "الانشقاق", "البروج", "الطارق", "الأعلى", "الغاشية", "الفجر", "البلد",
+  "الشمس", "الليل", "الضحى", "الشرح", "التين", "العلق", "القدر", "البينة", "الزلزلة", "العاديات",
+  "القارعة", "التكاثر", "العصر", "الهمزة", "الفيل", "قريش", "الماعون", "الكوثر", "الكافرون", "النصر",
+  "المسد", "الإخلاص", "الفلق", "الناس"
+]
+
 type PlayerState = {
   surah: number | null
   surahName: string
@@ -30,7 +46,8 @@ type PlayerState = {
   changeReciter: (reciter: Reciter, server: string) => void
 }
 
-type NativeTrack = { id: string; title: string; url: string }
+// ✅ إضافة artist إلى النوع
+type NativeTrack = { id: string; title: string; artist: string; url: string }
 type NativeState = {
   playing: boolean; loading: boolean; progress: number; repeat: boolean;
   url: string; ui: string; error: string; index?: number; title?: string;
@@ -56,12 +73,14 @@ function nativePlayerAvailable(): boolean {
   } catch { return false }
 }
 
-function buildQueue(startSurah: number, server: string, startSurahName: string): NativeTrack[] {
+// ✅ التعديل هنا: استقبال اسم القارئ وإضافته لكل سورة
+function buildQueue(startSurah: number, server: string, startSurahName: string, artistName: string): NativeTrack[] {
   const items: NativeTrack[] = []
   for (let number = startSurah; number <= 114; number++) {
     items.push({
       id: String(number),
-      title: number === startSurah ? startSurahName : `السورة رقم ${number}`,
+      title: `سورة ${number === startSurah ? startSurahName : SURAH_NAMES[number - 1]}`,
+      artist: artistName, // ✅ تمرير اسم القارئ
       url: surahAudioUrl(server, number),
     })
   }
@@ -154,11 +173,12 @@ export function QuranPlayerProvider({ children }: { children: ReactNode }) {
       audio.onplaying = () => { if (mountedRef.current) { setPlaying(true); setLoading(false); } }
       audio.onpause = () => { if (mountedRef.current) setPlaying(false); }
       
+      // ✅ التعديل هنا: قراءة اسم السورة الصحيح عند الانتقال التلقائي في الويب
       audio.onended = () => {
         if (!mountedRef.current) return
         const current = selectionRef.current
         if (current && current.surah < 114 && !audio.loop) {
-          playRef.current(current.surah + 1, `السورة رقم ${current.surah + 1}`, current.reciter, current.server)
+          playRef.current(current.surah + 1, SURAH_NAMES[current.surah], current.reciter, current.server)
         } else {
           setPlaying(false)
           setLoading(false)
@@ -194,16 +214,18 @@ export function QuranPlayerProvider({ children }: { children: ReactNode }) {
         const audio = audioRef.current
         if (audio && !audio.paused) audio.pause()
       })
+      
+      // ✅ التعديل هنا: أسماء السور الصحيحة عند استخدام أزرار الميديا في الويب
       navigator.mediaSession.setActionHandler('nexttrack', () => {
         const current = selectionRef.current
         if (current && current.surah < 114) {
-           playRef.current(current.surah + 1, `السورة رقم ${current.surah + 1}`, current.reciter, current.server)
+           playRef.current(current.surah + 1, SURAH_NAMES[current.surah], current.reciter, current.server)
         }
       })
       navigator.mediaSession.setActionHandler('previoustrack', () => {
         const current = selectionRef.current
         if (current && current.surah > 1) {
-           playRef.current(current.surah - 1, `السورة رقم ${current.surah - 1}`, current.reciter, current.server)
+           playRef.current(current.surah - 1, SURAH_NAMES[current.surah - 2], current.reciter, current.server)
         }
       })
     } catch (e) {
@@ -267,7 +289,8 @@ export function QuranPlayerProvider({ children }: { children: ReactNode }) {
     if (nativePlayerAvailable()) {
       const ui = JSON.stringify(selection)
       lastUiRef.current = ui 
-      const items = buildQueue(number, server, name)
+      // ✅ تمرير اسم القارئ إلى buildQueue
+      const items = buildQueue(number, server, name, selectedReciter.name)
       queueStartRef.current = number
       void runNative(async () => {
         await NativeQuran.stop()

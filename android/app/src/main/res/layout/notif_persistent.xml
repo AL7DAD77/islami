@@ -33,4 +33,17 @@
         android:fontFamily="monospace"
         android:textStyle="bold"
         android:layout_marginTop="8dp" />
+
+    <!-- ✅ إضافة شريط التقدم -->
+    <ProgressBar
+        android:id="@+id/notif_progress_bar"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="6dp"
+        android:layout_marginTop="12dp"
+        android:progressTint="#4CAF50"
+        android:progressBackgroundTint="#333333"
+        android:max="100"
+        android:progress="50" />
+
 </LinearLayout>

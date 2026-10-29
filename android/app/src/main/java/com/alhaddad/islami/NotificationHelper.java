@@ -4,13 +4,15 @@ import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
+import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.media.AudioAttributes;
+import android.net.Uri;
 import android.os.Build;
-import android.os.SystemClock; // ✅ ضروري جداً لحل مشكلة المؤقت
+import android.os.SystemClock;
 import android.provider.Settings;
 import android.util.Log;
 import android.widget.RemoteViews;
@@ -26,15 +28,12 @@ public final class NotificationHelper {
 
     private static final String TAG = "NotificationHelper";
 
-    /* ============================== الثوابت ============================== */
-
     public static final String CHANNEL_ID = "adhan_channel_id";
     public static final String CHANNEL_NAME = "أذان الصلاة";
-
     public static final String PERSISTENT_CHANNEL_ID = "persistent_channel_id";
     public static final String PERSISTENT_CHANNEL_NAME = "مواقيت الصلاة";
-
-    public static final String REMINDER_CHANNEL_ID = "reminder_channel_v4";
+    
+    public static final String REMINDER_CHANNEL_ID = "reminder_channel_v5";
     public static final String REMINDER_CHANNEL_NAME = "تذكيرات الأذكار والصلاة على النبي";
 
     public static final int NOTIFICATION_ID = 1001;
@@ -42,12 +41,8 @@ public final class NotificationHelper {
     public static final int PERSISTENT_NOTIFICATION_ID = 9999;
 
     private static final int APP_COLOR = Color.parseColor("#0A1F1A");
-    private static final long MINUTE_MS = 60_000L;
-    private static final long HOUR_MS = 60 * MINUTE_MS;
 
     private NotificationHelper() {}
-
-    /* ========================== قنوات الإشعارات ========================== */
 
     public static void ensureChannels(Context context) {
         createNotificationChannel(context);
@@ -59,50 +54,46 @@ public final class NotificationHelper {
         NotificationManager manager = context.getSystemService(NotificationManager.class);
         if (manager == null) return;
 
-        // قناة الأذان
         NotificationChannel adhanChannel = new NotificationChannel(
                 CHANNEL_ID, CHANNEL_NAME, NotificationManager.IMPORTANCE_HIGH
         );
         adhanChannel.setDescription("إشعارات الأذان والتذكيرات المهمة");
         adhanChannel.enableVibration(true);
-        adhanChannel.setVibrationPattern(new long[]{0, 500, 300, 500});
-        adhanChannel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
         adhanChannel.setSound(null, null);
         manager.createNotificationChannel(adhanChannel);
 
-        // قناة الإشعار الدائم
         NotificationChannel persistentChannel = new NotificationChannel(
                 PERSISTENT_CHANNEL_ID, PERSISTENT_CHANNEL_NAME, NotificationManager.IMPORTANCE_LOW
         );
         persistentChannel.setDescription("يعرض الوقت المتبقي للصلاة والتاريخ الهجري");
         persistentChannel.setSound(null, null);
         persistentChannel.enableVibration(false);
-        persistentChannel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
         manager.createNotificationChannel(persistentChannel);
 
-        // قناة التذكيرات
         NotificationChannel reminderChannel = new NotificationChannel(
                 REMINDER_CHANNEL_ID, REMINDER_CHANNEL_NAME, NotificationManager.IMPORTANCE_HIGH
         );
         reminderChannel.setDescription("إشعارات التذكير بالأذكار والصلاة على النبي");
         reminderChannel.enableVibration(true);
-        reminderChannel.setVibrationPattern(new long[]{0, 400, 250, 400});
-        reminderChannel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
-
+        
         AudioAttributes audioAttributes = new AudioAttributes.Builder()
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                 .setUsage(AudioAttributes.USAGE_NOTIFICATION)
                 .build();
-        reminderChannel.setSound(Settings.System.DEFAULT_NOTIFICATION_URI, audioAttributes);
+
+        Uri soundUri = Uri.parse(ContentResolver.SCHEME_ANDROID_RESOURCE + "://" +
+                context.getPackageName() + "/" + R.raw.salawat_voice);
+
+        reminderChannel.setSound(soundUri, audioAttributes);
         manager.createNotificationChannel(reminderChannel);
     }
 
-    /* ======================= الإشعار الدائم للمواقيت ======================= */
+    /* ======================= الإشعار الدائم ======================= */
 
     public static void updatePersistent(Context context) {
         try {
             long now = System.currentTimeMillis();
-            long elapsedRealtime = SystemClock.elapsedRealtime(); // ✅ وقت الهاتف منذ التشغيل
+            long elapsedRealtime = SystemClock.elapsedRealtime();
 
             PrayerTime next = findNextPrayer(context, now);
             PrayerTime previous = findPreviousPrayer(context, now);
@@ -110,7 +101,7 @@ public final class NotificationHelper {
             if (next == null && previous == null) return;
 
             boolean showNext = next != null && (previous == null || next.at - now <= now - previous.at);
-
+            
             String title = "إسلامي | " + getHijriDate(now);
             String body = showNext ? "متبقي على " + next.name + " " + formatTime(next.at) 
                                    : "مضى على " + previous.name + " " + formatTime(previous.at);
@@ -118,37 +109,44 @@ public final class NotificationHelper {
             RemoteViews expandedView = new RemoteViews(context.getPackageName(), R.layout.notif_persistent);
             
             if (showNext) {
-                expandedView.setTextViewText(R.id.notif_prayer_name, "متبقي على " + next.name);
-                expandedView.setTextViewText(R.id.notif_prayer_time, formatTime(next.at) + " م");
+                expandedView.setTextViewText(R.id.notif_prayer_name, next.name);
+                expandedView.setTextViewText(R.id.notif_prayer_time, formatTime(next.at));
             } else {
-                expandedView.setTextViewText(R.id.notif_prayer_name, "مضى على " + previous.name);
-                expandedView.setTextViewText(R.id.notif_prayer_time, formatTime(previous.at) + " م");
+                expandedView.setTextViewText(R.id.notif_prayer_name, previous.name);
+                expandedView.setTextViewText(R.id.notif_prayer_time, formatTime(previous.at));
             }
 
-            // ✅ المعادلة السحرية لحل مشكلة المؤقت
+            // ✅ حساب المؤقت (لم يمس)
             long targetTime = showNext ? next.at : previous.at;
             long timeDiff = showNext ? (targetTime - now) : (now - targetTime);
-            
-            long chronometerBase;
-            if (showNext) {
-                chronometerBase = elapsedRealtime + timeDiff; // وقت الانتهاء بالنسبة للهاتف
-            } else {
-                chronometerBase = elapsedRealtime - timeDiff; // وقت البدء بالنسبة للهاتف
-            }
+            long chronometerBase = showNext ? (elapsedRealtime + timeDiff) : (elapsedRealtime - timeDiff);
 
             expandedView.setChronometerCountDown(R.id.notif_chronometer, showNext);
             expandedView.setChronometer(R.id.notif_chronometer, chronometerBase, null, true);
 
+            // ✅ إضافة شريط التقدم (محمي بـ try-catch لكي لا ينهار التطبيق مطلقاً)
+            try {
+                if (next != null && previous != null) {
+                    long totalInterval = next.at - previous.at;
+                    long elapsed = now - previous.at;
+                    int progress = (int) ((elapsed * 100) / totalInterval);
+                    expandedView.setProgressBar(R.id.notif_progress_bar, 100, showNext ? (100 - progress) : progress, false);
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "خطأ في شريط التقدم، سيتم تجاهله", e);
+            }
+
             Notification notification = new NotificationCompat.Builder(context, PERSISTENT_CHANNEL_ID)
+                    // ✅ أيقونة صغيرة افتراضية (مضمونة ولن تختفي)
+                    .setSmallIcon(android.R.drawable.ic_lock_idle_alarm) 
                     .setContentTitle(title)
                     .setContentText(body)
-                    .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+                    // ✅ شعار التطبيق الكبير (يظهر في الإشعار المنسدل)
                     .setLargeIcon(getAppIcon(context))
                     .setColor(APP_COLOR)
                     .setOngoing(true)
                     .setOnlyAlertOnce(true)
                     .setPriority(NotificationCompat.PRIORITY_LOW)
-                    .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                     .setContentIntent(openApp(context, 0))
                     .setCustomBigContentView(expandedView)
                     .setStyle(new NotificationCompat.DecoratedCustomViewStyle())
@@ -164,12 +162,11 @@ public final class NotificationHelper {
     /* ========================== إشعار الأذان ========================== */
 
     public static Notification buildPlaying(Context context, String title, String body) {
-        PendingIntent stopIntent = createBroadcastPendingIntent(
-                context, AdhanReceiver.class, AdhanReceiver.ACTION_STOP_ADHAN, 0
-        );
-        PendingIntent openAppIntent = createActivityPendingIntent(
-                context, MainActivity.class, 0, true
-        );
+        PendingIntent stopIntent = PendingIntent.getBroadcast(context, 0, 
+            new Intent(context, AdhanReceiver.class).setAction(AdhanReceiver.ACTION_STOP_ADHAN), 
+            PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0));
+            
+        PendingIntent openAppIntent = openApp(context, 0);
 
         return new NotificationCompat.Builder(context, CHANNEL_ID)
                 .setContentTitle(title)
@@ -179,7 +176,6 @@ public final class NotificationHelper {
                 .setColor(APP_COLOR)
                 .setPriority(NotificationCompat.PRIORITY_MAX)
                 .setCategory(NotificationCompat.CATEGORY_ALARM)
-                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setOngoing(true)
                 .setAutoCancel(false)
                 .setContentIntent(openAppIntent)
@@ -196,18 +192,18 @@ public final class NotificationHelper {
                 .setSmallIcon(android.R.drawable.ic_dialog_info)
                 .setLargeIcon(getAppIcon(context))
                 .setColor(APP_COLOR)
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setCategory(NotificationCompat.CATEGORY_REMINDER)
-                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setAutoCancel(true)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setContentIntent(openApp(context, id))
                 .build();
 
         notifySafely(context, id, notification);
     }
 
+    /* ========================= إلغاء الإشعارات ========================= */
+
     public static void cancelAdhanNotification(Context context) {
-        NotificationManager manager = getNotificationManager(context);
+        NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
         if (manager != null) {
             manager.cancel(NOTIFICATION_ID);
             manager.cancel(ID_PLAYING);
@@ -258,7 +254,8 @@ public final class NotificationHelper {
     }
 
     private static String formatTime(long timeMs) {
-        return new SimpleDateFormat("hh:mm", Locale.US).format(new Date(timeMs));
+        String time = new SimpleDateFormat("hh:mm a", Locale.US).format(new Date(timeMs));
+        return time.replace("AM", "ص").replace("PM", "م");
     }
 
     private static String getHijriDate(long timeMs) {
@@ -284,11 +281,11 @@ public final class NotificationHelper {
     }
 
     private static android.graphics.Bitmap getAppIcon(Context context) {
-        return BitmapFactory.decodeResource(context.getResources(), R.mipmap.ic_launcher);
-    }
-
-    private static NotificationManager getNotificationManager(Context context) {
-        return (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+        try {
+            return BitmapFactory.decodeResource(context.getResources(), R.mipmap.ic_launcher);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private static void notifySafely(Context context, int id, Notification notification) {
@@ -316,14 +313,6 @@ public final class NotificationHelper {
         int flags = PendingIntent.FLAG_UPDATE_CURRENT;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) flags |= PendingIntent.FLAG_IMMUTABLE;
         return PendingIntent.getActivity(context, requestCode, intent, flags);
-    }
-
-    private static PendingIntent createBroadcastPendingIntent(Context context, Class<?> receiverClass, String action, int requestCode) {
-        Intent intent = new Intent(context, receiverClass);
-        intent.setAction(action);
-        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) flags |= PendingIntent.FLAG_IMMUTABLE;
-        return PendingIntent.getBroadcast(context, requestCode, intent, flags);
     }
 
     private static final class PrayerTime {

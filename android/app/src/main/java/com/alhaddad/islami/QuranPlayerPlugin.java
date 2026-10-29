@@ -141,11 +141,15 @@ public class QuranPlayerPlugin extends Plugin {
             Bundle extras = new Bundle();
             extras.putString("quran_ui", ui);
 
+            // ✅ إجبار التطبيق على استخدام أيقونة التطبيق
+            Uri artworkUri = Uri.parse("android.resource://" + getContext().getPackageName() + "/" + R.mipmap.ic_launcher);
+
             MediaMetadata metadata =
                     new MediaMetadata.Builder()
                             .setTitle(title)
                             .setArtist(artist)
                             .setAlbumTitle("القرآن الكريم")
+                            .setArtworkUri(artworkUri)
                             .setExtras(extras)
                             .build();
 
@@ -202,6 +206,7 @@ public class QuranPlayerPlugin extends Plugin {
                 String url = raw.optString("url", "");
                 String title = raw.optString("title", "القرآن الكريم");
                 String id = raw.optString("id", url);
+                String artist = raw.optString("artist", "القرآن الكريم"); // ✅ قراءة اسم القارئ
 
                 if (url == null || url.trim().isEmpty()) {
                     continue;
@@ -218,11 +223,15 @@ public class QuranPlayerPlugin extends Plugin {
                 Bundle extras = new Bundle();
                 extras.putString("quran_ui", ui);
 
+                // ✅ إجبار التطبيق على استخدام أيقونة التطبيق
+                Uri artworkUri = Uri.parse("android.resource://" + getContext().getPackageName() + "/" + R.mipmap.ic_launcher);
+
                 MediaMetadata metadata =
                         new MediaMetadata.Builder()
                                 .setTitle(title)
-                                .setArtist("القرآن الكريم")
+                                .setArtist(artist) // ✅ استخدام اسم القارئ
                                 .setAlbumTitle("القرآن الكريم")
+                                .setArtworkUri(artworkUri)
                                 .setExtras(extras)
                                 .build();
 

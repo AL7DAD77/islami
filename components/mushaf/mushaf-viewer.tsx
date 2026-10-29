@@ -31,6 +31,7 @@ import {
 
 import { toArabicNumber } from '@/lib/quran'
 import { useQuranPlayer } from '@/lib/quran-player'
+import { getSettings } from '@/lib/settings' // ✅ تمت الإضافة هنا لقراءة الإعدادات
 
 /* ============================== الأنواع ============================== */
 
@@ -88,9 +89,16 @@ function clampPage(page: number): number {
   return Math.min(Math.max(page, 1), TOTAL_PAGES)
 }
 
+// ✅ التعديل هنا: فحص إعداد الاهتزاز قبل تنفيذه
 function vibrateDevice(duration = 10): void {
   try {
-    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+    const settings = getSettings()
+    if (!settings.vibrationEnabled) return
+
+    if (
+      typeof navigator !== 'undefined' &&
+      'vibrate' in navigator
+    ) {
       navigator.vibrate(duration)
     }
   } catch {}
@@ -131,7 +139,7 @@ export function MushafViewer({
   const bookmarkState = useBookmarkState()
   const player = useQuranPlayer()
 
-  // ✅ التعديل هنا: اسم السورة الآن يتغير ديناميكياً بناءً على رقم الصفحة الحالية
+  // ✅ اسم السورة ديناميكي بناءً على الصفحة الحالية
   const surahName = useMemo(() => {
     if (!metaData || !metaData.surahStartPage || !metaData.surahNames) return '';
     
@@ -486,7 +494,7 @@ export function MushafViewer({
       onTouchEnd={handleTouchEnd}
       onClick={handleToggleUi}
     >
-      {/* منطقة المصحف */}
+      {/* منطقة المصحف: الحجم الأصلي 100% */}
       <div ref={containerRef} className="absolute inset-0 flex items-center justify-center overflow-hidden">
         {isPageLoading && !hasError && (
           <div className="absolute inset-0 z-10 flex items-center justify-center">

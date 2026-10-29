@@ -131,7 +131,6 @@ function createMidnightEvents(
     })
   }
 
-  // يُستخدم لتحديث التاريخ الهجري في الإشعار الدائم
   void settings
 }
 
@@ -164,20 +163,10 @@ function createPrayerEvents(
           title: '',
           body: '',
         })
-
         return
       }
 
-      createReminderEvent(
-        context,
-        items,
-        key,
-        prayerName,
-        prayerTime,
-        dayOffset,
-        index,
-      )
-
+      // ✅ تم حذف التنبيه المسبق نهائياً، والاكتفاء بالأذان الفعلي فقط
       createAdhanEvent(
         context,
         items,
@@ -191,38 +180,6 @@ function createPrayerEvents(
   }
 
   return timeline
-}
-
-function createReminderEvent(
-  context: ScheduleContext,
-  items: ScheduledItem[],
-  prayerKey: PrayerKey,
-  prayerName: string,
-  prayerTime: number,
-  dayOffset: number,
-  prayerIndex: number,
-): void {
-  const { settings, now } = context
-
-  if (settings.reminderMinutes <= 0) {
-    return
-  }
-
-  const reminderTime =
-    prayerTime - settings.reminderMinutes * MINUTE_MS
-
-  if (reminderTime <= now) {
-    return
-  }
-
-  items.push({
-    id: dayOffset * 10 + prayerIndex * 2 + 1,
-    at: reminderTime,
-    kind: 'reminder',
-    prayer: prayerKey,
-    title: `اقتربت صلاة ${prayerName}`,
-    body: `بعد ${settings.reminderMinutes} دقائق - ${settings.location.city}`,
-  })
 }
 
 function createAdhanEvent(
@@ -490,7 +447,7 @@ export function AdhanEngine() {
       settings.adhanVoice,
       settings.fajrVoice,
       settings.prayerVoices,
-      settings.reminderMinutes,
+      // ✅ تم حذف reminderMinutes من هنا
       settings.persistentNotification,
       settings.salawatEnabled,
       settings.salawatInterval,
@@ -507,7 +464,6 @@ export function AdhanEngine() {
     settings.adhanVoice,
     settings.fajrVoice,
     settings.prayerVoices,
-    settings.reminderMinutes,
     settings.persistentNotification,
     settings.salawatEnabled,
     settings.salawatInterval,

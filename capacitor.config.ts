@@ -6,7 +6,7 @@ const config: CapacitorConfig = {
   webDir: 'out',
   plugins: {
     LocalNotifications: {
-      smallIcon: 'ic_stat_adhan',
+      smallIcon: 'ic_launcher', // ✅ إجبار التطبيق على استخدام أيقونة التطبيق لضمان الظهور
       iconColor: '#02634D',
     },
   },

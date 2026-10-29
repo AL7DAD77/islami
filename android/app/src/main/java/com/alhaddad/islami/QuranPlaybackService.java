@@ -21,7 +21,6 @@ import androidx.media3.session.MediaSessionService;
 public class QuranPlaybackService extends MediaSessionService {
 
     private static final String TAG = "QuranPlayback";
-
     public static final String CHANNEL_ID = "quran_playback";
     public static final int NOTIFICATION_ID = 830021;
 
@@ -51,65 +50,37 @@ public class QuranPlaybackService extends MediaSessionService {
         player =
                 new ExoPlayer.Builder(this)
                         .setAudioAttributes(audioAttributes, true)
-                        .setHandleAudioBecomingNoisy(true)
+                        .setHandleAudioBecomingNoisy(true) // ✅ إيقاف الصوت إذا تم فصل السماعة
                         .setWakeMode(C.WAKE_MODE_LOCAL)
                         .build();
 
-        player.addListener(
-                new Player.Listener() {
-                    @Override
-                    public void onIsPlayingChanged(boolean isPlaying) {
-                        Log.d(
-                                TAG,
-                                "isPlaying: " + isPlaying
-                        );
-                    }
-
-                    @Override
-                    public void onPlayWhenReadyChanged(
-                            boolean playWhenReady,
-                            int reason
-                    ) {
-                        Log.d(
-                                TAG,
-                                "playWhenReady: " + playWhenReady
-                                        + ", reason: " + reason
-                        );
-
-                        if (!playWhenReady
-                                && reason
-                                == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS) {
-                            player.pause();
-                        }
-                    }
-
-                    @Override
-                    public void onPlayerError(PlaybackException error) {
-                        Log.e(
-                                TAG,
-                                "Playback failed. Code: " + error.errorCode,
-                                error
-                        );
-                    }
-                }
-        );
+        // ✅ إضافة Callback لاستقبال أوامر أزرار الهاتف (السماعات / شاشة القفل)
+        MediaSession.Callback sessionCallback = new MediaSession.Callback() {
+            @Override
+            public MediaSession.ConnectionResult onConnect(MediaSession session, MediaSession.ControllerInfo controller) {
+                // نسمح للنظام (أزرار الهاتف) بإرسال أوامر التشغيل والإيقاف
+                return new MediaSession.ConnectionResult.AcceptedResultBuilder(session)
+                        .setAvailablePlayerCommands(
+                                MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS.buildUpon()
+                                        .add(Player.COMMAND_PLAY_PAUSE)
+                                        .add(Player.COMMAND_SEEK_TO_NEXT)
+                                        .add(Player.COMMAND_SEEK_TO_PREVIOUS)
+                                        .build()
+                        ).build();
+            }
+        };
 
         mediaSession =
                 new MediaSession.Builder(this, player)
+                        .setCallback(sessionCallback) // ✅ ربط الأزرار بالـ Player
                         .build();
     }
 
     private void createPlaybackChannel() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-            return;
-        }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
 
-        NotificationManager manager =
-                getSystemService(NotificationManager.class);
-
-        if (manager == null) {
-            return;
-        }
+        NotificationManager manager = getSystemService(NotificationManager.class);
+        if (manager == null) return;
 
         NotificationChannel channel = new NotificationChannel(
                 CHANNEL_ID,
@@ -127,9 +98,7 @@ public class QuranPlaybackService extends MediaSessionService {
 
     @Nullable
     @Override
-    public MediaSession onGetSession(
-            MediaSession.ControllerInfo controllerInfo
-    ) {
+    public MediaSession onGetSession(MediaSession.ControllerInfo controllerInfo) {
         return mediaSession;
     }
 

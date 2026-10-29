@@ -3,42 +3,35 @@
 import { useEffect } from 'react'
 import { App } from '@capacitor/app'
 import { Capacitor } from '@capacitor/core'
-import { usePathname, useRouter } from 'next/navigation'
 
 export function NativeBackHandler() {
-  const router = useRouter()
-  const pathname = usePathname()
-
   useEffect(() => {
-    // التأكد من أننا نعمل على الهاتف (أندرويد) وليس المتصفح
+    // التأكد من أننا نعمل على الهاتف
     if (!Capacitor.isNativePlatform()) return
 
     let backListener: any = null
 
     const setupListener = async () => {
-      backListener = await App.addListener('backButton', () => {
-        // قائمة بالصفحات الرئيسية (إذا كان فيها، يغلق التطبيق)
-        const rootPages = ['/', '/prayer', '/quran', '/adhkar', '/more', '/kids', '/qibla', '/tasbih']
-        
-        // إذا كان في صفحة رئيسية، أغلق التطبيق
-        if (rootPages.includes(pathname)) {
-          App.exitApp()
+      backListener = await App.addListener('backButton', ({ canGoBack }) => {
+        if (canGoBack) {
+          // إذا كان هناك صفحة سابقة داخل التطبيق، ارجع لها
+          window.history.back()
         } else {
-          // إذا كان في صفحة فرعية، ارجع للخلف
-          router.back()
+          // إذا كنا في الصفحة الرئيسية، أغلق التطبيق وعُد لشاشة الهاتف
+          // ✅ هذا الأمر لا يلغي الإشعارات لأنها تعتمد على نظام أندرويد
+          App.exitApp() 
         }
       })
     }
 
     setupListener()
 
-    // تنظيف المستمع (Listener) عند إغلاق المكون
     return () => {
       if (backListener) {
         backListener.remove()
       }
     }
-  }, [pathname, router])
+  }, [])
 
   return null
 }

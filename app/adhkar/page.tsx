@@ -15,7 +15,7 @@ import { PageHeader } from '@/components/page-header'
 import { SearchButton } from '@/components/search-button'
 import { ADHKAR, ADHKAR_GROUPS } from '@/lib/adhkar'
 import { toArabicNumber } from '@/lib/quran'
-import { AyahCard } from '@/components/adhkar/ayah-card' // استدعاء المكون الجديد
+import { AyahCard } from '@/components/adhkar/ayah-card'
 
 export const metadata: Metadata = { title: 'الأذكار والأدعية | إسلامي' }
 
@@ -30,7 +30,8 @@ export default function AdhkarPage() {
 
   return (
     <div dir="rtl" className="min-h-screen bg-[#f7f3ea] pb-24">
-      <div className="container mx-auto px-4 py-4 max-w-4xl space-y-6">
+      {/* ✅ التعديل هنا: إضافة pt-[max(1rem,env(safe-area-inset-top))] لترك مسافة لشريط إشعارات الهاتف */}
+      <div className="container mx-auto px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-4 max-w-4xl space-y-6">
         
         <PageHeader 
           title="الأذكار والأدعية" 

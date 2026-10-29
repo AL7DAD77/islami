@@ -1,19 +1,14 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { MapPin, Calculator, Bell, BellRing, ChevronDown, RefreshCw, Check } from 'lucide-react'
+import { MapPin, Calculator, Bell, BellRing, ChevronDown, RefreshCw, Check, Vibrate } from 'lucide-react'
 import { useSettings, useHydrated, type MethodKey, type PrayerKey } from '@/lib/settings'
 import { PRAYER_NAMES, PRAYER_ORDER } from '@/lib/prayer'
 import { CITIES, type City } from '@/lib/places'
 import { methodForCountry, searchCities, searchCitiesOnline, normalizeArabic, type OnlineCity } from '@/lib/city-search'
 import { updateAutoLocation } from '@/lib/location'
-import { toArabicNumber } from '@/lib/quran'
 import { cn } from '@/lib/utils'
-import {
-  isNativePlatform,
-  isAdhanSchedulerAvailable,
-  setPersistentNotification,
-} from '@/lib/native'
+import { isNativePlatform, setPersistentNotification } from '@/lib/native'
 
 const METHODS: { id: MethodKey; name: string }[] = [
   { id: 'UmmAlQura', name: 'أم القرى (السعودية)' },
@@ -38,6 +33,7 @@ export function PrayerSettings() {
   const [openCityPicker, setOpenCityPicker] = useState(false)
   const [openMethodPicker, setOpenMethodPicker] = useState(false)
   const [locating, setLocating] = useState(false)
+  const [isNotifPending, setIsNotifPending] = useState(false)
 
   const [query, setQuery] = useState('')
   const [online, setOnline] = useState<OnlineCity[]>([])
@@ -105,7 +101,7 @@ export function PrayerSettings() {
   if (!hydrated) return <div className="h-96 animate-pulse rounded-2xl bg-card" aria-hidden="true" />
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="mx-auto flex w-full max-w-lg flex-col gap-4 pt-[max(1rem,env(safe-area-inset-top))] pb-4">
       {/* الموقع */}
       <section className="rounded-2xl bg-card p-4 shadow-sm ring-1 ring-border">
         <div className="mb-3 flex items-center gap-2">
@@ -216,29 +212,17 @@ export function PrayerSettings() {
         </div>
       </section>
 
-      {/* التنبيه والأذان */}
+      {/* تفعيل الأذان */}
       <section className="rounded-2xl bg-card p-4 shadow-sm ring-1 ring-border">
         <div className="mb-3 flex items-center gap-2">
           <span className="flex size-8 items-center justify-center rounded-xl bg-accent text-accent-foreground">
             <Bell className="size-4" />
           </span>
-          <h3 className="font-bold text-zinc-800 dark:text-zinc-100">التنبيه والأذان</h3>
+          <h3 className="font-bold text-zinc-800 dark:text-zinc-100">تفعيل الأذان</h3>
         </div>
         <div className="space-y-4">
           <div>
-            <p className="mb-2 text-xs text-muted-foreground">التنبيه قبل الأذان ({toArabicNumber(settings.reminderMinutes)} دقيقة)</p>
-            <input
-              type="range"
-              min={0}
-              max={30}
-              step={1}
-              value={settings.reminderMinutes}
-              onChange={(e) => update({ reminderMinutes: Number(e.target.value) })}
-              className="w-full accent-emerald-600"
-            />
-          </div>
-          <div>
-            <p className="mb-2 text-xs text-muted-foreground">تفعيل صوت الأذان</p>
+            <p className="mb-2 text-xs text-muted-foreground">اختر الصلوات التي تريد سماع الأذان لها</p>
             <div className="grid grid-cols-5 gap-2">
               {PRAYER_ORDER.map((key: PrayerKey) => (
                 <button
@@ -255,7 +239,7 @@ export function PrayerSettings() {
         </div>
       </section>
 
-      {/* الإشعارات - نظيفة تماماً */}
+      {/* الإشعارات والاهتزاز */}
       <section className="rounded-2xl bg-card p-4 shadow-sm ring-1 ring-border">
         <div className="mb-3 flex items-center gap-2">
           <span className="flex size-8 items-center justify-center rounded-xl bg-accent text-accent-foreground">
@@ -264,24 +248,56 @@ export function PrayerSettings() {
           <h3 className="font-bold text-zinc-800 dark:text-zinc-100">الإشعارات</h3>
         </div>
         
-        <div className="flex items-center justify-between gap-3 rounded-xl bg-muted/50 p-3">
-          <div className="flex-1">
-            <p className="font-medium text-zinc-800 dark:text-zinc-100">إشعار دائم بالصلاة القادمة</p>
-            <p className="text-xs text-muted-foreground">يبقى ظاهراً في الخلفية ويعرض الوقت المتبقي</p>
+        <div className="space-y-3">
+          {/* إشعار دائم */}
+          <div className="flex items-center justify-between gap-3 rounded-xl bg-muted/50 p-3">
+            <div className="flex-1">
+              <p className="font-medium text-zinc-800 dark:text-zinc-100">إشعار دائم بالصلاة القادمة</p>
+              <p className="text-xs text-muted-foreground">يبقى ظاهراً في الخلفية ويعرض الوقت المتبقي</p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={settings.persistentNotification}
+              disabled={isNotifPending}
+              onClick={async () => {
+                setIsNotifPending(true)
+                const next = !settings.persistentNotification
+                update({ persistentNotification: next })
+                try {
+                  await setPersistentNotification(next)
+                } catch (e) {
+                  update({ persistentNotification: !next })
+                  alert('حدث خطأ في الاتصال بنظام الإشعارات.')
+                } finally {
+                  setIsNotifPending(false)
+                }
+              }}
+              className={cn('relative h-6 w-11 shrink-0 rounded-full transition-colors', settings.persistentNotification ? 'bg-emerald-600' : 'bg-zinc-400', isNotifPending && 'opacity-50')}
+            >
+              <span className={cn('absolute top-0.5 size-5 rounded-full bg-white transition-all', settings.persistentNotification ? 'right-0.5' : 'right-5.5')} />
+            </button>
           </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={settings.persistentNotification}
-            onClick={() => {
-              const next = !settings.persistentNotification
-              update({ persistentNotification: next })
-              setPersistentNotification(next)
-            }}
-            className={cn('relative h-6 w-11 shrink-0 rounded-full transition-colors', settings.persistentNotification ? 'bg-emerald-600' : 'bg-zinc-400')}
-          >
-            <span className={cn('absolute top-0.5 size-5 rounded-full bg-white transition-all', settings.persistentNotification ? 'right-0.5' : 'right-5.5')} />
-          </button>
+
+          {/* تفعيل الاهتزاز */}
+          <div className="flex items-center justify-between gap-3 rounded-xl bg-muted/50 p-3">
+            <div className="flex items-center gap-2 flex-1">
+              <Vibrate className="size-5 text-muted-foreground" />
+              <div>
+                <p className="font-medium text-zinc-800 dark:text-zinc-100">الاهتزاز</p>
+                <p className="text-xs text-muted-foreground">اهتزاز عند تفاعل التطبيق وعند الإشعارات</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={settings.vibrationEnabled}
+              onClick={() => update({ vibrationEnabled: !settings.vibrationEnabled })}
+              className={cn('relative h-6 w-11 shrink-0 rounded-full transition-colors', settings.vibrationEnabled ? 'bg-emerald-600' : 'bg-zinc-400')}
+            >
+              <span className={cn('absolute top-0.5 size-5 rounded-full bg-white transition-all', settings.vibrationEnabled ? 'right-0.5' : 'right-5.5')} />
+            </button>
+          </div>
         </div>
       </section>
     </div>

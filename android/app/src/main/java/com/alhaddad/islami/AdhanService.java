@@ -5,9 +5,9 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ServiceInfo;
+import android.content.res.AssetFileDescriptor;
 import android.media.AudioAttributes;
 import android.media.MediaPlayer;
-import android.net.Uri;
 import android.os.Build;
 import android.os.IBinder;
 import android.util.Log;
@@ -16,7 +16,6 @@ import androidx.annotation.Nullable;
 
 /**
  * AdhanService
- *
  * خدمة أمامية مسؤولة عن تشغيل صوت الأذان.
  */
 public final class AdhanService extends Service {
@@ -31,14 +30,8 @@ public final class AdhanService extends Service {
     private static final String EXTRA_TITLE = "title";
     private static final String EXTRA_BODY = "body";
 
-    private static final String ADHAN_ASSETS_PATH =
-            "file:///android_asset/public/audio/adhans/";
-
-    private static final String DEFAULT_TITLE =
-            "حان وقت الأذان";
-
-    private static final String DEFAULT_BODY =
-            "حي على الصلاة، حي على الفلاح";
+    private static final String DEFAULT_TITLE = "حان وقت الأذان";
+    private static final String DEFAULT_BODY = "حي على الصلاة، حي على الفلاح";
 
     private MediaPlayer mediaPlayer;
 
@@ -49,11 +42,7 @@ public final class AdhanService extends Service {
     }
 
     @Override
-    public int onStartCommand(
-            Intent intent,
-            int flags,
-            int startId
-    ) {
+    public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent == null) {
             stopPlayback();
             return START_NOT_STICKY;
@@ -68,7 +57,6 @@ public final class AdhanService extends Service {
 
         String fileName = intent.getStringExtra(EXTRA_FILE);
         float volume = intent.getFloatExtra(EXTRA_VOLUME, 1.0f);
-
         String title = intent.getStringExtra(EXTRA_TITLE);
         String body = intent.getStringExtra(EXTRA_BODY);
 
@@ -80,16 +68,11 @@ public final class AdhanService extends Service {
 
         Notification notification = NotificationHelper.buildPlaying(
                 this,
-                title == null || title.trim().isEmpty()
-                        ? DEFAULT_TITLE
-                        : title,
-                body == null || body.trim().isEmpty()
-                        ? DEFAULT_BODY
-                        : body
+                title == null || title.trim().isEmpty() ? DEFAULT_TITLE : title,
+                body == null || body.trim().isEmpty() ? DEFAULT_BODY : body
         );
 
         startForegroundWithType(notification);
-
         playAdhan(fileName, volume);
 
         return START_NOT_STICKY;
@@ -97,24 +80,18 @@ public final class AdhanService extends Service {
 
     /* ============================ تشغيل الأذان ============================ */
 
-    private void playAdhan(
-            String fileName,
-            float volume
-    ) {
+    private void playAdhan(String fileName, float volume) {
         try {
             if (mediaPlayer == null) {
                 mediaPlayer = createMediaPlayer();
             }
-
             mediaPlayer.reset();
 
-            String audioUrl = ADHAN_ASSETS_PATH + fileName;
-            Uri audioUri = Uri.parse(audioUrl);
-
-            mediaPlayer.setDataSource(
-                    getApplicationContext(),
-                    audioUri
-            );
+            // ✅ الطريقة الرسمية والآمنة لقراءة الملفات من مجلد assets في أندرويد
+            // الملفات موجودة في: android/app/src/main/assets/public/audio/adhans/
+            AssetFileDescriptor afd = getAssets().openFd("public/audio/adhans/" + fileName);
+            mediaPlayer.setDataSource(afd.getFileDescriptor(), afd.getStartOffset(), afd.getLength());
+            afd.close();
 
             mediaPlayer.setVolume(volume, volume);
 
@@ -122,11 +99,7 @@ public final class AdhanService extends Service {
                 try {
                     player.start();
                 } catch (Exception e) {
-                    Log.e(
-                            TAG,
-                            "تعذر بدء تشغيل الأذان",
-                            e
-                    );
+                    Log.e(TAG, "تعذر بدء تشغيل الأذان", e);
                     stopPlayback();
                 }
             });
@@ -137,13 +110,7 @@ public final class AdhanService extends Service {
             });
 
             mediaPlayer.setOnErrorListener((player, what, extra) -> {
-                Log.e(
-                        TAG,
-                        "خطأ في مشغل الأذان: what=" +
-                        what +
-                        ", extra=" +
-                        extra
-                );
+                Log.e(TAG, "خطأ في مشغل الأذان: what=" + what + ", extra=" + extra);
                 stopPlayback();
                 return true;
             });
@@ -151,11 +118,7 @@ public final class AdhanService extends Service {
             mediaPlayer.prepareAsync();
 
         } catch (Exception e) {
-            Log.e(
-                    TAG,
-                    "خطأ في تحميل ملف الأذان: " + fileName,
-                    e
-            );
+            Log.e(TAG, "خطأ في تحميل ملف الأذان: " + fileName, e);
             stopPlayback();
         }
     }
@@ -195,33 +158,28 @@ public final class AdhanService extends Service {
     /* ============================ الخدمة الأمامية ============================ */
 
     private void startForegroundWithType(Notification notification) {
-        if (
-            Build.VERSION.SDK_INT >=
-            Build.VERSION_CODES.UPSIDE_DOWN_CAKE
-        ) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             startForeground(
                     NotificationHelper.ID_PLAYING,
                     notification,
                     ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
             );
-
             return;
         }
 
-        startForeground(
-                NotificationHelper.ID_PLAYING,
-                notification
-        );
+        startForeground(NotificationHelper.ID_PLAYING, notification);
     }
 
     /* ============================ إنشاء المشغل ============================ */
 
     private MediaPlayer createMediaPlayer() {
         MediaPlayer player = new MediaPlayer();
+        
+        // ✅ تغيير النوع إلى ALARM لكي يصدح الأذان حتى لو كان الهاتف في الوضع الصامت
         player.setAudioAttributes(
                 new AudioAttributes.Builder()
                         .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setUsage(AudioAttributes.USAGE_ALARM) 
                         .build()
         );
         return player;
@@ -237,9 +195,7 @@ public final class AdhanService extends Service {
     }
 
     private void releaseMediaPlayer() {
-        if (mediaPlayer == null) {
-            return;
-        }
+        if (mediaPlayer == null) return;
         try {
             mediaPlayer.release();
         } catch (Exception e) {

@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { CalendarDays, CalendarRange, Settings2, Volume2 } from 'lucide-react'
+import { CalendarDays, CalendarRange, Volume2 } from 'lucide-react' // تم حذف Settings2
 import type { Metadata } from 'next'
 import { PageHeader } from '@/components/page-header'
 import { NextPrayerCard } from '@/components/prayer/next-prayer-card'
@@ -39,10 +39,10 @@ export default function PrayerPage() {
         <IbadatiCard />
         <PrayerTimesList />
 
-        <nav aria-label="أدوات الصلاة" className="grid grid-cols-3 gap-3">
+        {/* ✅ تم حذف زر الإعدادات وتعديل التقسيم لزرين فقط */}
+        <nav aria-label="أدوات الصلاة" className="grid grid-cols-2 gap-3">
           <TileLink layout="stack" href="/prayer/adhan" icon={<Volume2 className="size-5" />} title="صوت الأذان" />
           <TileLink layout="stack" href="/prayer/week" icon={<CalendarRange className="size-5" />} title="مواقيت الأسبوع" />
-          <TileLink layout="stack" href="/prayer/settings" icon={<Settings2 className="size-5" />} title="الإعدادات" />
         </nav>
       </div>
 
