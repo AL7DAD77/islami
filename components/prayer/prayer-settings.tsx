@@ -9,6 +9,10 @@ import { methodForCountry, searchCities, searchCitiesOnline, normalizeArabic, ty
 import { updateAutoLocation } from '@/lib/location'
 import { cn } from '@/lib/utils'
 import { isNativePlatform, setPersistentNotification } from '@/lib/native'
+import { registerPlugin } from '@capacitor/core'
+
+// ✅ ربط الجسر الخاص بالجافا
+const SystemSettings = registerPlugin<any>('SystemSettings')
 
 const METHODS: { id: MethodKey; name: string }[] = [
   { id: 'UmmAlQura', name: 'أم القرى (السعودية)' },
@@ -38,6 +42,23 @@ export function PrayerSettings() {
   const [query, setQuery] = useState('')
   const [online, setOnline] = useState<OnlineCity[]>([])
   const [searching, setSearching] = useState(false)
+
+  // ✅ مزامنة إعداد الاهتزاز من الجافا إلى الواجهة عند فتح الشاشة
+  useEffect(() => {
+    const syncNativeSettings = async () => {
+      try {
+        if (isNativePlatform()) {
+          const res = await SystemSettings.getPreference({ key: 'vibration_enabled' })
+          if (res && res.value !== settings.vibrationEnabled) {
+            update({ vibrationEnabled: res.value })
+          }
+        }
+      } catch (e) {
+        console.log("لم يتم مزامنة إعدادات الأندرويد", e)
+      }
+    }
+    if (hydrated) syncNativeSettings()
+  }, [hydrated])
 
   const detectLocation = async () => {
     setLocating(true)
@@ -97,6 +118,18 @@ export function PrayerSettings() {
   const localMatches = searchCities(query)
   const localNames = new Set(localMatches.map((c) => normalizeArabic(c.name)))
   const onlineMatches = online.filter((o) => !localNames.has(normalizeArabic(o.name)))
+
+  // ✅ دالة تفعيل/إطفاء الاهتزاز وحفظه في الجافا
+  const toggleVibration = async () => {
+    const nextValue = !settings.vibrationEnabled
+    update({ vibrationEnabled: nextValue }) // تحديث الواجهة
+    try {
+      // تحديث الجافا (SharedPreferences)
+      await SystemSettings.setPreference({ key: 'vibration_enabled', value: nextValue })
+    } catch (e) {
+      console.log("فشل حفظ إعداد الاهتزاز في الأندرويد", e)
+    }
+  }
 
   if (!hydrated) return <div className="h-96 animate-pulse rounded-2xl bg-card" aria-hidden="true" />
 
@@ -279,7 +312,7 @@ export function PrayerSettings() {
             </button>
           </div>
 
-          {/* تفعيل الاهتزاز */}
+          {/* تفعيل الاهتزاز (مربوط الآن بالجافا) */}
           <div className="flex items-center justify-between gap-3 rounded-xl bg-muted/50 p-3">
             <div className="flex items-center gap-2 flex-1">
               <Vibrate className="size-5 text-muted-foreground" />
@@ -292,7 +325,7 @@ export function PrayerSettings() {
               type="button"
               role="switch"
               aria-checked={settings.vibrationEnabled}
-              onClick={() => update({ vibrationEnabled: !settings.vibrationEnabled })}
+              onClick={toggleVibration}
               className={cn('relative h-6 w-11 shrink-0 rounded-full transition-colors', settings.vibrationEnabled ? 'bg-emerald-600' : 'bg-zinc-400')}
             >
               <span className={cn('absolute top-0.5 size-5 rounded-full bg-white transition-all', settings.vibrationEnabled ? 'right-0.5' : 'right-5.5')} />

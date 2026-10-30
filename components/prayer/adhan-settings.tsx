@@ -7,8 +7,8 @@ import { ADHAN_VOICES, getAdhanVoice, voiceIdFor } from '@/lib/adhan-list'
 import { PRAYER_NAMES, PRAYER_ORDER } from '@/lib/prayer'
 import { registerPlugin } from '@capacitor/core'
 
-// تعريف الإضافة للتواصل مع الجافا
-const AdhanScheduler = registerPlugin<any>('AdhanScheduler')
+// ✅ التصحيح: استخدام الجسر الجديد SystemSettings بدلاً من AdhanScheduler
+const SystemSettings = registerPlugin<any>('SystemSettings')
 
 let previewAudio: HTMLAudioElement | null = null
 let previewId: string | null = null
@@ -30,7 +30,8 @@ export function AdhanSettings() {
   useEffect(() => {
     const checkBattery = async () => {
       try {
-        const res = await AdhanScheduler.checkBatteryOptimization()
+        // ✅ التصحيح: استدعاء الدالة من SystemSettings
+        const res = await SystemSettings.checkBatteryOptimization()
         setBatteryIgnored(res.isIgnored)
       } catch (e) {
         console.log("ليست في بيئة أندرويد", e)
@@ -41,9 +42,10 @@ export function AdhanSettings() {
 
   const requestBatteryPermission = async () => {
     try {
-      await AdhanScheduler.requestIgnoreBatteryOptimizations()
+      // ✅ التصحيح: استدعاء الدالة من SystemSettings
+      await SystemSettings.requestIgnoreBatteryOptimizations()
       setTimeout(async () => {
-        const res = await AdhanScheduler.checkBatteryOptimization()
+        const res = await SystemSettings.checkBatteryOptimization()
         setBatteryIgnored(res.isIgnored)
       }, 1000)
     } catch (e) {
@@ -185,7 +187,7 @@ export function AdhanSettings() {
         </div>
       </section>
 
-      {/* ============ الصوت الافتراضي (محدث إلى قائمة منسدلة) ============ */}
+      {/* ============ الصوت الافتراضي ============ */}
       <section aria-labelledby="default-voice">
         <div className="mb-3 rounded-2xl bg-linear-to-l from-emerald-600 to-emerald-700 p-4 text-white shadow-md">
           <div className="flex items-center gap-3">
@@ -203,7 +205,6 @@ export function AdhanSettings() {
           {'اختر الصوت الافتراضي'}
         </h3>
         
-        {/* التصميم الجديد: قائمة منسدلة بدلاً من القائمة الطويلة */}
         <div className="flex items-center gap-2 rounded-2xl border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-900">
           <select
             value={settings.adhanVoice}

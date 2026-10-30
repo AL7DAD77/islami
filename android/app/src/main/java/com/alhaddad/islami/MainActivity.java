@@ -18,6 +18,7 @@ public class MainActivity extends BridgeActivity {
         // 1. تسجيل الإضافات قبل super.onCreate - ضروري جداً
         registerPlugin(AdhanSchedulerPlugin.class);
         registerPlugin(QuranPlayerPlugin.class);
+        registerPlugin(SystemSettingsPlugin.class); // ✅ السطر الجديد تمت إضافته هنا
 
         // 2. تشغيل Capacitor
         super.onCreate(savedInstanceState);

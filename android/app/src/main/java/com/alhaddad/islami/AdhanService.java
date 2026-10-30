@@ -2,8 +2,10 @@ package com.alhaddad.islami;
 
 import android.app.Notification;
 import android.app.Service;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.ServiceInfo;
 import android.content.res.AssetFileDescriptor;
 import android.media.AudioAttributes;
@@ -35,10 +37,29 @@ public final class AdhanService extends Service {
 
     private MediaPlayer mediaPlayer;
 
+    // ✅ 1. مراقبة الشاشة (إطفاء وإضاءة) لإسكات الأذان في كل السيناريوهات
+    private final BroadcastReceiver screenStateReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            // إذا تم إطفاء الشاشة (زر الطاقة) أو إضاءتها (فتح الهاتف)
+            if (Intent.ACTION_SCREEN_OFF.equals(action) || Intent.ACTION_SCREEN_ON.equals(action)) {
+                Log.i(TAG, "تم تغيير حالة الشاشة (زر الطاقة) - جاري إسكات الأذان");
+                stopPlayback(); // استدعاء دالة الإيقاف الآمنة
+            }
+        }
+    };
+
     @Override
     public void onCreate() {
         super.onCreate();
         mediaPlayer = createMediaPlayer();
+
+        // ✅ 2. تسجيل المستقبل عند إنشاء الخدمة للحدثين معاً
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(Intent.ACTION_SCREEN_OFF);
+        filter.addAction(Intent.ACTION_SCREEN_ON);
+        registerReceiver(screenStateReceiver, filter);
     }
 
     @Override
@@ -88,7 +109,6 @@ public final class AdhanService extends Service {
             mediaPlayer.reset();
 
             // ✅ الطريقة الرسمية والآمنة لقراءة الملفات من مجلد assets في أندرويد
-            // الملفات موجودة في: android/app/src/main/assets/public/audio/adhans/
             AssetFileDescriptor afd = getAssets().openFd("public/audio/adhans/" + fileName);
             mediaPlayer.setDataSource(afd.getFileDescriptor(), afd.getStartOffset(), afd.getLength());
             afd.close();
@@ -189,6 +209,13 @@ public final class AdhanService extends Service {
 
     @Override
     public void onDestroy() {
+        // ✅ 3. إلغاء تسجيل المستقبل لمنع تسريب الذاكرة
+        try {
+            unregisterReceiver(screenStateReceiver);
+        } catch (Exception e) {
+            Log.w(TAG, "تمت محاولة إلغاء تسجيل مستقبل غير مسجل", e);
+        }
+
         releaseMediaPlayer();
         stopForegroundService();
         super.onDestroy();

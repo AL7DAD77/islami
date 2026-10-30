@@ -7,13 +7,13 @@ import android.app.PendingIntent;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.media.AudioAttributes;
 import android.net.Uri;
 import android.os.Build;
 import android.os.SystemClock;
-import android.provider.Settings;
 import android.util.Log;
 import android.widget.RemoteViews;
 
@@ -27,13 +27,22 @@ import java.util.Locale;
 public final class NotificationHelper {
 
     private static final String TAG = "NotificationHelper";
+    private static final String PREFS_NAME = "IslamiSettings";
 
     public static final String CHANNEL_ID = "adhan_channel_id";
     public static final String CHANNEL_NAME = "أذان الصلاة";
     public static final String PERSISTENT_CHANNEL_ID = "persistent_channel_id";
     public static final String PERSISTENT_CHANNEL_NAME = "مواقيت الصلاة";
     
-    public static final String REMINDER_CHANNEL_ID = "reminder_channel_v5";
+    // قنوات التذكيرات (3 أصوات × مهتز/صامت)
+    public static final String REMINDER_CHANNEL_1 = "reminder_channel_v6_1";
+    public static final String REMINDER_CHANNEL_2 = "reminder_channel_v6_2";
+    public static final String REMINDER_CHANNEL_3 = "reminder_channel_v6_3";
+    
+    public static final String REMINDER_CHANNEL_SILENT_1 = "reminder_channel_v6_silent_1";
+    public static final String REMINDER_CHANNEL_SILENT_2 = "reminder_channel_v6_silent_2";
+    public static final String REMINDER_CHANNEL_SILENT_3 = "reminder_channel_v6_silent_3";
+
     public static final String REMINDER_CHANNEL_NAME = "تذكيرات الأذكار والصلاة على النبي";
 
     public static final int NOTIFICATION_ID = 1001;
@@ -54,44 +63,59 @@ public final class NotificationHelper {
         NotificationManager manager = context.getSystemService(NotificationManager.class);
         if (manager == null) return;
 
-        NotificationChannel adhanChannel = new NotificationChannel(
-                CHANNEL_ID, CHANNEL_NAME, NotificationManager.IMPORTANCE_HIGH
-        );
+        NotificationChannel adhanChannel = new NotificationChannel(CHANNEL_ID, CHANNEL_NAME, NotificationManager.IMPORTANCE_HIGH);
         adhanChannel.setDescription("إشعارات الأذان والتذكيرات المهمة");
         adhanChannel.enableVibration(true);
         adhanChannel.setSound(null, null);
         manager.createNotificationChannel(adhanChannel);
 
-        NotificationChannel persistentChannel = new NotificationChannel(
-                PERSISTENT_CHANNEL_ID, PERSISTENT_CHANNEL_NAME, NotificationManager.IMPORTANCE_LOW
-        );
+        NotificationChannel persistentChannel = new NotificationChannel(PERSISTENT_CHANNEL_ID, PERSISTENT_CHANNEL_NAME, NotificationManager.IMPORTANCE_LOW);
         persistentChannel.setDescription("يعرض الوقت المتبقي للصلاة والتاريخ الهجري");
         persistentChannel.setSound(null, null);
         persistentChannel.enableVibration(false);
         manager.createNotificationChannel(persistentChannel);
 
-        NotificationChannel reminderChannel = new NotificationChannel(
-                REMINDER_CHANNEL_ID, REMINDER_CHANNEL_NAME, NotificationManager.IMPORTANCE_HIGH
-        );
-        reminderChannel.setDescription("إشعارات التذكير بالأذكار والصلاة على النبي");
-        reminderChannel.enableVibration(true);
-        
         AudioAttributes audioAttributes = new AudioAttributes.Builder()
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                 .setUsage(AudioAttributes.USAGE_NOTIFICATION)
                 .build();
 
-        Uri soundUri = Uri.parse(ContentResolver.SCHEME_ANDROID_RESOURCE + "://" +
-                context.getPackageName() + "/" + R.raw.salawat_voice);
+        // روابط الأصوات الثلاثة
+        Uri sound1 = Uri.parse(ContentResolver.SCHEME_ANDROID_RESOURCE + "://" + context.getPackageName() + "/" + R.raw.salawat_voice);
+        Uri sound2 = Uri.parse(ContentResolver.SCHEME_ANDROID_RESOURCE + "://" + context.getPackageName() + "/" + R.raw.salawat_voice_2);
+        Uri sound3 = Uri.parse(ContentResolver.SCHEME_ANDROID_RESOURCE + "://" + context.getPackageName() + "/" + R.raw.salawat_voice_3);
 
-        reminderChannel.setSound(soundUri, audioAttributes);
-        manager.createNotificationChannel(reminderChannel);
+        // إنشاء القنوات المهتزة
+        createReminderChannel(manager, REMINDER_CHANNEL_1, "تذكير (صوت 1)", sound1, audioAttributes, true);
+        createReminderChannel(manager, REMINDER_CHANNEL_2, "تذكير (صوت 2)", sound2, audioAttributes, true);
+        createReminderChannel(manager, REMINDER_CHANNEL_3, "تذكير (صوت 3)", sound3, audioAttributes, true);
+
+        // إنشاء القنوات الصامتة
+        createReminderChannel(manager, REMINDER_CHANNEL_SILENT_1, "تذكير صامت (صوت 1)", sound1, audioAttributes, false);
+        createReminderChannel(manager, REMINDER_CHANNEL_SILENT_2, "تذكير صامت (صوت 2)", sound2, audioAttributes, false);
+        createReminderChannel(manager, REMINDER_CHANNEL_SILENT_3, "تذكير صامت (صوت 3)", sound3, audioAttributes, false);
+    }
+
+    private static void createReminderChannel(NotificationManager manager, String id, String name, Uri sound, AudioAttributes attr, boolean vibrate) {
+        NotificationChannel channel = new NotificationChannel(id, name, NotificationManager.IMPORTANCE_HIGH);
+        channel.setDescription("نغمة التذكير المختارة");
+        channel.enableVibration(vibrate);
+        channel.setSound(sound, attr);
+        manager.createNotificationChannel(channel);
     }
 
     /* ======================= الإشعار الدائم ======================= */
 
     public static void updatePersistent(Context context) {
         try {
+            boolean isEnabled = AdhanStore.isPersistent(context);
+            NotificationManagerCompat manager = NotificationManagerCompat.from(context);
+            
+            if (!isEnabled) {
+                manager.cancel(PERSISTENT_NOTIFICATION_ID);
+                return; 
+            }
+
             long now = System.currentTimeMillis();
             long elapsedRealtime = SystemClock.elapsedRealtime();
 
@@ -116,7 +140,6 @@ public final class NotificationHelper {
                 expandedView.setTextViewText(R.id.notif_prayer_time, formatTime(previous.at));
             }
 
-            // ✅ حساب المؤقت (لم يمس)
             long targetTime = showNext ? next.at : previous.at;
             long timeDiff = showNext ? (targetTime - now) : (now - targetTime);
             long chronometerBase = showNext ? (elapsedRealtime + timeDiff) : (elapsedRealtime - timeDiff);
@@ -124,7 +147,6 @@ public final class NotificationHelper {
             expandedView.setChronometerCountDown(R.id.notif_chronometer, showNext);
             expandedView.setChronometer(R.id.notif_chronometer, chronometerBase, null, true);
 
-            // ✅ إضافة شريط التقدم (محمي بـ try-catch لكي لا ينهار التطبيق مطلقاً)
             try {
                 if (next != null && previous != null) {
                     long totalInterval = next.at - previous.at;
@@ -137,14 +159,12 @@ public final class NotificationHelper {
             }
 
             Notification notification = new NotificationCompat.Builder(context, PERSISTENT_CHANNEL_ID)
-                    // ✅ أيقونة صغيرة افتراضية (مضمونة ولن تختفي)
                     .setSmallIcon(android.R.drawable.ic_lock_idle_alarm) 
                     .setContentTitle(title)
                     .setContentText(body)
-                    // ✅ شعار التطبيق الكبير (يظهر في الإشعار المنسدل)
                     .setLargeIcon(getAppIcon(context))
                     .setColor(APP_COLOR)
-                    .setOngoing(true)
+                    .setOngoing(true) 
                     .setOnlyAlertOnce(true)
                     .setPriority(NotificationCompat.PRIORITY_LOW)
                     .setContentIntent(openApp(context, 0))
@@ -171,7 +191,7 @@ public final class NotificationHelper {
         return new NotificationCompat.Builder(context, CHANNEL_ID)
                 .setContentTitle(title)
                 .setContentText(body)
-                .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+                .setSmallIcon(android.R.drawable.ic_lock_idle_alarm) 
                 .setLargeIcon(getAppIcon(context))
                 .setColor(APP_COLOR)
                 .setPriority(NotificationCompat.PRIORITY_MAX)
@@ -186,10 +206,20 @@ public final class NotificationHelper {
     /* ========================= إشعارات التذكير ========================= */
 
     public static void showReminder(Context context, int id, String title, String body) {
-        Notification notification = new NotificationCompat.Builder(context, REMINDER_CHANNEL_ID)
+        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        boolean vibrationEnabled = prefs.getBoolean("vibration_enabled", true);
+        String soundId = prefs.getString("salawat_sound_id", "1");
+
+        // اختيار القناة المناسبة حسب الصوت والاهتزاز
+        String channelToUse = REMINDER_CHANNEL_1; // الافتراضي
+        if (soundId.equals("2")) channelToUse = vibrationEnabled ? REMINDER_CHANNEL_2 : REMINDER_CHANNEL_SILENT_2;
+        else if (soundId.equals("3")) channelToUse = vibrationEnabled ? REMINDER_CHANNEL_3 : REMINDER_CHANNEL_SILENT_3;
+        else channelToUse = vibrationEnabled ? REMINDER_CHANNEL_1 : REMINDER_CHANNEL_SILENT_1;
+
+        Notification notification = new NotificationCompat.Builder(context, channelToUse)
                 .setContentTitle(title)
                 .setContentText(body)
-                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setSmallIcon(android.R.drawable.ic_dialog_info) 
                 .setLargeIcon(getAppIcon(context))
                 .setColor(APP_COLOR)
                 .setAutoCancel(true)
@@ -199,8 +229,6 @@ public final class NotificationHelper {
 
         notifySafely(context, id, notification);
     }
-
-    /* ========================= إلغاء الإشعارات ========================= */
 
     public static void cancelAdhanNotification(Context context) {
         NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);

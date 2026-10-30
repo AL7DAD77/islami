@@ -46,10 +46,13 @@ public final class BootReceiver extends BroadcastReceiver {
             // 2. تحديث الإشعار الدائم
             NotificationHelper.updatePersistent(context);
 
-            // 3. إعادة جدولة جميع التنبيهات المخزنة
+            // 3. إعادة جدولة جميع التنبيهات المخزنة (مواقيت الصلاة)
             int scheduledCount = AdhanScheduler.scheduleAll(context);
             
-            Log.i(TAG, "تمت إعادة جدولة " + scheduledCount + " تنبيه بنجاح بعد الإقلاع/التحديث");
+            // ✅ 4. إعادة جدولة التذكيرات المفعلة (777 و 888) بعد الإقلاع
+            AdhanScheduler.rescheduleAllReminders(context);
+            
+            Log.i(TAG, "تمت إعادة جدولة " + scheduledCount + " تنبيه + التذكيرات بنجاح");
 
         } catch (Exception e) {
             Log.e(TAG, "خطأ فادح أثناء إعادة الجدولة بعد الإقلاع", e);

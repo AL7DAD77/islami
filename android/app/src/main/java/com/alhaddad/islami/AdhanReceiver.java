@@ -44,7 +44,7 @@ public final class AdhanReceiver extends BroadcastReceiver {
                 String body = intent.getStringExtra("body");
                 long intervalMillis = intent.getLongExtra("intervalMillis", 3600000L);
 
-                // إظهار الإشعار
+                // إظهار الإشعار (هنا يتم تشغيل الصوت - مشكلة القطع تُحل من داخل NotificationHelper)
                 NotificationHelper.showReminder(context, id, 
                     title != null ? title : "تذكير", 
                     body != null ? body : ""
