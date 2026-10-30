@@ -2,15 +2,15 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="#0A1F1A"> <!-- لون خلفية الإشعار (أخضر داكن فخم) -->
+    android:background="#0A1F1A"> <!-- لون خلفية الإشعار (أخضر داكن) -->
 
-    <!-- ✅ شعار التطبيق في الخلفية (شفاف) -->
+    <!-- ✅ شعار التطبيق كخلفية (Watermark) واضح وجميل -->
     <ImageView
         android:id="@+id/notif_watermark"
-        android:layout_width="160dp"
-        android:layout_height="160dp"
+        android:layout_width="200dp"
+        android:layout_height="200dp"
         android:layout_gravity="center"
-        android:alpha="0.05" 
+        android:alpha="0.15" 
         android:scaleType="fitCenter"
         android:contentDescription="Watermark" />
 
@@ -28,6 +28,7 @@
             android:gravity="center_vertical"
             android:layout_marginBottom="8dp">
 
+            <!-- الشعار الصغير بجانب الاسم -->
             <ImageView
                 android:id="@+id/notif_logo"
                 android:layout_width="40dp"
@@ -40,7 +41,6 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
 
-                <!-- ✅ تثبيت لون النص ليكون أبيض دائمًا -->
                 <TextView
                     android:id="@+id/notif_prayer_name"
                     android:layout_width="wrap_content"
@@ -50,7 +50,6 @@
                     android:textSize="20sp"
                     android:textStyle="bold" />
 
-                <!-- ✅ تثبيت لون النص ليكون رمادي فاتح دائمًا -->
                 <TextView
                     android:id="@+id/notif_prayer_time"
                     android:layout_width="wrap_content"

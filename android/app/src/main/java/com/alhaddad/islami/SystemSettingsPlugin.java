@@ -57,23 +57,45 @@ public class SystemSettingsPlugin extends Plugin {
         }
     }
 
-    // ✅ الدالة الجديدة: طلب صلاحية الظهور فوق التطبيقات (لحماية الأذان)
+    // ✅ دالة طلب صلاحية الظهور فوق التطبيقات
     @PluginMethod
     public void requestOverlayPermission(PluginCall call) {
         Context context = getContext();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (!Settings.canDrawOverlays(context)) {
                 try {
-                    Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                            Uri.parse("package:" + context.getPackageName()));
+                    // فتح صفحة معلومات التطبيق لتجاوز تحذير الأندرويد
+                    Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                    intent.setData(Uri.parse("package:" + context.getPackageName()));
                     getActivity().startActivity(intent);
                 } catch (Exception e) {
-                    call.reject("Failed to open overlay settings", e);
-                    return;
+                    try {
+                        Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                Uri.parse("package:" + context.getPackageName()));
+                        getActivity().startActivity(intent);
+                    } catch (Exception ex) {
+                        call.reject("فشل فتح الإعدادات", ex);
+                        return;
+                    }
                 }
             }
         }
         call.resolve();
+    }
+
+    // ✅ دالة فحص صلاحية الظهور فوق التطبيقات
+    @PluginMethod
+    public void checkOverlayPermission(PluginCall call) {
+        Context context = getContext();
+        boolean isGranted = false;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            isGranted = Settings.canDrawOverlays(context);
+        } else {
+            isGranted = true;
+        }
+        JSObject ret = new JSObject();
+        ret.put("granted", isGranted);
+        call.resolve(ret);
     }
 
     @PluginMethod

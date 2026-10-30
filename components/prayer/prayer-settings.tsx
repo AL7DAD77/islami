@@ -10,8 +10,8 @@ import { updateAutoLocation } from '@/lib/location'
 import { cn } from '@/lib/utils'
 import { isNativePlatform, setPersistentNotification } from '@/lib/native'
 import { registerPlugin } from '@capacitor/core'
+import { App } from '@capacitor/app' // ✅ استيراد App لمراقبة العودة للتطبيق
 
-// ✅ ربط الجسر الخاص بالجافا
 const SystemSettings = registerPlugin<any>('SystemSettings')
 
 const METHODS: { id: MethodKey; name: string }[] = [
@@ -38,12 +38,26 @@ export function PrayerSettings() {
   const [openMethodPicker, setOpenMethodPicker] = useState(false)
   const [locating, setLocating] = useState(false)
   const [isNotifPending, setIsNotifPending] = useState(false)
+  
+  // ✅ حالة لتتبع صلاحية الظهور فوق التطبيقات
+  const [hasOverlay, setHasOverlay] = useState(true) 
 
   const [query, setQuery] = useState('')
   const [online, setOnline] = useState<OnlineCity[]>([])
   const [searching, setSearching] = useState(false)
 
-  // ✅ مزامنة إعداد الاهتزاز من الجافا إلى الواجهة عند فتح الشاشة
+  // ✅ دالة فحص الصلاحية
+  const checkOverlayStatus = async () => {
+    try {
+      if (isNativePlatform()) {
+        const res = await SystemSettings.checkOverlayPermission()
+        setHasOverlay(res.granted)
+      }
+    } catch (e) {
+      console.log("فشل فحص صلاحية الظهور", e)
+    }
+  }
+
   useEffect(() => {
     const syncNativeSettings = async () => {
       try {
@@ -57,7 +71,24 @@ export function PrayerSettings() {
         console.log("لم يتم مزامنة إعدادات الأندرويد", e)
       }
     }
-    if (hydrated) syncNativeSettings()
+    if (hydrated) {
+      syncNativeSettings()
+      checkOverlayStatus() // فحص أولي
+    }
+
+    // ✅ مستمع: عندما يعود المستخدم من الإعدادات، يتم الفحص مرة أخرى
+    let listener: any = null
+    if (isNativePlatform()) {
+      App.addListener('appStateChange', ({ isActive }) => {
+        if (isActive) {
+          checkOverlayStatus()
+        }
+      }).then(l => { listener = l })
+    }
+
+    return () => {
+      if (listener) listener.remove()
+    }
   }, [hydrated])
 
   const detectLocation = async () => {
@@ -119,7 +150,6 @@ export function PrayerSettings() {
   const localNames = new Set(localMatches.map((c) => normalizeArabic(c.name)))
   const onlineMatches = online.filter((o) => !localNames.has(normalizeArabic(o.name)))
 
-  // ✅ دالة تفعيل/إطفاء الاهتزاز وحفظه في الجافا
   const toggleVibration = async () => {
     const nextValue = !settings.vibrationEnabled
     update({ vibrationEnabled: nextValue })
@@ -130,7 +160,6 @@ export function PrayerSettings() {
     }
   }
 
-  // ✅ دالة طلب صلاحية الظهور فوق التطبيقات
   const requestOverlayPermission = async () => {
     try {
       if (isNativePlatform()) {
@@ -138,6 +167,7 @@ export function PrayerSettings() {
       }
     } catch (e) {
       console.log("فشل فتح شاشة صلاحية الظهور", e)
+      alert("يرجى تفعيل الصلاحية يدوياً من: الإعدادات > التطبيقات > إسلامي > الظهور فوق التطبيقات")
     }
   }
 
@@ -342,23 +372,25 @@ export function PrayerSettings() {
             </button>
           </div>
 
-          {/* ✅ صلاحية الظهور فوق التطبيقات (لضمان عمل الأذان) */}
-          <div className="flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-900/50 dark:bg-amber-950/30">
-            <div className="flex items-center gap-2 flex-1">
-              <ShieldAlert className="size-5 text-amber-600 dark:text-amber-500" />
-              <div>
-                <p className="font-medium text-amber-900 dark:text-amber-100">الظهور فوق التطبيقات</p>
-                <p className="text-xs text-amber-800 dark:text-amber-200">ضروري لضمان عمل الأذان حتى لو أُغلق التطبيق</p>
+          {/* ✅ صلاحية الظهور فوق التطبيقات (تختفي إذا كانت مفعلة) */}
+          {!hasOverlay && (
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-900/50 dark:bg-amber-950/30 animate-in fade-in">
+              <div className="flex items-center gap-2 flex-1">
+                <ShieldAlert className="size-5 text-amber-600 dark:text-amber-500" />
+                <div>
+                  <p className="font-medium text-amber-900 dark:text-amber-100">الظهور فوق التطبيقات</p>
+                  <p className="text-xs text-amber-800 dark:text-amber-200">ضروري لضمان عمل الأذان حتى لو أُغلق التطبيق</p>
+                </div>
               </div>
+              <button
+                type="button"
+                onClick={requestOverlayPermission}
+                className="rounded-lg bg-amber-600 px-3 py-2 text-xs font-bold text-white hover:bg-amber-700 transition active:scale-95"
+              >
+                تفعيل
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={requestOverlayPermission}
-              className="rounded-lg bg-amber-600 px-3 py-2 text-xs font-bold text-white hover:bg-amber-700"
-            >
-              تفعيل
-            </button>
-          </div>
+          )}
 
         </div>
       </section>
