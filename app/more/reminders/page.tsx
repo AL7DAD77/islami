@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { PageHeader } from '@/components/page-header'
 import { useSettings, useHydrated } from '@/lib/settings'
-import { Heart, BookOpen, Clock, Music, Settings2, Play, Square, AlertTriangle } from 'lucide-react'
+import { Heart, BookOpen, Clock, Music, Settings2, Play, Square, AlertTriangle, ArrowRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Capacitor, registerPlugin } from '@capacitor/core'
 
@@ -22,16 +22,8 @@ export default function RemindersPage() {
   const [salawatSound, setSalawatSound] = useState('1')
   const [playingSound, setPlayingSound] = useState<string | null>(null)
 
-  // طلب صلاحية المنبهات الدقيقة عند فتح الصفحة (لضمان عمل التذكيرات)
-  useEffect(() => {
-    if (Capacitor.getPlatform() === 'android') {
-      AdhanScheduler.status().then((res: any) => {
-        if (res && !res.exactAlarmAllowed) {
-          AdhanScheduler.requestExactAlarm().catch(() => {})
-        }
-      }).catch(() => {})
-    }
-  }, [])
+  // ✅ حالة لفحص صلاحية المنبهات الدقيقة
+  const [exactAlarmAllowed, setExactAlarmAllowed] = useState(true)
 
   const [showCustomSalawat, setShowCustomSalawat] = useState(false)
   const [customSalawatValue, setCustomSalawatValue] = useState('')
@@ -41,13 +33,22 @@ export default function RemindersPage() {
   const [customAdhkarValue, setCustomAdhkarValue] = useState('')
   const [customAdhkarUnit, setCustomAdhkarUnit] = useState<'min' | 'hr'>('min')
 
+  // ✅ فحص الصلاحية وقراءة الإعدادات عند فتح الصفحة
   useEffect(() => {
     const loadSettings = async () => {
       try {
         if (Capacitor.getPlatform() === 'android') {
+          // فحص صلاحية المنبهات الدقيقة
+          const statusRes = await AdhanScheduler.status()
+          if (statusRes) {
+            setExactAlarmAllowed(statusRes.exactAlarmAllowed)
+          }
+
           const res = await SystemSettings.getStringPreference({ key: 'salawat_sound_id' })
           if (res && res.value) setSalawatSound(res.value)
         }
+        
+        // التحقق من الأوقات المخصصة
         if (![30, 60, 120, 180].includes(settings.salawatInterval)) {
           setShowCustomSalawat(true)
           setCustomSalawatValue(settings.salawatInterval.toString())
@@ -98,7 +99,6 @@ export default function RemindersPage() {
     }
   }
 
-  // ✅ دالة تُرجع (true/false) لكي نعرف هل نجح الحفظ أم لا
   const handleReminderToggle = async (type: 'salawat' | 'adhkar', enabled: boolean, minutes: number): Promise<boolean> => {
     if (minutes < 1) {
       alert('الرجاء إدخال وقت صحيح (دقيقة واحدة على الأقل).')
@@ -126,11 +126,11 @@ export default function RemindersPage() {
           await AdhanScheduler.cancelReminder({ id: reminderId });
           update(type === 'salawat' ? { salawatEnabled: false } : { adhkarRemindersEnabled: false });
         }
-        return true; // ✅ نجح
+        return true; 
       } catch (error) {
         console.error('خطأ في جدولة التذكيرات:', error);
-        alert('حدث خطأ! يرجى التأكد من إعطاء صلاحية "المنبهات والتذكيرات" للتطبيق من إعدادات الهاتف.');
-        return false; // ❌ فشل
+        alert('حدث خطأ! يرجى التأكد من إعطاء صلاحية "المنبهات" للتطبيق.');
+        return false;
       } finally {
         setIsPending(null) 
       }
@@ -140,39 +140,38 @@ export default function RemindersPage() {
     }
   }
 
-  // ✅ إصلاح زر الحفظ ليكون سريعاً ولا يتجمد
   const applyCustomSalawat = async () => {
     const val = parseInt(customSalawatValue)
-    if (isNaN(val) || val <= 0) {
-      alert('الرجاء إدخال رقم صحيح أكبر من صفر')
-      return
-    }
+    if (isNaN(val) || val <= 0) return alert('الرجاء إدخال رقم صحيح')
     
     setIsSaving('salawat')
     const minutes = customSalawatUnit === 'hr' ? val * 60 : val
     const success = await handleReminderToggle('salawat', true, minutes)
     setIsSaving(null)
-    
-    if (success) {
-      setShowCustomSalawat(false)
-    }
+    if (success) setShowCustomSalawat(false)
   }
 
   const applyCustomAdhkar = async () => {
     const val = parseInt(customAdhkarValue)
-    if (isNaN(val) || val <= 0) {
-      alert('الرجاء إدخال رقم صحيح أكبر من صفر')
-      return
-    }
+    if (isNaN(val) || val <= 0) return alert('الرجاء إدخال رقم صحيح')
     
     setIsSaving('adhkar')
     const minutes = customAdhkarUnit === 'hr' ? val * 60 : val
     const success = await handleReminderToggle('adhkar', true, minutes)
     setIsSaving(null)
-    
-    if (success) {
-      setShowCustomAdhkar(false)
-    }
+    if (success) setShowCustomAdhkar(false)
+  }
+
+  // ✅ دالة طلب صلاحية المنبهات الدقيقة
+  const requestExactAlarm = async () => {
+    try {
+      await AdhanScheduler.requestExactAlarm()
+      // إعادة الفحص بعد ثانية
+      setTimeout(async () => {
+        const res = await AdhanScheduler.status()
+        if (res) setExactAlarmAllowed(res.exactAlarmAllowed)
+      }, 1500)
+    } catch (e) { console.log(e) }
   }
 
   if (!hydrated) return null
@@ -186,6 +185,26 @@ export default function RemindersPage() {
           subtitle="اجعل يومك مليئاً بالذكر والصلاة على الحبيب" 
           backHref="/more" 
         />
+
+        {/* ✅ تحذير صلاحية المنبهات الدقيقة (يظهر فقط إذا كانت مغلقة) */}
+        {!exactAlarmAllowed && (
+          <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 dark:border-red-900/50 dark:bg-red-950/30">
+            <AlertTriangle className="mt-0.5 size-6 shrink-0 text-red-600 dark:text-red-500" />
+            <div className="flex-1">
+              <h3 className="font-bold text-red-900 dark:text-red-100">التذكيرات لن تعمل بدقة!</h3>
+              <p className="mt-1 text-xs text-red-800 dark:text-red-200">
+                نظام الهاتف يمنع التطبيق من ضبط المنبهات الدقيقة. يرجى الضغط على الزر أدناه والسماح بذلك لضمان عمل التذكير.
+              </p>
+              <button
+                type="button"
+                onClick={requestExactAlarm}
+                className="mt-3 rounded-lg bg-red-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-red-700"
+              >
+                السماح بالمنبهات الدقيقة
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* قسم الصلاة على النبي */}
         <section className="rounded-3xl bg-white p-5 shadow-sm border border-[#e8dccb]">
@@ -223,9 +242,9 @@ export default function RemindersPage() {
                   <button 
                     type="button"
                     onClick={() => setShowCustomSalawat(!showCustomSalawat)}
-                    className="text-xs font-bold text-emerald-700 flex items-center gap-1 hover:underline active:opacity-50"
+                    className="text-xs font-bold text-emerald-700 flex items-center gap-1 hover:underline"
                   >
-                    <Settings2 className="size-3" /> تخصيص
+                    {showCustomSalawat ? <><ArrowRight className="size-3" /> رجوع</> : <><Settings2 className="size-3" /> تخصيص</>}
                   </button>
                 </div>
 
@@ -342,9 +361,9 @@ export default function RemindersPage() {
                 <button 
                   type="button"
                   onClick={() => setShowCustomAdhkar(!showCustomAdhkar)}
-                  className="text-xs font-bold text-blue-700 flex items-center gap-1 hover:underline active:opacity-50"
+                  className="text-xs font-bold text-blue-700 flex items-center gap-1 hover:underline"
                 >
-                  <Settings2 className="size-3" /> تخصيص
+                  {showCustomAdhkar ? <><ArrowRight className="size-3" /> رجوع</> : <><Settings2 className="size-3" /> تخصيص</>}
                 </button>
               </div>
 
@@ -397,13 +416,6 @@ export default function RemindersPage() {
             </div>
           )}
         </section>
-
-        <div className="rounded-2xl bg-[#d4af37]/10 p-4 text-center">
-          <p className="text-sm text-[#b89965] leading-relaxed">
-            قال رسول الله ﷺ: "من صلى عليّ صلاة صلى الله عليه بها عشراً". 
-            <br/> اجعل لسانك رطباً بذكر الله.
-          </p>
-        </div>
       </div>
     </div>
   )
