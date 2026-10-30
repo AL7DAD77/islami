@@ -34,7 +34,6 @@ public final class NotificationHelper {
     public static final String PERSISTENT_CHANNEL_ID = "persistent_channel_id";
     public static final String PERSISTENT_CHANNEL_NAME = "مواقيت الصلاة";
     
-    // قنوات التذكيرات (3 أصوات × مهتز/صامت)
     public static final String REMINDER_CHANNEL_1 = "reminder_channel_v6_1";
     public static final String REMINDER_CHANNEL_2 = "reminder_channel_v6_2";
     public static final String REMINDER_CHANNEL_3 = "reminder_channel_v6_3";
@@ -80,17 +79,14 @@ public final class NotificationHelper {
                 .setUsage(AudioAttributes.USAGE_NOTIFICATION)
                 .build();
 
-        // روابط الأصوات الثلاثة
         Uri sound1 = Uri.parse(ContentResolver.SCHEME_ANDROID_RESOURCE + "://" + context.getPackageName() + "/" + R.raw.salawat_voice);
         Uri sound2 = Uri.parse(ContentResolver.SCHEME_ANDROID_RESOURCE + "://" + context.getPackageName() + "/" + R.raw.salawat_voice_2);
         Uri sound3 = Uri.parse(ContentResolver.SCHEME_ANDROID_RESOURCE + "://" + context.getPackageName() + "/" + R.raw.salawat_voice_3);
 
-        // إنشاء القنوات المهتزة
         createReminderChannel(manager, REMINDER_CHANNEL_1, "تذكير (صوت 1)", sound1, audioAttributes, true);
         createReminderChannel(manager, REMINDER_CHANNEL_2, "تذكير (صوت 2)", sound2, audioAttributes, true);
         createReminderChannel(manager, REMINDER_CHANNEL_3, "تذكير (صوت 3)", sound3, audioAttributes, true);
 
-        // إنشاء القنوات الصامتة
         createReminderChannel(manager, REMINDER_CHANNEL_SILENT_1, "تذكير صامت (صوت 1)", sound1, audioAttributes, false);
         createReminderChannel(manager, REMINDER_CHANNEL_SILENT_2, "تذكير صامت (صوت 2)", sound2, audioAttributes, false);
         createReminderChannel(manager, REMINDER_CHANNEL_SILENT_3, "تذكير صامت (صوت 3)", sound3, audioAttributes, false);
@@ -131,6 +127,12 @@ public final class NotificationHelper {
                                    : "مضى على " + previous.name + " " + formatTime(previous.at);
 
             RemoteViews expandedView = new RemoteViews(context.getPackageName(), R.layout.notif_persistent);
+
+            try {
+                expandedView.setImageViewBitmap(R.id.notif_logo, getAppIcon(context));
+            } catch (Exception e) {
+                Log.e(TAG, "خطأ في تحميل الشعار داخل الإشعار الدائم", e);
+            }
             
             if (showNext) {
                 expandedView.setTextViewText(R.id.notif_prayer_name, next.name);
@@ -159,7 +161,8 @@ public final class NotificationHelper {
             }
 
             Notification notification = new NotificationCompat.Builder(context, PERSISTENT_CHANNEL_ID)
-                    .setSmallIcon(android.R.drawable.ic_lock_idle_alarm) 
+                    // ✅ استخدام الأيقونة الخاصة بك
+                    .setSmallIcon(R.drawable.ic_stat_adhan) 
                     .setContentTitle(title)
                     .setContentText(body)
                     .setLargeIcon(getAppIcon(context))
@@ -191,7 +194,8 @@ public final class NotificationHelper {
         return new NotificationCompat.Builder(context, CHANNEL_ID)
                 .setContentTitle(title)
                 .setContentText(body)
-                .setSmallIcon(android.R.drawable.ic_lock_idle_alarm) 
+                // ✅ استخدام الأيقونة الخاصة بك
+                .setSmallIcon(R.drawable.ic_stat_adhan) 
                 .setLargeIcon(getAppIcon(context))
                 .setColor(APP_COLOR)
                 .setPriority(NotificationCompat.PRIORITY_MAX)
@@ -210,8 +214,7 @@ public final class NotificationHelper {
         boolean vibrationEnabled = prefs.getBoolean("vibration_enabled", true);
         String soundId = prefs.getString("salawat_sound_id", "1");
 
-        // اختيار القناة المناسبة حسب الصوت والاهتزاز
-        String channelToUse = REMINDER_CHANNEL_1; // الافتراضي
+        String channelToUse = REMINDER_CHANNEL_1;
         if (soundId.equals("2")) channelToUse = vibrationEnabled ? REMINDER_CHANNEL_2 : REMINDER_CHANNEL_SILENT_2;
         else if (soundId.equals("3")) channelToUse = vibrationEnabled ? REMINDER_CHANNEL_3 : REMINDER_CHANNEL_SILENT_3;
         else channelToUse = vibrationEnabled ? REMINDER_CHANNEL_1 : REMINDER_CHANNEL_SILENT_1;
@@ -219,7 +222,8 @@ public final class NotificationHelper {
         Notification notification = new NotificationCompat.Builder(context, channelToUse)
                 .setContentTitle(title)
                 .setContentText(body)
-                .setSmallIcon(android.R.drawable.ic_dialog_info) 
+                // ✅ استخدام الأيقونة الخاصة بك
+                .setSmallIcon(R.drawable.ic_stat_adhan) 
                 .setLargeIcon(getAppIcon(context))
                 .setColor(APP_COLOR)
                 .setAutoCancel(true)
