@@ -1,72 +1,85 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="vertical"
-    android:padding="16dp"
-    android:gravity="center_horizontal">
+    android:background="#0A1F1A"> <!-- لون خلفية الإشعار (أخضر داكن فخم) -->
 
-    <!-- ✅ صف علوي يحتوي على الشعار واسم الصلاة -->
+    <!-- ✅ شعار التطبيق في الخلفية (شفاف) -->
+    <ImageView
+        android:id="@+id/notif_watermark"
+        android:layout_width="160dp"
+        android:layout_height="160dp"
+        android:layout_gravity="center"
+        android:alpha="0.05" 
+        android:scaleType="fitCenter"
+        android:contentDescription="Watermark" />
+
     <LinearLayout
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:layout_marginBottom="8dp">
-
-        <!-- ✅ شعار التطبيق (سيتم تحميله من الكود) -->
-        <ImageView
-            android:id="@+id/notif_logo"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_marginEnd="12dp"
-            android:contentDescription="شعار التطبيق" />
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:gravity="center_horizontal">
 
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="8dp">
 
-            <TextView
-                android:id="@+id/notif_prayer_name"
+            <ImageView
+                android:id="@+id/notif_logo"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginEnd="12dp"
+                android:contentDescription="App Icon" />
+
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="الصلاة"
-                android:textColor="?android:attr/textColorPrimary"
-                android:textSize="20sp"
-                android:textStyle="bold" />
+                android:orientation="vertical">
 
-            <TextView
-                android:id="@+id/notif_prayer_time"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="00:00 م"
-                android:textColor="?android:attr/textColorSecondary"
-                android:textSize="16sp" />
+                <!-- ✅ تثبيت لون النص ليكون أبيض دائمًا -->
+                <TextView
+                    android:id="@+id/notif_prayer_name"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="الصلاة"
+                    android:textColor="#FFFFFF"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+                <!-- ✅ تثبيت لون النص ليكون رمادي فاتح دائمًا -->
+                <TextView
+                    android:id="@+id/notif_prayer_time"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="00:00 م"
+                    android:textColor="#A1A1AA"
+                    android:textSize="16sp" />
+            </LinearLayout>
         </LinearLayout>
+
+        <Chronometer
+            android:id="@+id/notif_chronometer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#4DB6AC"
+            android:textSize="26sp"
+            android:fontFamily="monospace"
+            android:textStyle="bold"
+            android:layout_marginTop="4dp" />
+
+        <ProgressBar
+            android:id="@+id/notif_progress_bar"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="6dp"
+            android:layout_marginTop="12dp"
+            android:progressTint="#4CAF50"
+            android:progressBackgroundTint="#333333"
+            android:max="100"
+            android:progress="50" />
     </LinearLayout>
-
-    <!-- المؤقت التنازلي -->
-    <Chronometer
-        android:id="@+id/notif_chronometer"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:textColor="#4DB6AC"
-        android:textSize="26sp"
-        android:fontFamily="monospace"
-        android:textStyle="bold"
-        android:layout_marginTop="4dp" />
-
-    <!-- شريط التقدم -->
-    <ProgressBar
-        android:id="@+id/notif_progress_bar"
-        style="?android:attr/progressBarStyleHorizontal"
-        android:layout_width="match_parent"
-        android:layout_height="6dp"
-        android:layout_marginTop="12dp"
-        android:progressTint="#4CAF50"
-        android:progressBackgroundTint="#333333"
-        android:max="100"
-        android:progress="50" />
-
-</LinearLayout>
+</FrameLayout>

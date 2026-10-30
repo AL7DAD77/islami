@@ -4,6 +4,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.Uri;
+import android.os.Build;
 import android.os.PowerManager;
 import android.provider.Settings;
 import com.getcapacitor.JSObject;
@@ -56,6 +57,25 @@ public class SystemSettingsPlugin extends Plugin {
         }
     }
 
+    // ✅ الدالة الجديدة: طلب صلاحية الظهور فوق التطبيقات (لحماية الأذان)
+    @PluginMethod
+    public void requestOverlayPermission(PluginCall call) {
+        Context context = getContext();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (!Settings.canDrawOverlays(context)) {
+                try {
+                    Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                            Uri.parse("package:" + context.getPackageName()));
+                    getActivity().startActivity(intent);
+                } catch (Exception e) {
+                    call.reject("Failed to open overlay settings", e);
+                    return;
+                }
+            }
+        }
+        call.resolve();
+    }
+
     @PluginMethod
     public void setPreference(PluginCall call) {
         String key = call.getString("key");
@@ -82,7 +102,6 @@ public class SystemSettingsPlugin extends Plugin {
         }
     }
 
-    // ✅ دوال جديدة لحفظ وقراءة النصوص (مثل رقم الصوت)
     @PluginMethod
     public void setStringPreference(PluginCall call) {
         String key = call.getString("key");
@@ -102,7 +121,7 @@ public class SystemSettingsPlugin extends Plugin {
         if (key != null) {
             SharedPreferences prefs = getContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
             JSObject ret = new JSObject();
-            ret.put("value", prefs.getString(key, "1")); // الافتراضي "1"
+            ret.put("value", prefs.getString(key, "1"));
             call.resolve(ret);
         } else {
             call.reject("Missing key");

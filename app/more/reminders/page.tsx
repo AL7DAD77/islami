@@ -3,14 +3,13 @@
 import { useState, useEffect } from 'react'
 import { PageHeader } from '@/components/page-header'
 import { useSettings, useHydrated } from '@/lib/settings'
-import { Heart, BookOpen, Clock, Music, Settings2, Play, Square } from 'lucide-react'
+import { Heart, BookOpen, Clock, Music, Settings2, Play, Square, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Capacitor, registerPlugin } from '@capacitor/core'
 
 const AdhanScheduler = registerPlugin<any>('AdhanScheduler')
 const SystemSettings = registerPlugin<any>('SystemSettings')
 
-// متغيرات للتحكم في صوت التجربة
 let previewAudio: HTMLAudioElement | null = null
 
 export default function RemindersPage() {
@@ -18,10 +17,22 @@ export default function RemindersPage() {
   const hydrated = useHydrated()
   
   const [isPending, setIsPending] = useState<'salawat' | 'adhkar' | null>(null)
+  const [isSaving, setIsSaving] = useState<'salawat' | 'adhkar' | null>(null)
+  
   const [salawatSound, setSalawatSound] = useState('1')
   const [playingSound, setPlayingSound] = useState<string | null>(null)
 
-  // حالات مخصصة للوقت المخصص
+  // طلب صلاحية المنبهات الدقيقة عند فتح الصفحة (لضمان عمل التذكيرات)
+  useEffect(() => {
+    if (Capacitor.getPlatform() === 'android') {
+      AdhanScheduler.status().then((res: any) => {
+        if (res && !res.exactAlarmAllowed) {
+          AdhanScheduler.requestExactAlarm().catch(() => {})
+        }
+      }).catch(() => {})
+    }
+  }, [])
+
   const [showCustomSalawat, setShowCustomSalawat] = useState(false)
   const [customSalawatValue, setCustomSalawatValue] = useState('')
   const [customSalawatUnit, setCustomSalawatUnit] = useState<'min' | 'hr'>('min')
@@ -50,7 +61,6 @@ export default function RemindersPage() {
     if (hydrated) loadSettings()
   }, [hydrated])
 
-  // دالة إيقاف صوت التجربة
   const stopPreview = () => {
     if (previewAudio) {
       previewAudio.pause()
@@ -60,7 +70,6 @@ export default function RemindersPage() {
     setPlayingSound(null)
   }
 
-  // دالة تشغيل صوت التجربة
   const togglePreview = (soundId: string) => {
     if (playingSound === soundId) {
       stopPreview()
@@ -76,23 +85,24 @@ export default function RemindersPage() {
       previewAudio = audio
       setPlayingSound(soundId)
     }).catch(() => {
-      alert('لم يتم العثور على الملف الصوتي. تأكد من وجوده في مجلد public/audio/salawat/')
+      alert('لم يتم العثور على الملف الصوتي.')
       stopPreview()
     })
   }
 
   const handleSoundChange = async (val: string) => {
-    stopPreview() // إيقاف أي صوت يعمل عند التغيير
+    stopPreview()
     setSalawatSound(val)
     if (Capacitor.getPlatform() === 'android') {
       try { await SystemSettings.setStringPreference({ key: 'salawat_sound_id', value: val }) } catch (e) {}
     }
   }
 
-  const handleReminderToggle = async (type: 'salawat' | 'adhkar', enabled: boolean, minutes: number) => {
+  // ✅ دالة تُرجع (true/false) لكي نعرف هل نجح الحفظ أم لا
+  const handleReminderToggle = async (type: 'salawat' | 'adhkar', enabled: boolean, minutes: number): Promise<boolean> => {
     if (minutes < 1) {
       alert('الرجاء إدخال وقت صحيح (دقيقة واحدة على الأقل).')
-      return
+      return false
     }
 
     if (Capacitor.getPlatform() === 'android') {
@@ -116,29 +126,53 @@ export default function RemindersPage() {
           await AdhanScheduler.cancelReminder({ id: reminderId });
           update(type === 'salawat' ? { salawatEnabled: false } : { adhkarRemindersEnabled: false });
         }
+        return true; // ✅ نجح
       } catch (error) {
         console.error('خطأ في جدولة التذكيرات:', error);
-        alert('حدث خطأ في النظام.');
+        alert('حدث خطأ! يرجى التأكد من إعطاء صلاحية "المنبهات والتذكيرات" للتطبيق من إعدادات الهاتف.');
+        return false; // ❌ فشل
       } finally {
         setIsPending(null) 
       }
     } else {
       update(type === 'salawat' ? { salawatEnabled: enabled, salawatInterval: minutes } : { adhkarRemindersEnabled: enabled, adhkarRemindersInterval: minutes });
+      return true;
     }
   }
 
-  const applyCustomSalawat = () => {
+  // ✅ إصلاح زر الحفظ ليكون سريعاً ولا يتجمد
+  const applyCustomSalawat = async () => {
     const val = parseInt(customSalawatValue)
-    if (isNaN(val) || val <= 0) return
+    if (isNaN(val) || val <= 0) {
+      alert('الرجاء إدخال رقم صحيح أكبر من صفر')
+      return
+    }
+    
+    setIsSaving('salawat')
     const minutes = customSalawatUnit === 'hr' ? val * 60 : val
-    handleReminderToggle('salawat', true, minutes)
+    const success = await handleReminderToggle('salawat', true, minutes)
+    setIsSaving(null)
+    
+    if (success) {
+      setShowCustomSalawat(false)
+    }
   }
 
-  const applyCustomAdhkar = () => {
+  const applyCustomAdhkar = async () => {
     const val = parseInt(customAdhkarValue)
-    if (isNaN(val) || val <= 0) return
+    if (isNaN(val) || val <= 0) {
+      alert('الرجاء إدخال رقم صحيح أكبر من صفر')
+      return
+    }
+    
+    setIsSaving('adhkar')
     const minutes = customAdhkarUnit === 'hr' ? val * 60 : val
-    handleReminderToggle('adhkar', true, minutes)
+    const success = await handleReminderToggle('adhkar', true, minutes)
+    setIsSaving(null)
+    
+    if (success) {
+      setShowCustomAdhkar(false)
+    }
   }
 
   if (!hydrated) return null
@@ -187,8 +221,9 @@ export default function RemindersPage() {
                     <Clock className="size-3.5" /> التذكير كل:
                   </p>
                   <button 
+                    type="button"
                     onClick={() => setShowCustomSalawat(!showCustomSalawat)}
-                    className="text-xs font-bold text-emerald-700 flex items-center gap-1 hover:underline"
+                    className="text-xs font-bold text-emerald-700 flex items-center gap-1 hover:underline active:opacity-50"
                   >
                     <Settings2 className="size-3" /> تخصيص
                   </button>
@@ -199,10 +234,11 @@ export default function RemindersPage() {
                     {[30, 60, 120, 180].map((min) => (
                       <button
                         key={min}
+                        type="button"
                         disabled={isPending === 'salawat'}
                         onClick={() => handleReminderToggle('salawat', true, min)}
                         className={cn(
-                          'flex-1 rounded-xl py-2 text-sm font-medium transition',
+                          'flex-1 rounded-xl py-2 text-sm font-medium transition active:scale-95',
                           settings.salawatInterval === min ? 'bg-[#0a1f1a] text-white' : 'bg-[#f4ece1] text-[#5a3e1b]',
                           isPending === 'salawat' && 'opacity-50'
                         )}
@@ -212,35 +248,35 @@ export default function RemindersPage() {
                     ))}
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2 bg-[#f4ece1] p-2 rounded-xl">
+                  <div className="flex items-center gap-2 bg-[#f4ece1] p-2 rounded-xl relative z-10">
                     <input
                       type="number"
                       min="1"
                       value={customSalawatValue}
                       onChange={(e) => setCustomSalawatValue(e.target.value)}
                       placeholder="العدد"
-                      className="w-20 rounded-lg border border-[#e8dccb] px-2 py-1.5 text-center text-sm"
+                      className="w-16 rounded-lg border border-[#e8dccb] px-2 py-1.5 text-center text-sm bg-white"
                     />
                     <select
                       value={customSalawatUnit}
                       onChange={(e) => setCustomSalawatUnit(e.target.value as 'min' | 'hr')}
-                      className="rounded-lg border border-[#e8dccb] px-2 py-1.5 text-sm bg-white"
+                      className="rounded-lg border border-[#e8dccb] px-1 py-1.5 text-sm bg-white flex-1"
                     >
                       <option value="min">دقيقة</option>
                       <option value="hr">ساعة</option>
                     </select>
                     <button
+                      type="button"
                       onClick={applyCustomSalawat}
-                      disabled={isPending === 'salawat'}
-                      className="flex-1 rounded-lg bg-[#0a1f1a] py-1.5 text-sm text-white font-bold"
+                      disabled={isSaving === 'salawat' || isPending === 'salawat'}
+                      className="flex-1 rounded-lg bg-[#0a1f1a] py-2 text-sm text-white font-bold transition-all active:scale-95 disabled:opacity-70 shadow-md"
                     >
-                      حفظ التخصيص
+                      {isSaving === 'salawat' || isPending === 'salawat' ? 'جاري الحفظ...' : 'حفظ'}
                     </button>
                   </div>
                 )}
               </div>
 
-              {/* قائمة اختيار الصوت مع زر التجربة */}
               <div>
                 <p className="mb-2 text-xs font-medium text-muted-foreground flex items-center gap-1">
                   <Music className="size-3.5" /> نغمة التذكير:
@@ -255,18 +291,13 @@ export default function RemindersPage() {
                     <option value="2">الصوت الثاني</option>
                     <option value="3">الصوت الثالث</option>
                   </select>
-
-                  {/* زر التشغيل / الإيقاف */}
                   <button
                     type="button"
                     onClick={() => togglePreview(salawatSound)}
                     className={cn(
-                      'flex size-10 shrink-0 items-center justify-center rounded-xl transition',
-                      playingSound === salawatSound
-                        ? 'bg-rose-600 text-white'
-                        : 'bg-rose-100 text-rose-700 hover:bg-rose-200'
+                      'flex size-10 shrink-0 items-center justify-center rounded-xl transition active:scale-90',
+                      playingSound === salawatSound ? 'bg-rose-600 text-white' : 'bg-rose-100 text-rose-700 hover:bg-rose-200'
                     )}
-                    aria-label={playingSound === salawatSound ? 'إيقاف' : 'تجربة الصوت'}
                   >
                     {playingSound === salawatSound ? <Square className="size-4" /> : <Play className="size-4" />}
                   </button>
@@ -309,8 +340,9 @@ export default function RemindersPage() {
                   <Clock className="size-3.5" /> التذكير كل:
                 </p>
                 <button 
+                  type="button"
                   onClick={() => setShowCustomAdhkar(!showCustomAdhkar)}
-                  className="text-xs font-bold text-blue-700 flex items-center gap-1 hover:underline"
+                  className="text-xs font-bold text-blue-700 flex items-center gap-1 hover:underline active:opacity-50"
                 >
                   <Settings2 className="size-3" /> تخصيص
                 </button>
@@ -321,10 +353,11 @@ export default function RemindersPage() {
                   {[60, 180, 360, 720].map((min) => (
                     <button
                       key={min}
+                      type="button"
                       disabled={isPending === 'adhkar'}
                       onClick={() => handleReminderToggle('adhkar', true, min)}
                       className={cn(
-                        'flex-1 rounded-xl py-2 text-sm font-medium transition',
+                        'flex-1 rounded-xl py-2 text-sm font-medium transition active:scale-95',
                         settings.adhkarRemindersInterval === min ? 'bg-[#0a1f1a] text-white' : 'bg-[#f4ece1] text-[#5a3e1b]',
                         isPending === 'adhkar' && 'opacity-50'
                       )}
@@ -334,29 +367,30 @@ export default function RemindersPage() {
                   ))}
                 </div>
               ) : (
-                <div className="flex items-center gap-2 bg-[#f4ece1] p-2 rounded-xl">
+                <div className="flex items-center gap-2 bg-[#f4ece1] p-2 rounded-xl relative z-10">
                   <input
                     type="number"
                     min="1"
                     value={customAdhkarValue}
                     onChange={(e) => setCustomAdhkarValue(e.target.value)}
                     placeholder="العدد"
-                    className="w-20 rounded-lg border border-[#e8dccb] px-2 py-1.5 text-center text-sm"
+                    className="w-16 rounded-lg border border-[#e8dccb] px-2 py-1.5 text-center text-sm bg-white"
                   />
                   <select
                     value={customAdhkarUnit}
                     onChange={(e) => setCustomAdhkarUnit(e.target.value as 'min' | 'hr')}
-                    className="rounded-lg border border-[#e8dccb] px-2 py-1.5 text-sm bg-white"
+                    className="rounded-lg border border-[#e8dccb] px-1 py-1.5 text-sm bg-white flex-1"
                   >
                     <option value="min">دقيقة</option>
                     <option value="hr">ساعة</option>
                   </select>
                   <button
+                    type="button"
                     onClick={applyCustomAdhkar}
-                    disabled={isPending === 'adhkar'}
-                    className="flex-1 rounded-lg bg-[#0a1f1a] py-1.5 text-sm text-white font-bold"
+                    disabled={isSaving === 'adhkar' || isPending === 'adhkar'}
+                    className="flex-1 rounded-lg bg-[#0a1f1a] py-2 text-sm text-white font-bold transition-all active:scale-95 disabled:opacity-70 shadow-md"
                   >
-                    حفظ التخصيص
+                    {isSaving === 'adhkar' || isPending === 'adhkar' ? 'جاري الحفظ...' : 'حفظ'}
                   </button>
                 </div>
               )}

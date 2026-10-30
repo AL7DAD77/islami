@@ -129,9 +129,13 @@ public final class NotificationHelper {
             RemoteViews expandedView = new RemoteViews(context.getPackageName(), R.layout.notif_persistent);
 
             try {
+                // ✅ تحميل الشعار الصغير بجانب اسم الصلاة
                 expandedView.setImageViewBitmap(R.id.notif_logo, getAppIcon(context));
+                
+                // ✅ تحميل الشعار الكبير في الخلفية (Watermark)
+                expandedView.setImageViewBitmap(R.id.notif_watermark, getAppIcon(context));
             } catch (Exception e) {
-                Log.e(TAG, "خطأ في تحميل الشعار داخل الإشعار الدائم", e);
+                Log.e(TAG, "خطأ في تحميل الشعارات داخل الإشعار الدائم", e);
             }
             
             if (showNext) {
@@ -161,7 +165,6 @@ public final class NotificationHelper {
             }
 
             Notification notification = new NotificationCompat.Builder(context, PERSISTENT_CHANNEL_ID)
-                    // ✅ استخدام الأيقونة الخاصة بك
                     .setSmallIcon(R.drawable.ic_stat_adhan) 
                     .setContentTitle(title)
                     .setContentText(body)
@@ -189,12 +192,15 @@ public final class NotificationHelper {
             new Intent(context, AdhanReceiver.class).setAction(AdhanReceiver.ACTION_STOP_ADHAN), 
             PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0));
             
-        PendingIntent openAppIntent = openApp(context, 0);
+        // ✅ إنشاء نية لفتح الشاشة كاملة (لإيقاظ الهاتف وإجبار النظام على تشغيل الصوت حتى لو أُزيح الإشعار)
+        Intent fullScreenIntent = new Intent(context, MainActivity.class);
+        fullScreenIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        PendingIntent fullScreenPendingIntent = PendingIntent.getActivity(context, 1, 
+            fullScreenIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
         return new NotificationCompat.Builder(context, CHANNEL_ID)
                 .setContentTitle(title)
                 .setContentText(body)
-                // ✅ استخدام الأيقونة الخاصة بك
                 .setSmallIcon(R.drawable.ic_stat_adhan) 
                 .setLargeIcon(getAppIcon(context))
                 .setColor(APP_COLOR)
@@ -202,7 +208,9 @@ public final class NotificationHelper {
                 .setCategory(NotificationCompat.CATEGORY_ALARM)
                 .setOngoing(true)
                 .setAutoCancel(false)
-                .setContentIntent(openAppIntent)
+                .setContentIntent(openApp(context, 0))
+                // ✅ إجبار الهاتف على إيقاظ الشاشة وعرض الإشعار فوراً
+                .setFullScreenIntent(fullScreenPendingIntent, true) 
                 .addAction(android.R.drawable.ic_media_pause, "إيقاف الأذان", stopIntent)
                 .build();
     }
@@ -222,7 +230,6 @@ public final class NotificationHelper {
         Notification notification = new NotificationCompat.Builder(context, channelToUse)
                 .setContentTitle(title)
                 .setContentText(body)
-                // ✅ استخدام الأيقونة الخاصة بك
                 .setSmallIcon(R.drawable.ic_stat_adhan) 
                 .setLargeIcon(getAppIcon(context))
                 .setColor(APP_COLOR)

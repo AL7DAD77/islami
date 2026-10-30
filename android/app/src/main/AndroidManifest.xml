@@ -6,14 +6,13 @@
     <!-- الإنترنت وتحديث المواقيت -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    
+    <!-- الإشعارات -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- تحديد الموقع لحساب مواقيت الصلاة -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-
-    <!-- الإشعارات -->
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- الأذان والخدمة الأمامية -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -21,8 +20,12 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.VIBRATE" />
 
+    <!-- ✅ الصلاحية الجديدة: الظهور فوق التطبيقات (لحماية الأذان) -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
     <!-- التنبيهات الدقيقة لمواقيت الصلاة -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
 
     <!-- إعادة الجدولة بعد إعادة تشغيل الجهاز -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />

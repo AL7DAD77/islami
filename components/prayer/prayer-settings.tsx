@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { MapPin, Calculator, Bell, BellRing, ChevronDown, RefreshCw, Check, Vibrate } from 'lucide-react'
+import { MapPin, Calculator, Bell, BellRing, ChevronDown, RefreshCw, Check, Vibrate, ShieldAlert } from 'lucide-react'
 import { useSettings, useHydrated, type MethodKey, type PrayerKey } from '@/lib/settings'
 import { PRAYER_NAMES, PRAYER_ORDER } from '@/lib/prayer'
 import { CITIES, type City } from '@/lib/places'
@@ -122,12 +122,22 @@ export function PrayerSettings() {
   // ✅ دالة تفعيل/إطفاء الاهتزاز وحفظه في الجافا
   const toggleVibration = async () => {
     const nextValue = !settings.vibrationEnabled
-    update({ vibrationEnabled: nextValue }) // تحديث الواجهة
+    update({ vibrationEnabled: nextValue })
     try {
-      // تحديث الجافا (SharedPreferences)
       await SystemSettings.setPreference({ key: 'vibration_enabled', value: nextValue })
     } catch (e) {
       console.log("فشل حفظ إعداد الاهتزاز في الأندرويد", e)
+    }
+  }
+
+  // ✅ دالة طلب صلاحية الظهور فوق التطبيقات
+  const requestOverlayPermission = async () => {
+    try {
+      if (isNativePlatform()) {
+        await SystemSettings.requestOverlayPermission()
+      }
+    } catch (e) {
+      console.log("فشل فتح شاشة صلاحية الظهور", e)
     }
   }
 
@@ -312,7 +322,7 @@ export function PrayerSettings() {
             </button>
           </div>
 
-          {/* تفعيل الاهتزاز (مربوط الآن بالجافا) */}
+          {/* تفعيل الاهتزاز */}
           <div className="flex items-center justify-between gap-3 rounded-xl bg-muted/50 p-3">
             <div className="flex items-center gap-2 flex-1">
               <Vibrate className="size-5 text-muted-foreground" />
@@ -331,6 +341,25 @@ export function PrayerSettings() {
               <span className={cn('absolute top-0.5 size-5 rounded-full bg-white transition-all', settings.vibrationEnabled ? 'right-0.5' : 'right-5.5')} />
             </button>
           </div>
+
+          {/* ✅ صلاحية الظهور فوق التطبيقات (لضمان عمل الأذان) */}
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-900/50 dark:bg-amber-950/30">
+            <div className="flex items-center gap-2 flex-1">
+              <ShieldAlert className="size-5 text-amber-600 dark:text-amber-500" />
+              <div>
+                <p className="font-medium text-amber-900 dark:text-amber-100">الظهور فوق التطبيقات</p>
+                <p className="text-xs text-amber-800 dark:text-amber-200">ضروري لضمان عمل الأذان حتى لو أُغلق التطبيق</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={requestOverlayPermission}
+              className="rounded-lg bg-amber-600 px-3 py-2 text-xs font-bold text-white hover:bg-amber-700"
+            >
+              تفعيل
+            </button>
+          </div>
+
         </div>
       </section>
     </div>
