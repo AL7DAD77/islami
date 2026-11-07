@@ -2,7 +2,6 @@ package com.alhaddad.islami;
 
 import android.app.Notification;
 import android.app.Service;
-import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -17,17 +16,18 @@ import android.os.IBinder;
 import android.util.Log;
 
 import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
 
 /**
  * AdhanService
  * خدمة أمامية مسؤولة عن تشغيل صوت الأذان.
+ * يتوقف الأذان عند إطفاء الشاشة (زر الباور).
  */
 public final class AdhanService extends Service {
 
     private static final String TAG = "AdhanService";
 
-    public static final String ACTION_STOP_ADHAN =
-            "com.alhaddad.islami.STOP_ADHAN";
+    public static final String ACTION_STOP_ADHAN = "com.alhaddad.islami.STOP_ADHAN";
 
     private static final String EXTRA_FILE = "file";
     private static final String EXTRA_VOLUME = "volume";
@@ -38,40 +38,38 @@ public final class AdhanService extends Service {
     private static final String DEFAULT_BODY = "حي على الصلاة، حي على الفلاح";
 
     private MediaPlayer mediaPlayer;
-
     private AudioManager audioManager;
     private AudioFocusRequest audioFocusRequest;
+    private boolean screenReceiverRegistered = false;
 
     private final AudioManager.OnAudioFocusChangeListener audioFocusListener =
             new AudioManager.OnAudioFocusChangeListener() {
                 @Override
                 public void onAudioFocusChange(int focusChange) {
-                    if (focusChange == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT && mediaPlayer != null) {
-                        try {
+                    if (mediaPlayer == null) return;
+                    try {
+                        if (focusChange == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) {
                             mediaPlayer.setVolume(0.2f, 0.2f);
-                        } catch (Exception e) {
-                            Log.w(TAG, "خطأ في خفض الصوت عند فقدان التركيز المؤقت", e);
-                        }
-                    } else if (focusChange == AudioManager.AUDIOFOCUS_GAIN && mediaPlayer != null) {
-                        try {
+                        } else if (focusChange == AudioManager.AUDIOFOCUS_GAIN) {
                             mediaPlayer.setVolume(1.0f, 1.0f);
-                        } catch (Exception e) {
-                            Log.w(TAG, "خطأ في استعادة الصوت بعد استعادة التركيز", e);
                         }
+                    } catch (Exception e) {
+                        Log.w(TAG, "خطأ في تغيير مستوى الصوت حسب التركيز", e);
                     }
                 }
             };
 
-    private final BroadcastReceiver screenStateReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            String action = intent.getAction();
-            if (Intent.ACTION_SCREEN_OFF.equals(action) || Intent.ACTION_SCREEN_ON.equals(action)) {
-                Log.i(TAG, "تم تغيير حالة الشاشة - جاري إسكات الأذان");
-                stopPlayback();
-            }
-        }
-    };
+    // يستقبل إطفاء الشاشة (زر الباور) ويوقف الأذان فوراً
+    private final android.content.BroadcastReceiver screenOffReceiver =
+            new android.content.BroadcastReceiver() {
+                @Override
+                public void onReceive(Context context, Intent intent) {
+                    if (intent != null && Intent.ACTION_SCREEN_OFF.equals(intent.getAction())) {
+                        Log.i(TAG, "تم إطفاء الشاشة، إيقاف الأذان فوراً");
+                        stopPlayback(true);
+                    }
+                }
+            };
 
     @Override
     public void onCreate() {
@@ -79,23 +77,24 @@ public final class AdhanService extends Service {
         mediaPlayer = createMediaPlayer();
         audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
 
-        IntentFilter filter = new IntentFilter();
-        filter.addAction(Intent.ACTION_SCREEN_OFF);
-        filter.addAction(Intent.ACTION_SCREEN_ON);
-        registerReceiver(screenStateReceiver, filter);
+        if (!screenReceiverRegistered) {
+            IntentFilter filter = new IntentFilter(Intent.ACTION_SCREEN_OFF);
+            ContextCompat.registerReceiver(
+                    this,
+                    screenOffReceiver,
+                    filter,
+                    ContextCompat.RECEIVER_NOT_EXPORTED
+            );
+            screenReceiverRegistered = true;
+        }
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        if (intent == null) {
-            stopPlayback();
-            return START_NOT_STICKY;
-        }
-
-        String action = intent.getAction();
-
-        if (ACTION_STOP_ADHAN.equals(action)) {
-            stopPlayback();
+        // لازم نستدعي startForeground في كل الحالات قبل أي return، وإلا يحصل انهيار
+        if (intent == null || ACTION_STOP_ADHAN.equals(intent.getAction())) {
+            startForegroundWithType(NotificationHelper.buildPlaying(this, DEFAULT_TITLE, DEFAULT_BODY));
+            stopPlayback(true);
             return START_NOT_STICKY;
         }
 
@@ -104,37 +103,34 @@ public final class AdhanService extends Service {
         String title = intent.getStringExtra(EXTRA_TITLE);
         String body = intent.getStringExtra(EXTRA_BODY);
 
-        if (fileName == null || fileName.trim().isEmpty()) {
-            Log.e(TAG, "لم يتم توفير ملف صوتي للأذان");
-            stopPlayback();
-            return START_NOT_STICKY;
-        }
-
         Notification notification = NotificationHelper.buildPlaying(
                 this,
                 title == null || title.trim().isEmpty() ? DEFAULT_TITLE : title,
                 body == null || body.trim().isEmpty() ? DEFAULT_BODY : body
         );
-
         startForegroundWithType(notification);
-        playAdhan(fileName, volume);
 
+        if (fileName == null || fileName.trim().isEmpty()) {
+            Log.e(TAG, "لم يتم توفير ملف صوتي للأذان");
+            stopPlayback(true);
+            return START_NOT_STICKY;
+        }
+
+        playAdhan(fileName, volume);
         return START_NOT_STICKY;
     }
 
     private void playAdhan(String fileName, float volume) {
+        AssetFileDescriptor afd = null;
         try {
             if (mediaPlayer == null) {
                 mediaPlayer = createMediaPlayer();
             }
             mediaPlayer.reset();
-
             requestAudioFocus();
 
-            AssetFileDescriptor afd = getAssets().openFd("public/audio/adhans/" + fileName);
+            afd = getAssets().openFd("public/audio/adhans/" + fileName);
             mediaPlayer.setDataSource(afd.getFileDescriptor(), afd.getStartOffset(), afd.getLength());
-            afd.close();
-
             mediaPlayer.setVolume(volume, volume);
 
             mediaPlayer.setOnPreparedListener(player -> {
@@ -142,18 +138,18 @@ public final class AdhanService extends Service {
                     player.start();
                 } catch (Exception e) {
                     Log.e(TAG, "تعذر بدء تشغيل الأذان", e);
-                    stopPlayback();
+                    stopPlayback(true);
                 }
             });
 
             mediaPlayer.setOnCompletionListener(player -> {
                 Log.i(TAG, "انتهى تشغيل الأذان");
-                stopPlayback();
+                stopPlayback(true);
             });
 
             mediaPlayer.setOnErrorListener((player, what, extra) -> {
                 Log.e(TAG, "خطأ في مشغل الأذان: what=" + what + ", extra=" + extra);
-                stopPlayback();
+                stopPlayback(true);
                 return true;
             });
 
@@ -161,7 +157,14 @@ public final class AdhanService extends Service {
 
         } catch (Exception e) {
             Log.e(TAG, "خطأ في تحميل ملف الأذان: " + fileName, e);
-            stopPlayback();
+            stopPlayback(true);
+        } finally {
+            if (afd != null) {
+                try {
+                    afd.close();
+                } catch (Exception ignored) {
+                }
+            }
         }
     }
 
@@ -172,12 +175,12 @@ public final class AdhanService extends Service {
             }
             if (audioManager == null) return;
 
-            AudioAttributes attributes = new AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_ALARM)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                    .build();
-
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                AudioAttributes attributes = new AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .build();
+
                 audioFocusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
                         .setAudioAttributes(attributes)
                         .setAcceptsDelayedFocusGain(true)
@@ -191,14 +194,7 @@ public final class AdhanService extends Service {
                         AudioManager.AUDIOFOCUS_GAIN_TRANSIENT
                 );
             }
-
-            audioManager.adjustStreamVolume(
-                    AudioManager.STREAM_ALARM,
-                    AudioManager.ADJUST_SAME,
-                    0
-            );
-
-            Log.i(TAG, "تم طلب AudioFocus وتوجيه أزرار الصوت إلى STREAM_ALARM");
+            Log.i(TAG, "تم طلب AudioFocus");
         } catch (Exception e) {
             Log.e(TAG, "خطأ في طلب AudioFocus", e);
         }
@@ -218,31 +214,32 @@ public final class AdhanService extends Service {
         }
     }
 
-    private void stopPlayback() {
+    /**
+     * إيقاف الأذان وتنظيف الخدمة.
+     * @param scheduleNext هل تُجدول الصلاة التالية؟
+     */
+    private void stopPlayback(boolean scheduleNext) {
         try {
             if (mediaPlayer != null) {
                 mediaPlayer.setOnCompletionListener(null);
                 mediaPlayer.setOnErrorListener(null);
                 mediaPlayer.setOnPreparedListener(null);
-
                 if (mediaPlayer.isPlaying()) {
                     mediaPlayer.stop();
                 }
-
                 mediaPlayer.reset();
             }
         } catch (Exception e) {
             Log.w(TAG, "خطأ أثناء إيقاف مشغل الأذان", e);
         } finally {
             abandonAudioFocus();
-
             stopForegroundService();
             stopSelf();
-
             NotificationHelper.updatePersistent(this);
 
-            // ✅ الإضافة الحاسمة: جدولة الصلاة التالية بعد انتهاء الأذان
-            AdhanScheduler.scheduleNextAdhan(this);
+            if (scheduleNext) {
+                AdhanScheduler.scheduleNextAdhan(this);
+            }
         }
     }
 
@@ -261,10 +258,9 @@ public final class AdhanService extends Service {
                     notification,
                     ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
             );
-            return;
+        } else {
+            startForeground(NotificationHelper.ID_PLAYING, notification);
         }
-
-        startForeground(NotificationHelper.ID_PLAYING, notification);
     }
 
     private MediaPlayer createMediaPlayer() {
@@ -280,14 +276,16 @@ public final class AdhanService extends Service {
 
     @Override
     public void onDestroy() {
-        try {
-            unregisterReceiver(screenStateReceiver);
-        } catch (Exception e) {
-            Log.w(TAG, "تمت محاولة إلغاء تسجيل مستقبل غير مسجل", e);
+        if (screenReceiverRegistered) {
+            try {
+                unregisterReceiver(screenOffReceiver);
+            } catch (Exception e) {
+                Log.w(TAG, "تعذر إلغاء تسجيل مستقبل الشاشة", e);
+            }
+            screenReceiverRegistered = false;
         }
 
         abandonAudioFocus();
-
         releaseMediaPlayer();
         stopForegroundService();
         super.onDestroy();

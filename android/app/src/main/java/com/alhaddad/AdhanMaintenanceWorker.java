@@ -4,7 +4,6 @@ import android.content.Context;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
-import androidx.work.Constraints;
 import androidx.work.ExistingPeriodicWorkPolicy;
 import androidx.work.PeriodicWorkRequest;
 import androidx.work.WorkManager;
@@ -45,22 +44,16 @@ public final class AdhanMaintenanceWorker extends Worker {
     }
 
     public static void schedule(Context context) {
-        Constraints constraints = new Constraints.Builder()
-                .setRequiresBatteryNotLow(true)
-                .build();
-
         PeriodicWorkRequest request =
                 new PeriodicWorkRequest.Builder(
                         AdhanMaintenanceWorker.class,
                         6,
                         TimeUnit.HOURS
-                )
-                        .setConstraints(constraints)
-                        .build();
+                ).build();
 
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
                 WORK_NAME,
-                ExistingPeriodicWorkPolicy.KEEP,
+                ExistingPeriodicWorkPolicy.UPDATE,
                 request
         );
     }

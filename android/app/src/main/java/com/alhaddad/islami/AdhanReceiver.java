@@ -36,21 +36,21 @@ public final class AdhanReceiver extends BroadcastReceiver {
             return;
         }
 
-        // 2. استقبال التذكيرات (الأذكار والصلاة على النبي)
-        if ("com.alhaddad.islami.ACTION_REMINDER_ALARM".equals(action)) {
+        // 2. استقبال التذكيرات
+        if (AdhanScheduler.ACTION_REMINDER.equals(action)) {
             try {
-                int id = intent.getIntExtra("id", 777);
-                String title = intent.getStringExtra("title");
-                String body = intent.getStringExtra("body");
+                int id = intent.getIntExtra(EXTRA_ID, 777);
+                String title = intent.getStringExtra(EXTRA_TITLE);
+                String body = intent.getStringExtra(EXTRA_BODY);
                 long intervalMillis = intent.getLongExtra("intervalMillis", 3600000L);
 
-                // إظهار الإشعار (هنا يتم تشغيل الصوت - مشكلة القطع تُحل من داخل NotificationHelper)
-                NotificationHelper.showReminder(context, id, 
-                    title != null ? title : "تذكير", 
-                    body != null ? body : ""
+                NotificationHelper.showReminder(
+                        context,
+                        id,
+                        title != null ? title : "تذكير",
+                        body != null ? body : ""
                 );
 
-                // إعادة جدولة التذكير للمرة القادمة تلقائياً
                 AdhanScheduler.scheduleReminderAlarm(context, id, intervalMillis, title, body);
             } catch (Exception e) {
                 Log.e(TAG, "خطأ في معالجة التذكير، تم منع انهيار التطبيق", e);
@@ -58,19 +58,28 @@ public final class AdhanReceiver extends BroadcastReceiver {
             return;
         }
 
-        // 3. استقبال الأذان العادي
+        // 3. استقبال الأذان
         final String kind = intent.getStringExtra(EXTRA_KIND);
-        if (kind == null) return;
+        final boolean isAdhanAction = AdhanScheduler.ACTION_ALARM.equals(action);
+
+        if (!isAdhanAction && kind == null) return;
 
         try {
-            if ("adhan".equals(kind)) {
+            if (isAdhanAction || "adhan".equals(kind)) {
                 Intent serviceIntent = new Intent(context, AdhanService.class);
                 serviceIntent.putExtras(intent);
                 ContextCompat.startForegroundService(context, serviceIntent);
                 NotificationHelper.updatePersistent(context);
+                AdhanScheduler.scheduleNextAdhan(context);
+
             } else if ("reminder".equals(kind)) {
-                NotificationHelper.showReminder(context, intent.getIntExtra(EXTRA_ID, 0), 
-                    intent.getStringExtra(EXTRA_TITLE), intent.getStringExtra(EXTRA_BODY));
+                NotificationHelper.showReminder(
+                        context,
+                        intent.getIntExtra(EXTRA_ID, 0),
+                        intent.getStringExtra(EXTRA_TITLE),
+                        intent.getStringExtra(EXTRA_BODY)
+                );
+
             } else if ("time".equals(kind) || "phase".equals(kind)) {
                 NotificationHelper.updatePersistent(context);
             }
