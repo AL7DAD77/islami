@@ -1,138 +1,54 @@
-import type { Metadata } from 'next'
-import { LegalLayout, LegalSection, Contact } from '@/components/legal/legal-layout'
+'use client'
 
-export const metadata: Metadata = { title: 'سياسة الخصوصية | إسلامي' }
+import { LegalLayout, LegalSection, Contact } from '@/components/legal/legal-layout'
+import { useLanguage } from '@/lib/language-context'
 
 export default function PrivacyPage() {
+  const { dict, locale } = useLanguage()
+  const isAr = locale === 'ar'
+
+  const content = isAr ? {
+    intro: <>تشرح هذه السياسة كيف يتعامل تطبيق <strong>«إسلامي»</strong> مع المعلومات عند استخدامه، وما يُخزَّن على جهازك وما يُرسل إلى خدمات خارجية. نحن لا نطلب منك إنشاء حساب، ولا نطلب اسمك أو بريدك أو رقم هاتفك.</>,
+    sections: [
+      { title: '١. ما يُحفظ على جهازك فقط', body: <><p>يحفظ التطبيق على جهازك إعداداتك: طريقة الحساب، والمدينة وإحداثياتها، وأصوات الأذان المختارة، وأوقات التنبيه، والعلامات المرجعية، وآخر موضع قراءة، وتقدم الورد اليومي (ومتتبع الختمة)، وعداد المسبحة، وقائمة «عباداتي» لإنجاز اليوم، <strong>وإعدادات التذكيرات الذكية (الصلاة على النبي والأذكار)</strong>. هذه البيانات لا تُرسل إلينا، ويصفّر «عباداتي» تلقائيًا كل يوم. والبحث في التطبيق يعمل على المحتوى المحفوظ فيه دون أي اتصال بالإنترنت.</p><p><strong>لحذفها:</strong> من إعدادات الهاتف ← التطبيقات ← إسلامي ← التخزين ← مسح البيانات، أو ألغِ تثبيت التطبيق.</p></> },
+      { title: '٢. الموقع الجغرافي', body: <><p>يطلب التطبيق إذن الموقع <strong>اختياريًا</strong>، ويستخدمه لحساب مواقيت الصلاة واتجاه القبلة وتحديد مدينتك تلقائيًا. الحساب نفسه يتم على جهازك.</p><p>عند تحديد اسم مدينتك تلقائيًا، يُرسل التطبيق <strong>إحداثياتك التقريبية</strong> إلى خدمة تحويل الإحداثيات (BigDataCloud) لتعرف اسم المدينة. وعند البحث اليدوي عن مدينة، يُرسل النص الذي تكتبه إلى خدمة البحث عن المواقع (Open-Meteo).</p><p>يمكنك إلغاء إذن الموقع في أي وقت من إعدادات الهاتف، وعندها يستمر التطبيق بالمدينة التي اخترتها يدويًا.</p></> },
+      { title: '٣. الإشعارات والأذان', body: <><p>يحتاج التطبيق إذن <strong>الإشعارات</strong> لعرض مواعيد الصلاة والأذان، و<strong>المنبهات الدقيقة</strong> لتشغيل الأذان في وقته <strong>ولجدولة التذكيرات الذكية (الصلاة على النبي والأذكار الدورية)</strong>، و<strong>الخدمة الأمامية</strong> لتشغيل الأذان والإشعار الدائم، و<strong>التشغيل عند الإقلاع</strong> لإعادة جدولة الأذان بعد إعادة تشغيل الهاتف، و<strong>الاهتزاز</strong> عند الانتقال بين الأذكار.</p><p>التطبيق <strong>لا يرسل إشعارات تسويقية</strong>، وكل الإشعارات تُولَّد على جهازك بحسب مواقيت الصلاة أو الأوقات التي تختارها للتذكيرات.</p></> },
+      { title: '٤. الخدمات الخارجية', body: <><p>بعض الميزات تحتاج الاتصال بالإنترنت، وتُحمَّل منها البيانات مباشرة من خوادم تلك الخدمات. وكأي تطبيق يتصل بالإنترنت، تستقبل هذه الخدمات عنوان IP الخاص بجهازك حسب طبيعة الاتصال:</p><ul className="list-inside list-disc space-y-1"><li><strong>Al Quran Cloud</strong> (api.alquran.cloud): نصوص القرآن والأوراد، ويُرسل إليها رقم السورة أو الصفحة المطلوبة.</li><li><strong>mp3quran.net</strong>: قائمة القراء وبث التلاوات.</li><li><strong>Aladhan CDN</strong> (cdn.aladhan.com): ملفات صوت الأذان.</li><li><strong>BigDataCloud</strong>: تحويل الإحداثيات إلى اسم مدينة (انظر البند 2).</li><li><strong>Open-Meteo</strong>: البحث عن المدن بالاسم (انظر البند 2).</li></ul><p>عند تشغيل التلاوات الصوتية، يستخدم التطبيق نظام التشغيل (Media Session) لعرض أزرار التحكم على شاشة القفل، ولا يتم إرسال أي بيانات خاصة بك لهذا الغرض.</p><p>لكل خدمة سياسة خصوصية خاصة بها، ولا نتحكم في ما تفعله بالطلبات التي تستقبلها. يمكنك الاطلاع على سياساتها على مواقعها الرسمية.</p></> },
+      { title: '٥. التحليلات', body: <p>نسخة الموقع المنشورة تستخدم <strong>Vercel Analytics</strong> لقياس عدد الزيارات وأكثر الصفحات استخدامًا، وهي تحليلات مجمّعة ومجهولة الهوية، ولا تستخدم ملفات تعريف الارتباط (Cookies) ولا تتبعك بين التطبيقات.</p> },
+      { title: '٦. الإعلانات', body: <p>التطبيق <strong>مجاني وخالٍ من الإعلانات</strong>، ولا يستخدم أي أدوات تتبع إعلانية، ولا يبيع بياناتك لأحد.</p> },
+      { title: '٦.١. المحتوى الحديثي', body: <p>قسم "الصحيحان" يعتمد على ملفات JSON محلية (offline) مصدرها موقع Sunnah.com. لا يتم إرسال أي بيانات من جهازك إلى Sunnah.com. جميع النصوص محفوظة على جهازك ولا تتطلب اتصالاً بالإنترنت لعرضها.</p> },
+      { title: '٧. الأطفال', body: <p>يحتوي التطبيق على قسم مخصص للأطفال. <strong>لا نجمع أي بيانات من الأطفال</strong>، ولا نطلب منهم معلومات شخصية، ولا يتضمن التطبيق حسابات أو محادثات أو ميزات مشاركة مع الغرباء. ننصح ولي الأمر بالإشراف على استخدام الأطفال للتطبيق.</p> },
+      { title: '٨. الملاحظات والتواصل معنا', body: <p>إذا أرسلت لنا ملاحظة أو تقرير خطأ من صفحة «الدعم والتواصل» في قسم «حول التطبيق»، فإن ما ترسله يصلنا عبر بريدك ويُستخدم فقط للرد عليك وتحسين التطبيق. لا نضيفك إلى أي قائمة بريدية.</p> },
+      { title: '٩. حقوقك', body: <><p>لك الحق في معرفة ما نحتفظ به عنك، وطلب تصحيحه أو حذفه، والاعتراض على معالجته. وبما أن التطبيق لا يحفظ معلومات شخصية على خوادمنا، فغالب ما يُحذف هو ما يُراسلنا به عبر البريد. وقد تمنحك قوانين بلدك حقوقًا إضافية، مثل قوانين حماية البيانات المعمول بها لديك.</p><Contact /></> },
+      { title: '١٠. نقل البيانات خارج بلدك', body: <p>بعض الخدمات الخارجية المذكورة أعلاه تعمل من خارج بلدك، فقد تُعالج طلباتك خارج حدود بلدك وفق قوانينها.</p> },
+      { title: '١١. الأمان', body: <p>نبذل جهدنا لتقليل ما نتعامل معه من بيانات، لكن لا يوجد نظام آمن بشكل مطلق. أمان جهازك وحمايته بكلمة مرور هي أول خط دفاع لبياناتك المحفوظة عليه.</p> },
+      { title: '١٢. تغيير هذه السياسة', body: <p>قد نحدّث هذه السياسة عند إضافة ميزات جديدة. سيظهر تاريخ آخر تحديث في أعلى الصفحة، وستنطبق التغييرات الجوهرية بعد نشرها هنا.</p> },
+    ]
+  } : {
+    intro: <>This policy explains how the <strong>"Islami"</strong> app handles information when used, what is stored on your device, and what is sent to external services. We do not ask you to create an account, nor do we ask for your name, email, or phone number.</>,
+    sections: [
+      { title: '1. What is stored only on your device', body: <><p>The app stores on your device your settings: calculation method, city and coordinates, selected Adhan sounds, alert times, bookmarks, last reading position, daily wird progress (and Khatmah tracker), tasbih counter, "My Worship" list for today's completion, <strong>and smart reminder settings (Salawat on the Prophet and Adhkar)</strong>. This data is not sent to us, and "My Worship" resets automatically every day. In-app search works on locally stored content without any internet connection.</p><p><strong>To delete it:</strong> From phone settings → Apps → Islami → Storage → Clear data, or uninstall the app.</p></> },
+      { title: '2. Geolocation', body: <><p>The app requests location permission <strong>optionally</strong>, and uses it to calculate prayer times and Qibla direction and automatically determine your city. The calculation itself is done on your device.</p><p>When automatically determining your city name, the app sends your <strong>approximate coordinates</strong> to a coordinate conversion service (BigDataCloud) to know the city name. When manually searching for a city, the text you type is sent to a location search service (Open-Meteo).</p><p>You can revoke location permission at any time from phone settings, and the app will continue with the city you manually selected.</p></> },
+      { title: '3. Notifications and Adhan', body: <><p>The app needs <strong>notifications</strong> permission to display prayer times and Adhan, <strong>exact alarms</strong> to play Adhan on time <strong>and to schedule smart reminders (Salawat on the Prophet and periodic Adhkar)</strong>, <strong>foreground service</strong> to play Adhan and the ongoing notification, <strong>boot startup</strong> to reschedule Adhan after phone restart, and <strong>vibration</strong> when transitioning between adhkar.</p><p>The app <strong>does not send marketing notifications</strong>, and all notifications are generated on your device based on prayer times or the times you choose for reminders.</p></> },
+      { title: '4. External Services', body: <><p>Some features need internet connection, and data is loaded directly from those services' servers. Like any app connecting to the internet, these services receive your device's IP address according to the nature of the connection:</p><ul className="list-inside list-disc space-y-1"><li><strong>Al Quran Cloud</strong> (api.alquran.cloud): Quran texts and wirds; the requested surah or page number is sent to them.</li><li><strong>mp3quran.net</strong>: Reciters list and recitation streaming.</li><li><strong>Aladhan CDN</strong> (cdn.aladhan.com): Adhan audio files.</li><li><strong>BigDataCloud</strong>: Convert coordinates to city name (see section 2).</li><li><strong>Open-Meteo</strong>: Search for cities by name (see section 2).</li></ul><p>When playing audio recitations, the app uses the operating system (Media Session) to display control buttons on the lock screen, and no personal data is sent for this purpose.</p><p>Each service has its own privacy policy, and we do not control what it does with the requests it receives. You can review their policies on their official websites.</p></> },
+      { title: '5. Analytics', body: <p>The published website version uses <strong>Vercel Analytics</strong> to measure visit counts and most-used pages, which is aggregated and anonymous analytics, does not use cookies, and does not track you across apps.</p> },
+      { title: '6. Ads', body: <p>The app is <strong>free and ad-free</strong>, does not use any ad tracking tools, and does not sell your data to anyone.</p> },
+      { title: '6.1. Hadith Content', body: <p>The "Two Sahihs" section relies on local JSON files (offline) sourced from Sunnah.com. No data is sent from your device to Sunnah.com. All texts are stored on your device and do not require an internet connection to display.</p> },
+      { title: '7. Children', body: <p>The app has a dedicated section for children. <strong>We do not collect any data from children</strong>, do not ask them for personal information, and the app does not include accounts, chats, or features for sharing with strangers. We recommend parents supervise children's use of the app.</p> },
+      { title: '8. Feedback and Contact', body: <p>If you send us feedback or a bug report from the "Support & Contact" page in the "About App" section, what you send reaches us via your email and is used only to reply to you and improve the app. We do not add you to any mailing list.</p> },
+      { title: '9. Your Rights', body: <><p>You have the right to know what we hold about you, request its correction or deletion, and object to its processing. Since the app does not store personal information on our servers, what is often deleted is what is emailed to us. Your country's laws may grant you additional rights, such as applicable data protection laws.</p><Contact /></> },
+      { title: '10. Data Transfer Outside Your Country', body: <p>Some of the external services mentioned above operate from outside your country, so your requests may be processed outside your country's borders according to their laws.</p> },
+      { title: '11. Security', body: <p>We do our best to minimize the data we handle, but no system is absolutely secure. The security of your device and protecting it with a password is the first line of defense for data stored on it.</p> },
+      { title: '12. Changes to This Policy', body: <p>We may update this policy when adding new features. The last update date will appear at the top of the page, and material changes will apply after being published here.</p> },
+    ]
+  }
+
   return (
-    <LegalLayout title="سياسة الخصوصية" updated="أكتوبر 2026">
-      <p>
-        تشرح هذه السياسة كيف يتعامل تطبيق <strong>«إسلامي»</strong> مع المعلومات عند استخدامه، وما يُخزَّن على جهازك وما
-        يُرسل إلى خدمات خارجية. نحن لا نطلب منك إنشاء حساب، ولا نطلب اسمك أو بريدك أو رقم هاتفك.
-      </p>
-
-      <LegalSection title="١. ما يُحفظ على جهازك فقط">
-        <p>
-          يحفظ التطبيق على جهازك إعداداتك: طريقة الحساب، والمدينة وإحداثياتها، وأصوات الأذان المختارة، وأوقات التنبيه،
-          والعلامات المرجعية، وآخر موضع قراءة، وتقدم الورد اليومي (ومتتبع الختمة)، وعداد المسبحة، وقائمة «عباداتي» لإنجاز اليوم، <strong>وإعدادات التذكيرات الذكية (الصلاة على النبي والأذكار)</strong>. هذه البيانات لا تُرسل إلينا، ويصفّر «عباداتي» تلقائيًا كل يوم. والبحث في التطبيق يعمل على المحتوى المحفوظ فيه دون أي اتصال بالإنترنت.
-        </p>
-        <p>
-          <strong>لحذفها:</strong> من إعدادات الهاتف ← التطبيقات ← إسلامي ← التخزين ← مسح البيانات، أو ألغِ تثبيت التطبيق.
-        </p>
-      </LegalSection>
-
-      <LegalSection title="٢. الموقع الجغرافي">
-        <p>
-          يطلب التطبيق إذن الموقع <strong>اختياريًا</strong>، ويستخدمه لحساب مواقيت الصلاة واتجاه القبلة وتحديد مدينتك
-          تلقائيًا. الحساب نفسه يتم على جهازك.
-        </p>
-        <p>
-          عند تحديد اسم مدينتك تلقائيًا، يُرسل التطبيق <strong>إحداثياتك التقريبية</strong> إلى خدمة تحويل الإحداثيات
-          (BigDataCloud) لتعرف اسم المدينة. وعند البحث اليدوي عن مدينة، يُرسل النص الذي تكتبه إلى خدمة البحث عن
-          المواقع (Open-Meteo).
-        </p>
-        <p>يمكنك إلغاء إذن الموقع في أي وقت من إعدادات الهاتف، وعندها يستمر التطبيق بالمدينة التي اخترتها يدويًا.</p>
-      </LegalSection>
-
-      <LegalSection title="٣. الإشعارات والأذان">
-        <p>
-          يحتاج التطبيق إذن <strong>الإشعارات</strong> لعرض مواعيد الصلاة والأذان، و<strong>المنبهات الدقيقة</strong> لتشغيل
-          الأذان في وقته <strong>ولجدولة التذكيرات الذكية (الصلاة على النبي والأذكار الدورية)</strong>، و<strong>الخدمة الأمامية</strong> لتشغيل الأذان والإشعار الدائم، و<strong>التشغيل عند الإقلاع</strong>
-          لإعادة جدولة الأذان بعد إعادة تشغيل الهاتف، و<strong>الاهتزاز</strong> عند الانتقال بين الأذكار.
-        </p>
-        <p>
-          التطبيق <strong>لا يرسل إشعارات تسويقية</strong>، وكل الإشعارات تُولَّد على جهازك بحسب مواقيت الصلاة أو الأوقات التي تختارها للتذكيرات.
-        </p>
-      </LegalSection>
-
-      <LegalSection title="٤. الخدمات الخارجية">
-        <p>
-          بعض الميزات تحتاج الاتصال بالإنترنت، وتُحمَّل منها البيانات مباشرة من خوادم تلك الخدمات. وكأي تطبيق يتصل
-          بالإنترنت، تستقبل هذه الخدمات عنوان IP الخاص بجهازك حسب طبيعة الاتصال:
-        </p>
-        <ul className="list-inside list-disc space-y-1">
-          <li>
-            <strong>Al Quran Cloud</strong> (api.alquran.cloud): نصوص القرآن والأوراد، ويُرسل إليها رقم السورة أو الصفحة
-            المطلوبة.
-          </li>
-          <li>
-            <strong>mp3quran.net</strong>: قائمة القراء وبث التلاوات.
-          </li>
-          <li>
-            <strong>Aladhan CDN</strong> (cdn.aladhan.com): ملفات صوت الأذان.
-          </li>
-          <li>
-            <strong>BigDataCloud</strong>: تحويل الإحداثيات إلى اسم مدينة (انظر البند 2).
-          </li>
-          <li>
-            <strong>Open-Meteo</strong>: البحث عن المدن بالاسم (انظر البند 2).
-          </li>
-        </ul>
-        <p>
-          عند تشغيل التلاوات الصوتية، يستخدم التطبيق نظام التشغيل (Media Session) لعرض أزرار التحكم على شاشة القفل، ولا يتم إرسال أي بيانات خاصة بك لهذا الغرض.
-        </p>
-        <p>
-          لكل خدمة سياسة خصوصية خاصة بها، ولا نتحكم في ما تفعله بالطلبات التي تستقبلها. يمكنك الاطلاع على سياساتها على
-          مواقعها الرسمية.
-        </p>
-      </LegalSection>
-
-      <LegalSection title="٥. التحليلات">
-        <p>
-          نسخة الموقع المنشورة تستخدم <strong>Vercel Analytics</strong> لقياس عدد الزيارات وأكثر الصفحات استخدامًا، وهي
-          تحليلات مجمّعة ومجهولة الهوية، ولا تستخدم ملفات تعريف الارتباط (Cookies) ولا تتبعك بين التطبيقات.
-        </p>
-      </LegalSection>
-
-      <LegalSection title="٦. الإعلانات">
-        <p>
-          التطبيق <strong>مجاني وخالٍ من الإعلانات</strong>، ولا يستخدم أي أدوات تتبع إعلانية، ولا يبيع بياناتك لأحد.
-        </p>
-      </LegalSection>
-
-      <LegalSection title="٧. الأطفال">
-        <p>
-          يحتوي التطبيق على قسم مخصص للأطفال. <strong>لا نجمع أي بيانات من الأطفال</strong>، ولا نطلب منهم معلومات شخصية،
-          ولا يتضمن التطبيق حسابات أو محادثات أو ميزات مشاركة مع الغرباء. ننصح ولي الأمر بالإشراف على استخدام الأطفال
-          للتطبيق.
-        </p>
-      </LegalSection>
-
-      <LegalSection title="٨. الملاحظات والتواصل معنا">
-        <p>
-          إذا أرسلت لنا ملاحظة أو تقرير خطأ من صفحة «الدعم والتواصل» في قسم «حول التطبيق»، فإن ما ترسله يصلنا عبر بريدك ويُستخدم فقط للرد
-          عليك وتحسين التطبيق. لا نضيفك إلى أي قائمة بريدية.
-        </p>
-      </LegalSection>
-
-      <LegalSection title="٩. حقوقك">
-        <p>
-          لك الحق في معرفة ما نحتفظ به عنك، وطلب تصحيحه أو حذفه، والاعتراض على معالجته. وبما أن التطبيق لا يحفظ معلومات
-          شخصية على خوادمنا، فغالب ما يُحذف هو ما يُراسلنا به عبر البريد. وقد تمنحك قوانين بلدك حقوقًا إضافية، مثل
-          قوانين حماية البيانات المعمول بها لديك.
-        </p>
-        <Contact />
-      </LegalSection>
-
-      <LegalSection title="١٠. نقل البيانات خارج بلدك">
-        <p>
-          بعض الخدمات الخارجية المذكورة أعلاه تعمل من خارج بلدك، فقد تُعالج طلباتك خارج حدود بلدك وفق قوانينها.
-        </p>
-      </LegalSection>
-
-      <LegalSection title="١١. الأمان">
-        <p>
-          نبذل جهدنا لتقليل ما نتعامل معه من بيانات، لكن لا يوجد نظام آمن بشكل مطلق. أمان جهازك وحمايته بكلمة مرور هي
-          أول خط دفاع لبياناتك المحفوظة عليه.
-        </p>
-      </LegalSection>
-
-      <LegalSection title="١٢. تغيير هذه السياسة">
-        <p>
-          قد نحدّث هذه السياسة عند إضافة ميزات جديدة. سيظهر تاريخ آخر تحديث في أعلى الصفحة، وستنطبق التغييرات الجوهرية بعد
-          نشرها هنا.
-        </p>
-      </LegalSection>
+    <LegalLayout title={dict.legal.privacy.title} updated={dict.legal.privacy.updated}>
+      <p>{content.intro}</p>
+      {content.sections.map((s, i) => (
+        <LegalSection key={i} title={s.title}>{s.body}</LegalSection>
+      ))}
     </LegalLayout>
   )
 }

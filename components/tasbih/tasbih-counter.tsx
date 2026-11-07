@@ -2,11 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { RotateCcw, Check, ChevronRight } from 'lucide-react'
-import { toArabicNumber } from '@/lib/quran'
-import { useHydrated } from '@/lib/settings'
+import { useHydrated, useSettings } from '@/lib/settings'
+import { useNumberFormat } from '@/lib/numbers'
 import { cn } from '@/lib/utils'
 
-// ============ الأذكار ============
 const TASBIH_ITEMS = [
   { text: 'سُبْحَانَ اللَّهِ', target: 33 },
   { text: 'الْحَمْدُ لِلَّهِ', target: 33 },
@@ -41,9 +40,12 @@ function loadState(): TasbihState {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return DEFAULT_STATE
     const parsed = JSON.parse(raw) as TasbihState
-    // ⚠️ إعادة تعيين إذا تغيّر اليوم
     if (parsed.lastDate !== new Date().toDateString()) {
-      return { ...parsed, dailyTotal: 0, lastDate: new Date().toDateString() }
+      return {
+        ...parsed,
+        dailyTotal: 0,
+        lastDate: new Date().toDateString(),
+      }
     }
     return parsed
   } catch {
@@ -60,15 +62,17 @@ function saveState(state: TasbihState) {
 
 export function TasbihCounter() {
   const hydrated = useHydrated()
+  const [settings] = useSettings()
+  const vibrationEnabled = settings.vibrationEnabled
+  const { formatValue } = useNumberFormat()
+
   const [state, setState] = useState<TasbihState>(DEFAULT_STATE)
   const [completed, setCompleted] = useState(false)
 
-  // ⚠️ تحميل الحالة
   useEffect(() => {
     if (hydrated) setState(loadState())
   }, [hydrated])
 
-  // ⚠️ حفظ عند كل تغيير
   useEffect(() => {
     if (hydrated) saveState(state)
   }, [state, hydrated])
@@ -82,21 +86,24 @@ export function TasbihCounter() {
   const done = state.count >= current.target
 
   const handleTap = () => {
-    if ('vibrate' in navigator) navigator.vibrate(10)
+    if (vibrationEnabled && 'vibrate' in navigator) {
+      navigator.vibrate(10)
+    }
 
     setState((prev) => {
       const next = prev.count + 1
       const currentTarget = TASBIH_ITEMS[prev.index].target
 
-      // ⚠️ وصل للهدف
       if (next >= currentTarget) {
-        // ⚠️ تأثير الإكمال
         setCompleted(true)
         setTimeout(() => setCompleted(false), 800)
-        if ('vibrate' in navigator) navigator.vibrate([30, 50, 30])
 
-        // ⚠️ الانتقال التلقائي للذكر التالي
+        if (vibrationEnabled && 'vibrate' in navigator) {
+          navigator.vibrate([30, 50, 30])
+        }
+
         const nextIndex = (prev.index + 1) % TASBIH_ITEMS.length
+
         return {
           index: nextIndex,
           count: 0,
@@ -134,23 +141,30 @@ export function TasbihCounter() {
   const handlePrev = () => {
     setState((prev) => ({
       ...prev,
-      index: prev.index === 0 ? TASBIH_ITEMS.length - 1 : prev.index - 1,
+      index:
+        prev.index === 0
+          ? TASBIH_ITEMS.length - 1
+          : prev.index - 1,
       count: 0,
     }))
   }
 
   return (
     <div data-no-swipe className="flex flex-col items-center gap-6">
-      {/* ============ الذكر الحالي ============ */}
       <div className="w-full text-center">
         <p className="text-xs text-muted-foreground">
-          {`الذكر ${toArabicNumber(state.index + 1)} من ${toArabicNumber(TASBIH_ITEMS.length)}`}
+          {`الذكر ${formatValue(state.index + 1)} من ${formatValue(TASBIH_ITEMS.length)}`}
         </p>
-        <p className="mt-2 font-quran text-2xl leading-relaxed text-foreground">{current.text}</p>
-        <p className="mt-1 text-xs text-muted-foreground">{`الهدف: ${toArabicNumber(current.target)} مرة`}</p>
+
+        <p className="mt-2 font-quran text-2xl leading-relaxed text-foreground">
+          {current.text}
+        </p>
+
+        <p className="mt-1 text-xs text-muted-foreground">
+          {`الهدف: ${formatValue(current.target)} مرة`}
+        </p>
       </div>
 
-      {/* ============ زر العدّ الرئيسي ============ */}
       <button
         type="button"
         onClick={handleTap}
@@ -160,9 +174,20 @@ export function TasbihCounter() {
           completed && 'ring-4 ring-gold',
         )}
       >
-        {/* دائرة التقدم */}
-        <svg className="absolute inset-0 size-full -rotate-90" viewBox="0 0 100 100" aria-hidden="true">
-          <circle cx="50" cy="50" r="46" fill="none" stroke="currentColor" strokeWidth="3" className="text-muted-foreground/20" />
+        <svg
+          className="absolute inset-0 size-full -rotate-90"
+          viewBox="0 0 100 100"
+          aria-hidden="true"
+        >
+          <circle
+            cx="50"
+            cy="50"
+            r="46"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="3"
+            className="text-muted-foreground/20"
+          />
           <circle
             cx="50"
             cy="50"
@@ -176,20 +201,22 @@ export function TasbihCounter() {
           />
         </svg>
 
-        {/* الرقم */}
         <div className="flex flex-col items-center">
           {done ? (
             <Check className="size-16 text-primary" aria-hidden="true" />
           ) : (
             <>
-              <span className="text-7xl font-bold tabular-nums text-foreground">{toArabicNumber(state.count)}</span>
-              <span className="mt-1 text-xs text-muted-foreground">{`من ${toArabicNumber(current.target)}`}</span>
+              <span className="text-7xl font-bold tabular-nums text-foreground">
+                {formatValue(state.count)}
+              </span>
+              <span className="mt-1 text-xs text-muted-foreground">
+                {`من ${formatValue(current.target)}`}
+              </span>
             </>
           )}
         </div>
       </button>
 
-      {/* ============ أزرار التحكم ============ */}
       <div className="flex w-full items-center justify-between">
         <button
           type="button"
@@ -219,21 +246,30 @@ export function TasbihCounter() {
         </button>
       </div>
 
-      {/* ============ مجموع اليوم ============ */}
       <p className="text-sm text-muted-foreground">
         {'مجموع اليوم: '}
-        <span className="font-bold text-foreground">{toArabicNumber(state.dailyTotal)}</span>
+        <span className="font-bold text-foreground">
+          {formatValue(state.dailyTotal)}
+        </span>
       </p>
 
-      {/* ============ قائمة الأذكار ============ */}
       <div className="w-full rounded-2xl bg-card p-4 shadow-sm ring-1 ring-border">
-        <h3 className="mb-3 text-sm font-bold text-muted-foreground">{'الأذكار'}</h3>
+        <h3 className="mb-3 text-sm font-bold text-muted-foreground">
+          {'الأذكار'}
+        </h3>
+
         <div className="flex flex-wrap gap-2">
           {TASBIH_ITEMS.map((item, i) => (
             <button
               key={i}
               type="button"
-              onClick={() => setState((prev) => ({ ...prev, index: i, count: 0 }))}
+              onClick={() =>
+                setState((prev) => ({
+                  ...prev,
+                  index: i,
+                  count: 0,
+                }))
+              }
               className={cn(
                 'rounded-full px-3 py-1.5 text-xs transition',
                 i === state.index

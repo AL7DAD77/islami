@@ -14,16 +14,16 @@ export type IbadatiKey =
   | 'quran'
   | 'sleep'
 
-export const IBADATI_ITEMS: { key: IbadatiKey; label: string; group: 'prayer' | 'dhikr' | 'quran' }[] = [
-  { key: 'fajr', label: 'صلاة الفجر', group: 'prayer' },
-  { key: 'dhuhr', label: 'صلاة الظهر', group: 'prayer' },
-  { key: 'asr', label: 'صلاة العصر', group: 'prayer' },
-  { key: 'maghrib', label: 'صلاة المغرب', group: 'prayer' },
-  { key: 'isha', label: 'صلاة العشاء', group: 'prayer' },
-  { key: 'morning', label: 'أذكار الصباح', group: 'dhikr' },
-  { key: 'evening', label: 'أذكار المساء', group: 'dhikr' },
-  { key: 'sleep', label: 'أذكار النوم', group: 'dhikr' },
-  { key: 'quran', label: 'ورد من القرآن', group: 'quran' },
+export const IBADATI_ITEMS: { key: IbadatiKey; group: 'prayer' | 'dhikr' | 'quran' }[] = [
+  { key: 'fajr', group: 'prayer' },
+  { key: 'dhuhr', group: 'prayer' },
+  { key: 'asr', group: 'prayer' },
+  { key: 'maghrib', group: 'prayer' },
+  { key: 'isha', group: 'prayer' },
+  { key: 'morning', group: 'dhikr' },
+  { key: 'evening', group: 'dhikr' },
+  { key: 'sleep', group: 'dhikr' },
+  { key: 'quran', group: 'quran' },
 ]
 
 export interface IbadatiState {
@@ -67,20 +67,8 @@ export function progress(state: IbadatiState): { count: number; total: number; p
   return { count, total, percent: Math.round((count / total) * 100) }
 }
 
-/** تحدٍّ يومي ثابت لليوم نفسه (يتغير كل يوم)، من أعمال عامة لا تحتاج فتوى */
-export const DAILY_CHALLENGES: string[] = [
-  'اقرأ صفحة من القرآن الكريم بتدبّر',
-  'استغفر الله مئة مرة',
-  'تصدّق ولو بشيء قليل',
-  'صل صلة رحم بمكالمة أو زيارة',
-  'ابتسم في وجه أخيك، فهي صدقة',
-  'أكثر من الصلاة على النبي ﷺ اليوم',
-  'ساعد أحداً من أهل بيتك دون أن يطلب',
-  'اقرأ حديثاً من الأحاديث المختارة في التطبيق',
-]
-
-export function challengeFor(date: string): string {
-  // مجموع أرقام التاريخ يعطي فهرساً ثابتاً لكل يوم
+/** يعيد فهرس التحدي اليومي بناءً على التاريخ (ثابت لكل يوم، يتغير يومياً) */
+export function challengeIndexFor(date: string): number {
   const sum = date.split('').reduce((a, c) => a + (c >= '0' && c <= '9' ? Number(c) : 0), 0)
-  return DAILY_CHALLENGES[sum % DAILY_CHALLENGES.length]
+  return sum % 8 // لدينا 8 تحديات في ملف الترجمة
 }

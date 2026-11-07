@@ -1,14 +1,20 @@
-import type { Metadata } from 'next'
+'use client'
+
 import { PageHeader } from '@/components/page-header'
 import { LessonList } from '@/components/learn/lesson-list'
 import { MUSLIM_GUIDE } from '@/lib/learn'
-
-export const metadata: Metadata = { title: 'دليل المسلم | إسلامي' }
+import { useLanguage } from '@/lib/language-context'
 
 export default function GuidePage() {
+  const { dict } = useLanguage()
+
   return (
     <>
-      <PageHeader title="دليل المسلم" subtitle="الوضوء، الصلاة، الطهارة، الصيام، الزكاة وأحكام أخرى" backHref="/more" />
+      <PageHeader 
+        title={dict.guidePage.title} 
+        subtitle={dict.guidePage.subtitle} 
+        backHref="/more" 
+      />
       <LessonList lessons={MUSLIM_GUIDE} />
     </>
   )

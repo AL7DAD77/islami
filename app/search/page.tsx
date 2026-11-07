@@ -1,13 +1,19 @@
-import type { Metadata } from 'next'
+'use client'
+
 import { PageHeader } from '@/components/page-header'
 import { SearchView } from '@/components/search/search-view'
-
-export const metadata: Metadata = { title: 'البحث | إسلامي' }
+import { useLanguage } from '@/lib/language-context'
 
 export default function SearchPage() {
+  const { dict } = useLanguage()
+
   return (
     <>
-      <PageHeader title="البحث" subtitle="في الأذكار والأنبياء والأحاديث والغزوات والسنن" backHref="/more" />
+      <PageHeader 
+        title={dict.searchPage.title} 
+        subtitle={dict.searchPage.subtitle} 
+        backHref="/more" 
+      />
       <SearchView />
     </>
   )

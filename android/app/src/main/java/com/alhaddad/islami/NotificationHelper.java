@@ -29,18 +29,35 @@ public final class NotificationHelper {
     private static final String TAG = "NotificationHelper";
     private static final String PREFS_NAME = "IslamiSettings";
 
+    // ======================= قنوات الأذان =======================
+    // ⚠️ أكواد مقدسة: لا تغيير في قنوات الأذان أو الإشعار الدائم.
+
     public static final String CHANNEL_ID = "adhan_channel_id";
     public static final String CHANNEL_NAME = "أذان الصلاة";
+
     public static final String PERSISTENT_CHANNEL_ID = "persistent_channel_id";
     public static final String PERSISTENT_CHANNEL_NAME = "مواقيت الصلاة";
-    
-    public static final String REMINDER_CHANNEL_1 = "reminder_channel_v6_1";
-    public static final String REMINDER_CHANNEL_2 = "reminder_channel_v6_2";
-    public static final String REMINDER_CHANNEL_3 = "reminder_channel_v6_3";
-    
-    public static final String REMINDER_CHANNEL_SILENT_1 = "reminder_channel_v6_silent_1";
-    public static final String REMINDER_CHANNEL_SILENT_2 = "reminder_channel_v6_silent_2";
-    public static final String REMINDER_CHANNEL_SILENT_3 = "reminder_channel_v6_silent_3";
+
+    // ======================= قنوات التذكيرات v7 =======================
+    // BUG-01: تم رفع إصدار قنوات التذكيرات إلى v7
+    // لأن Android لا يسمح بتعديل سلوك الاهتزاز لقناة موجودة بنفس المعرّف.
+
+    public static final String REMINDER_CHANNEL_1 = "reminder_channel_v7_1";
+    public static final String REMINDER_CHANNEL_2 = "reminder_channel_v7_2";
+    public static final String REMINDER_CHANNEL_3 = "reminder_channel_v7_3";
+
+    public static final String REMINDER_CHANNEL_SILENT_1 = "reminder_channel_v7_silent_1";
+    public static final String REMINDER_CHANNEL_SILENT_2 = "reminder_channel_v7_silent_2";
+    public static final String REMINDER_CHANNEL_SILENT_3 = "reminder_channel_v7_silent_3";
+
+    // قنوات v6 القديمة: تُحذف بعد إنشاء قنوات v7.
+    private static final String OLD_REMINDER_CHANNEL_1 = "reminder_channel_v6_1";
+    private static final String OLD_REMINDER_CHANNEL_2 = "reminder_channel_v6_2";
+    private static final String OLD_REMINDER_CHANNEL_3 = "reminder_channel_v6_3";
+
+    private static final String OLD_REMINDER_CHANNEL_SILENT_1 = "reminder_channel_v6_silent_1";
+    private static final String OLD_REMINDER_CHANNEL_SILENT_2 = "reminder_channel_v6_silent_2";
+    private static final String OLD_REMINDER_CHANNEL_SILENT_3 = "reminder_channel_v6_silent_3";
 
     public static final String REMINDER_CHANNEL_NAME = "تذكيرات الأذكار والصلاة على النبي";
 
@@ -62,42 +79,157 @@ public final class NotificationHelper {
         NotificationManager manager = context.getSystemService(NotificationManager.class);
         if (manager == null) return;
 
-        NotificationChannel adhanChannel = new NotificationChannel(CHANNEL_ID, CHANNEL_NAME, NotificationManager.IMPORTANCE_HIGH);
+        // ======================= قناة الأذان =======================
+        // ⚠️ أكواد مقدسة: لم يتم تغيير أي إعداد هنا.
+
+        NotificationChannel adhanChannel = new NotificationChannel(
+                CHANNEL_ID,
+                CHANNEL_NAME,
+                NotificationManager.IMPORTANCE_HIGH
+        );
         adhanChannel.setDescription("إشعارات الأذان والتذكيرات المهمة");
         adhanChannel.enableVibration(true);
         adhanChannel.setSound(null, null);
         manager.createNotificationChannel(adhanChannel);
 
-        NotificationChannel persistentChannel = new NotificationChannel(PERSISTENT_CHANNEL_ID, PERSISTENT_CHANNEL_NAME, NotificationManager.IMPORTANCE_LOW);
+        // ======================= الإشعار الدائم =======================
+        // ⚠️ أكواد مقدسة: لم يتم تغيير أي إعداد هنا.
+
+        NotificationChannel persistentChannel = new NotificationChannel(
+                PERSISTENT_CHANNEL_ID,
+                PERSISTENT_CHANNEL_NAME,
+                NotificationManager.IMPORTANCE_LOW
+        );
         persistentChannel.setDescription("يعرض الوقت المتبقي للصلاة والتاريخ الهجري");
         persistentChannel.setSound(null, null);
         persistentChannel.enableVibration(false);
         manager.createNotificationChannel(persistentChannel);
+
+        // ======================= قنوات التذكيرات v7 =======================
 
         AudioAttributes audioAttributes = new AudioAttributes.Builder()
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                 .setUsage(AudioAttributes.USAGE_NOTIFICATION)
                 .build();
 
-        Uri sound1 = Uri.parse(ContentResolver.SCHEME_ANDROID_RESOURCE + "://" + context.getPackageName() + "/" + R.raw.salawat_voice);
-        Uri sound2 = Uri.parse(ContentResolver.SCHEME_ANDROID_RESOURCE + "://" + context.getPackageName() + "/" + R.raw.salawat_voice_2);
-        Uri sound3 = Uri.parse(ContentResolver.SCHEME_ANDROID_RESOURCE + "://" + context.getPackageName() + "/" + R.raw.salawat_voice_3);
+        Uri sound1 = Uri.parse(
+                ContentResolver.SCHEME_ANDROID_RESOURCE + "://"
+                        + context.getPackageName() + "/" + R.raw.salawat_voice
+        );
 
-        createReminderChannel(manager, REMINDER_CHANNEL_1, "تذكير (صوت 1)", sound1, audioAttributes, true);
-        createReminderChannel(manager, REMINDER_CHANNEL_2, "تذكير (صوت 2)", sound2, audioAttributes, true);
-        createReminderChannel(manager, REMINDER_CHANNEL_3, "تذكير (صوت 3)", sound3, audioAttributes, true);
+        Uri sound2 = Uri.parse(
+                ContentResolver.SCHEME_ANDROID_RESOURCE + "://"
+                        + context.getPackageName() + "/" + R.raw.salawat_voice_2
+        );
 
-        createReminderChannel(manager, REMINDER_CHANNEL_SILENT_1, "تذكير صامت (صوت 1)", sound1, audioAttributes, false);
-        createReminderChannel(manager, REMINDER_CHANNEL_SILENT_2, "تذكير صامت (صوت 2)", sound2, audioAttributes, false);
-        createReminderChannel(manager, REMINDER_CHANNEL_SILENT_3, "تذكير صامت (صوت 3)", sound3, audioAttributes, false);
+        Uri sound3 = Uri.parse(
+                ContentResolver.SCHEME_ANDROID_RESOURCE + "://"
+                        + context.getPackageName() + "/" + R.raw.salawat_voice_3
+        );
+
+        // قنوات الاهتزاز المفعّل
+        createReminderChannel(
+                manager,
+                REMINDER_CHANNEL_1,
+                "تذكير (صوت 1)",
+                sound1,
+                audioAttributes,
+                true
+        );
+
+        createReminderChannel(
+                manager,
+                REMINDER_CHANNEL_2,
+                "تذكير (صوت 2)",
+                sound2,
+                audioAttributes,
+                true
+        );
+
+        createReminderChannel(
+                manager,
+                REMINDER_CHANNEL_3,
+                "تذكير (صوت 3)",
+                sound3,
+                audioAttributes,
+                true
+        );
+
+        // قنوات الاهتزاز المعطّل
+        createReminderChannel(
+                manager,
+                REMINDER_CHANNEL_SILENT_1,
+                "تذكير صامت (صوت 1)",
+                sound1,
+                audioAttributes,
+                false
+        );
+
+        createReminderChannel(
+                manager,
+                REMINDER_CHANNEL_SILENT_2,
+                "تذكير صامت (صوت 2)",
+                sound2,
+                audioAttributes,
+                false
+        );
+
+        createReminderChannel(
+                manager,
+                REMINDER_CHANNEL_SILENT_3,
+                "تذكير صامت (صوت 3)",
+                sound3,
+                audioAttributes,
+                false
+        );
+
+        // تنظيف قنوات v6 القديمة الخاصة بالتذكيرات فقط.
+        deleteOldReminderChannel(manager, OLD_REMINDER_CHANNEL_1);
+        deleteOldReminderChannel(manager, OLD_REMINDER_CHANNEL_2);
+        deleteOldReminderChannel(manager, OLD_REMINDER_CHANNEL_3);
+
+        deleteOldReminderChannel(manager, OLD_REMINDER_CHANNEL_SILENT_1);
+        deleteOldReminderChannel(manager, OLD_REMINDER_CHANNEL_SILENT_2);
+        deleteOldReminderChannel(manager, OLD_REMINDER_CHANNEL_SILENT_3);
     }
 
-    private static void createReminderChannel(NotificationManager manager, String id, String name, Uri sound, AudioAttributes attr, boolean vibrate) {
-        NotificationChannel channel = new NotificationChannel(id, name, NotificationManager.IMPORTANCE_HIGH);
+    private static void createReminderChannel(
+            NotificationManager manager,
+            String id,
+            String name,
+            Uri sound,
+            AudioAttributes attributes,
+            boolean vibrate
+    ) {
+        NotificationChannel channel = new NotificationChannel(
+                id,
+                name,
+                NotificationManager.IMPORTANCE_HIGH
+        );
+
         channel.setDescription("نغمة التذكير المختارة");
-        channel.enableVibration(vibrate);
-        channel.setSound(sound, attr);
+        channel.setSound(sound, attributes);
+
+        if (vibrate) {
+            channel.enableVibration(true);
+            channel.setVibrationPattern(new long[]{0, 400, 200, 400});
+        } else {
+            channel.enableVibration(false);
+            channel.setVibrationPattern(new long[]{0, 0});
+        }
+
         manager.createNotificationChannel(channel);
+    }
+
+    private static void deleteOldReminderChannel(NotificationManager manager, String channelId) {
+        try {
+            NotificationChannel oldChannel = manager.getNotificationChannel(channelId);
+            if (oldChannel != null) {
+                manager.deleteNotificationChannel(channelId);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "تعذر حذف قناة التذكير القديمة: " + channelId, e);
+        }
     }
 
     /* ======================= الإشعار الدائم ======================= */
@@ -106,10 +238,10 @@ public final class NotificationHelper {
         try {
             boolean isEnabled = AdhanStore.isPersistent(context);
             NotificationManagerCompat manager = NotificationManagerCompat.from(context);
-            
+
             if (!isEnabled) {
                 manager.cancel(PERSISTENT_NOTIFICATION_ID);
-                return; 
+                return;
             }
 
             long now = System.currentTimeMillis();
@@ -121,23 +253,24 @@ public final class NotificationHelper {
             if (next == null && previous == null) return;
 
             boolean showNext = next != null && (previous == null || next.at - now <= now - previous.at);
-            
-            String title = "إسلامي | " + getHijriDate(now);
-            String body = showNext ? "متبقي على " + next.name + " " + formatTime(next.at) 
-                                   : "مضى على " + previous.name + " " + formatTime(previous.at);
 
-            RemoteViews expandedView = new RemoteViews(context.getPackageName(), R.layout.notif_persistent);
+            String title = "إسلامي | " + getHijriDate(now);
+            String body = showNext
+                    ? "متبقي على " + next.name + " " + formatTime(next.at)
+                    : "مضى على " + previous.name + " " + formatTime(previous.at);
+
+            RemoteViews expandedView = new RemoteViews(
+                    context.getPackageName(),
+                    R.layout.notif_persistent
+            );
 
             try {
-                // ✅ تحميل الشعار الصغير بجانب اسم الصلاة
                 expandedView.setImageViewBitmap(R.id.notif_logo, getAppIcon(context));
-                
-                // ✅ تحميل الشعار الكبير في الخلفية (Watermark)
                 expandedView.setImageViewBitmap(R.id.notif_watermark, getAppIcon(context));
             } catch (Exception e) {
                 Log.e(TAG, "خطأ في تحميل الشعارات داخل الإشعار الدائم", e);
             }
-            
+
             if (showNext) {
                 expandedView.setTextViewText(R.id.notif_prayer_name, next.name);
                 expandedView.setTextViewText(R.id.notif_prayer_time, formatTime(next.at));
@@ -158,19 +291,24 @@ public final class NotificationHelper {
                     long totalInterval = next.at - previous.at;
                     long elapsed = now - previous.at;
                     int progress = (int) ((elapsed * 100) / totalInterval);
-                    expandedView.setProgressBar(R.id.notif_progress_bar, 100, showNext ? (100 - progress) : progress, false);
+                    expandedView.setProgressBar(
+                            R.id.notif_progress_bar,
+                            100,
+                            showNext ? (100 - progress) : progress,
+                            false
+                    );
                 }
             } catch (Exception e) {
                 Log.e(TAG, "خطأ في شريط التقدم، سيتم تجاهله", e);
             }
 
             Notification notification = new NotificationCompat.Builder(context, PERSISTENT_CHANNEL_ID)
-                    .setSmallIcon(R.drawable.ic_stat_adhan) 
+                    .setSmallIcon(R.drawable.ic_stat_adhan)
                     .setContentTitle(title)
                     .setContentText(body)
                     .setLargeIcon(getAppIcon(context))
                     .setColor(APP_COLOR)
-                    .setOngoing(true) 
+                    .setOngoing(true)
                     .setOnlyAlertOnce(true)
                     .setPriority(NotificationCompat.PRIORITY_LOW)
                     .setContentIntent(openApp(context, 0))
@@ -188,20 +326,31 @@ public final class NotificationHelper {
     /* ========================== إشعار الأذان ========================== */
 
     public static Notification buildPlaying(Context context, String title, String body) {
-        PendingIntent stopIntent = PendingIntent.getBroadcast(context, 0, 
-            new Intent(context, AdhanReceiver.class).setAction(AdhanReceiver.ACTION_STOP_ADHAN), 
-            PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0));
-            
-        // ✅ إنشاء نية لفتح الشاشة كاملة (لإيقاظ الهاتف وإجبار النظام على تشغيل الصوت حتى لو أُزيح الإشعار)
+        PendingIntent stopIntent = PendingIntent.getBroadcast(
+                context,
+                0,
+                new Intent(context, AdhanReceiver.class)
+                        .setAction(AdhanReceiver.ACTION_STOP_ADHAN),
+                PendingIntent.FLAG_UPDATE_CURRENT
+                        | (Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0)
+        );
+
         Intent fullScreenIntent = new Intent(context, MainActivity.class);
-        fullScreenIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        PendingIntent fullScreenPendingIntent = PendingIntent.getActivity(context, 1, 
-            fullScreenIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        fullScreenIntent.setFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP
+        );
+
+        PendingIntent fullScreenPendingIntent = PendingIntent.getActivity(
+                context,
+                1,
+                fullScreenIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+        );
 
         return new NotificationCompat.Builder(context, CHANNEL_ID)
                 .setContentTitle(title)
                 .setContentText(body)
-                .setSmallIcon(R.drawable.ic_stat_adhan) 
+                .setSmallIcon(R.drawable.ic_stat_adhan)
                 .setLargeIcon(getAppIcon(context))
                 .setColor(APP_COLOR)
                 .setPriority(NotificationCompat.PRIORITY_MAX)
@@ -209,8 +358,7 @@ public final class NotificationHelper {
                 .setOngoing(true)
                 .setAutoCancel(false)
                 .setContentIntent(openApp(context, 0))
-                // ✅ إجبار الهاتف على إيقاظ الشاشة وعرض الإشعار فوراً
-                .setFullScreenIntent(fullScreenPendingIntent, true) 
+                .setFullScreenIntent(fullScreenPendingIntent, true)
                 .addAction(android.R.drawable.ic_media_pause, "إيقاف الأذان", stopIntent)
                 .build();
     }
@@ -218,19 +366,28 @@ public final class NotificationHelper {
     /* ========================= إشعارات التذكير ========================= */
 
     public static void showReminder(Context context, int id, String title, String body) {
-        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        SharedPreferences prefs = context.getSharedPreferences(
+                PREFS_NAME,
+                Context.MODE_PRIVATE
+        );
+
         boolean vibrationEnabled = prefs.getBoolean("vibration_enabled", true);
         String soundId = prefs.getString("salawat_sound_id", "1");
 
-        String channelToUse = REMINDER_CHANNEL_1;
-        if (soundId.equals("2")) channelToUse = vibrationEnabled ? REMINDER_CHANNEL_2 : REMINDER_CHANNEL_SILENT_2;
-        else if (soundId.equals("3")) channelToUse = vibrationEnabled ? REMINDER_CHANNEL_3 : REMINDER_CHANNEL_SILENT_3;
-        else channelToUse = vibrationEnabled ? REMINDER_CHANNEL_1 : REMINDER_CHANNEL_SILENT_1;
+        String channelToUse;
+
+        if (soundId.equals("2")) {
+            channelToUse = vibrationEnabled ? REMINDER_CHANNEL_2 : REMINDER_CHANNEL_SILENT_2;
+        } else if (soundId.equals("3")) {
+            channelToUse = vibrationEnabled ? REMINDER_CHANNEL_3 : REMINDER_CHANNEL_SILENT_3;
+        } else {
+            channelToUse = vibrationEnabled ? REMINDER_CHANNEL_1 : REMINDER_CHANNEL_SILENT_1;
+        }
 
         Notification notification = new NotificationCompat.Builder(context, channelToUse)
                 .setContentTitle(title)
                 .setContentText(body)
-                .setSmallIcon(R.drawable.ic_stat_adhan) 
+                .setSmallIcon(R.drawable.ic_stat_adhan)
                 .setLargeIcon(getAppIcon(context))
                 .setColor(APP_COLOR)
                 .setAutoCancel(true)
@@ -242,7 +399,9 @@ public final class NotificationHelper {
     }
 
     public static void cancelAdhanNotification(Context context) {
-        NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+        NotificationManager manager =
+                (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+
         if (manager != null) {
             manager.cancel(NOTIFICATION_ID);
             manager.cancel(ID_PLAYING);
@@ -253,34 +412,47 @@ public final class NotificationHelper {
 
     private static boolean isValidPrayerItem(AdhanStore.Item item) {
         if (item == null || item.prayer == null) return false;
+
         String p = item.prayer.toLowerCase(Locale.US);
-        return p.equals("fajr") || p.equals("dhuhr") || p.equals("asr") || p.equals("maghrib") || p.equals("isha");
+
+        return p.equals("fajr")
+                || p.equals("dhuhr")
+                || p.equals("asr")
+                || p.equals("maghrib")
+                || p.equals("isha");
     }
 
     private static PrayerTime findNextPrayer(Context context, long now) {
         PrayerTime next = null;
+
         for (AdhanStore.Item item : AdhanStore.load(context)) {
             if (!isValidPrayerItem(item) || item.at <= now) continue;
+
             if (next == null || item.at < next.at) {
                 next = new PrayerTime(translatePrayer(item.prayer), item.at);
             }
         }
+
         return next;
     }
 
     private static PrayerTime findPreviousPrayer(Context context, long now) {
         PrayerTime previous = null;
+
         for (AdhanStore.Item item : AdhanStore.load(context)) {
             if (!isValidPrayerItem(item) || item.at > now) continue;
+
             if (previous == null || item.at > previous.at) {
                 previous = new PrayerTime(translatePrayer(item.prayer), item.at);
             }
         }
+
         return previous;
     }
 
     private static String translatePrayer(String englishName) {
         if (englishName == null) return "";
+
         switch (englishName.toLowerCase(Locale.US)) {
             case "fajr": return "الفجر";
             case "sunrise": return "الشروق";
@@ -301,12 +473,15 @@ public final class NotificationHelper {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
             return new SimpleDateFormat("dd/MM/yyyy", new Locale("ar")).format(new Date(timeMs));
         }
+
         try {
             android.icu.util.IslamicCalendar calendar = new android.icu.util.IslamicCalendar();
             calendar.setTimeInMillis(timeMs);
+
             int day = calendar.get(android.icu.util.Calendar.DAY_OF_MONTH);
             int month = calendar.get(android.icu.util.Calendar.MONTH);
             int year = calendar.get(android.icu.util.Calendar.YEAR);
+
             return day + " " + getHijriMonthName(month) + " " + year + " هـ";
         } catch (Exception e) {
             return new SimpleDateFormat("dd/MM/yyyy", new Locale("ar")).format(new Date(timeMs));
@@ -314,14 +489,22 @@ public final class NotificationHelper {
     }
 
     private static String getHijriMonthName(int month) {
-        String[] months = {"محرم", "صفر", "ربيع الأول", "ربيع الآخر", "جمادى الأولى", "جمادى الآخرة", "رجب", "شعبان", "رمضان", "شوال", "ذو القعدة", "ذو الحجة"};
+        String[] months = {
+                "محرم", "صفر", "ربيع الأول", "ربيع الآخر",
+                "جمادى الأولى", "جمادى الآخرة", "رجب", "شعبان",
+                "رمضان", "شوال", "ذو القعدة", "ذو الحجة"
+        };
+
         if (month < 0 || month >= months.length) return "";
         return months[month];
     }
 
     private static android.graphics.Bitmap getAppIcon(Context context) {
         try {
-            return BitmapFactory.decodeResource(context.getResources(), R.mipmap.ic_launcher);
+            return BitmapFactory.decodeResource(
+                    context.getResources(),
+                    R.mipmap.ic_launcher
+            );
         } catch (Exception e) {
             return null;
         }
@@ -330,10 +513,12 @@ public final class NotificationHelper {
     private static void notifySafely(Context context, int id, Notification notification) {
         try {
             NotificationManagerCompat manager = NotificationManagerCompat.from(context);
+
             if (!manager.areNotificationsEnabled()) {
                 Log.w(TAG, "الإشعارات غير مفعلة من إعدادات النظام، لن يظهر الإشعار.");
                 return;
             }
+
             manager.notify(id, notification);
         } catch (SecurityException e) {
             Log.e(TAG, "لم يتم منح إذن POST_NOTIFICATIONS، لن يظهر الإشعار.", e);
@@ -343,20 +528,49 @@ public final class NotificationHelper {
     }
 
     public static PendingIntent openApp(Context context, int requestCode) {
-        return createActivityPendingIntent(context, MainActivity.class, requestCode, false);
+        return createActivityPendingIntent(
+                context,
+                MainActivity.class,
+                requestCode,
+                false
+        );
     }
 
-    private static PendingIntent createActivityPendingIntent(Context context, Class<?> activityClass, int requestCode, boolean clearTask) {
+    private static PendingIntent createActivityPendingIntent(
+            Context context,
+            Class<?> activityClass,
+            int requestCode,
+            boolean clearTask
+    ) {
         Intent intent = new Intent(context, activityClass);
-        if (clearTask) intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+
+        if (clearTask) {
+            intent.setFlags(
+                    Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK
+            );
+        }
+
         int flags = PendingIntent.FLAG_UPDATE_CURRENT;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) flags |= PendingIntent.FLAG_IMMUTABLE;
-        return PendingIntent.getActivity(context, requestCode, intent, flags);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            flags |= PendingIntent.FLAG_IMMUTABLE;
+        }
+
+        return PendingIntent.getActivity(
+                context,
+                requestCode,
+                intent,
+                flags
+        );
     }
 
     private static final class PrayerTime {
         final String name;
         final long at;
-        PrayerTime(String name, long at) { this.name = name; this.at = at; }
+
+        PrayerTime(String name, long at) {
+            this.name = name;
+            this.at = at;
+        }
     }
 }

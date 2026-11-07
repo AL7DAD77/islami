@@ -9,6 +9,7 @@ import { QuranPlayerProvider } from '@/lib/quran-player'
 import { BottomNav } from '@/components/bottom-nav'
 import { FirstRun } from '@/components/setup/first-run'
 import { SplashScreen } from '@/components/splash-screen'
+import { LanguageProvider } from '@/lib/language-context' // ✅ استيراد مزود اللغة
 
 const plex = IBM_Plex_Sans_Arabic({
   subsets: ['arabic'],
@@ -23,7 +24,7 @@ const amiri = Amiri({
 })
 
 export const metadata: Metadata = {
-  title: 'إسلامي',
+  title: 'إسلامي | Islami',
   description: 'تطبيق إسلامي شامل: مواقيت الصلاة، القرآن الكريم، الأذكار، والقبلة.',
   manifest: '/manifest.json',
   icons: {
@@ -32,7 +33,6 @@ export const metadata: Metadata = {
   },
 }
 
-// ✅ إعدادات الشاشة لدعم الهواتف الحديثة (Edge-to-Edge)
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
@@ -47,25 +47,24 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ar" dir="rtl" className={`${plex.variable} ${amiri.variable}`}>
-      <body className="min-h-dvh bg-[#f7f3ea] font-sans text-zinc-900 antialiased">
-        {/* مزودات الخدمات */}
-        <QuranPlayerProvider>
-          <SplashScreen />
-          <FirstRun />
-          
-          {/* المكونات التي تعمل في الخلفية */}
-          <AdhanEngine />
-          <NativeBackHandler />
-          <DailyMessageModal />
+      <body className="min-h-dvh bg-background text-foreground font-sans antialiased">
+        {/* ✅ تغليف التطبيق بالكامل بمزود اللغة */}
+        <LanguageProvider>
+          <QuranPlayerProvider>
+            <SplashScreen />
+            <FirstRun />
 
-          {/* محتوى الصفحات */}
-          <main className="pb-16">
-            {children}
-          </main>
-          
-          {/* شريط التنقل السفلي */}
-          <BottomNav />
-        </QuranPlayerProvider>
+            <AdhanEngine />
+            <NativeBackHandler />
+            <DailyMessageModal />
+
+            <main className="min-h-dvh pb-16 [&:has(.mushaf-root)]:pb-0">
+              {children}
+            </main>
+
+            <BottomNav />
+          </QuranPlayerProvider>
+        </LanguageProvider>
       </body>
     </html>
   )

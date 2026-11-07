@@ -6,7 +6,7 @@
     <!-- الإنترنت وتحديث المواقيت -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    
+
     <!-- الإشعارات -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
@@ -79,6 +79,12 @@
         <!-- مستقبِل الأذان والتذكيرات (داخلي فقط) -->
         <receiver
             android:name=".AdhanReceiver"
+            android:enabled="true"
+            android:exported="false" />
+
+        <!-- مستقبِل التنبيه قبل الأذان (منفصل تماماً) -->
+        <receiver
+            android:name=".PreAdhanReceiver"
             android:enabled="true"
             android:exported="false" />
 

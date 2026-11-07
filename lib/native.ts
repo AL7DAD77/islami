@@ -6,7 +6,7 @@ import { Capacitor, registerPlugin } from '@capacitor/core'
 
 export type LocationResult =
   | {
-      status: 'granted'
+      status: 'ok'
       lat: number
       lng: number
     }
@@ -57,6 +57,23 @@ export interface ScheduleNativeResult {
   exactAlarmAllowed: boolean
 }
 
+export type PreAdhanItemKind = 'pre_adhan'
+
+export interface PreAdhanItem {
+  id: number
+  at: number
+  kind: PreAdhanItemKind
+  prayer: string
+  prayerName: string
+  title: string
+  body: string
+}
+
+export interface SchedulePreAdhanResult {
+  scheduled: number
+  exactAlarmAllowed: boolean
+}
+
 interface AdhanSchedulerPlugin {
   schedule(options: {
     items: ScheduledItem[]
@@ -83,6 +100,16 @@ interface AdhanSchedulerPlugin {
   cancelAll(): Promise<void>
 }
 
+interface PreAdhanSchedulerPlugin {
+  schedule(options: {
+    items: PreAdhanItem[]
+  }): Promise<SchedulePreAdhanResult>
+
+  stop(): Promise<void>
+
+  cancelAll(): Promise<void>
+}
+
 /* ============================== الثوابت ============================== */
 
 const LOCATION_TIMEOUT_MS = 20_000
@@ -90,6 +117,7 @@ const LOCATION_MAX_AGE_MS = 10 * 60 * 1000
 
 const NOTIFICATION_DELAY_MS = 500
 const ADHAN_PLUGIN_NAME = 'AdhanScheduler'
+const PRE_ADHAN_PLUGIN_NAME = 'PreAdhanScheduler'
 
 const NATIVE_NOTIFICATION_ICON = 'ic_stat_adhan'
 const NATIVE_NOTIFICATION_COLOR = '#065F46'
@@ -115,10 +143,8 @@ export function isNativePlatform(): boolean {
 export async function getNativeLocation(
   options: LocationOptions = {},
 ): Promise<LocationResult> {
-  const {
-    askPermission = true,
-    highAccuracy = true,
-  } = options
+  const askPermission = options.askPermission ?? true
+  const highAccuracy = options.highAccuracy ?? true
 
   if (isNativePlatform()) {
     return getDeviceLocation({
@@ -170,10 +196,25 @@ async function getDeviceLocation(
       maximumAge: highAccuracy ? 0 : LOCATION_MAX_AGE_MS,
     })
 
+    const lat = position?.coords?.latitude
+    const lng = position?.coords?.longitude
+
+    if (
+      typeof lat !== 'number' ||
+      typeof lng !== 'number' ||
+      !Number.isFinite(lat) ||
+      !Number.isFinite(lng)
+    ) {
+      return {
+        status: 'error',
+        message: 'تعذر قراءة إحداثيات الموقع',
+      }
+    }
+
     return {
-      status: 'granted',
-      lat: position.coords.latitude,
-      lng: position.coords.longitude,
+      status: 'ok',
+      lat,
+      lng,
     }
   } catch (error) {
     return {
@@ -214,10 +255,27 @@ async function getBrowserLocation(
   return new Promise<LocationResult>(resolve => {
     navigator.geolocation.getCurrentPosition(
       position => {
+        const lat = position?.coords?.latitude
+        const lng = position?.coords?.longitude
+
+        if (
+          typeof lat !== 'number' ||
+          typeof lng !== 'number' ||
+          !Number.isFinite(lat) ||
+          !Number.isFinite(lng)
+        ) {
+          resolve({
+            status: 'error',
+            message: 'تعذر قراءة إحداثيات الموقع',
+          })
+
+          return
+        }
+
         resolve({
-          status: 'granted',
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
+          status: 'ok',
+          lat,
+          lng,
         })
       },
       error => {
@@ -653,6 +711,82 @@ export async function stopNativeAdhan(): Promise<void> {
   }
 }
 
+/* ==================== جدولة التنبيه قبل الأذان ==================== */
+
+let preAdhanSchedulerPlugin: PreAdhanSchedulerPlugin | null = null
+
+function getPreAdhanScheduler(): PreAdhanSchedulerPlugin | null {
+  if (!isNativePlatform()) {
+    return null
+  }
+
+  try {
+    if (
+      !Capacitor.isPluginAvailable(PRE_ADHAN_PLUGIN_NAME)
+    ) {
+      return null
+    }
+
+    if (!preAdhanSchedulerPlugin) {
+      preAdhanSchedulerPlugin =
+        registerPlugin<PreAdhanSchedulerPlugin>(
+          PRE_ADHAN_PLUGIN_NAME,
+        )
+    }
+
+    return preAdhanSchedulerPlugin
+  } catch (error) {
+    console.warn(
+      'تعذر تحميل إضافة التنبيه قبل الأذان:',
+      error,
+    )
+    return null
+  }
+}
+
+export function isPreAdhanSchedulerAvailable(): boolean {
+  return getPreAdhanScheduler() !== null
+}
+
+export async function scheduleNativePreAdhans(
+  items: PreAdhanItem[],
+): Promise<SchedulePreAdhanResult | null> {
+  const scheduler = getPreAdhanScheduler()
+
+  if (!scheduler) {
+    return null
+  }
+
+  try {
+    return await scheduler.schedule({
+      items,
+    })
+  } catch (error) {
+    console.warn(
+      'تعذر جدولة التنبيه قبل الأذان على الجهاز:',
+      error,
+    )
+    return null
+  }
+}
+
+export async function stopNativePreAdhans(): Promise<void> {
+  const scheduler = getPreAdhanScheduler()
+
+  if (!scheduler) {
+    return
+  }
+
+  try {
+    await scheduler.stop()
+  } catch (error) {
+    console.warn(
+      'تعذر إيقاف التنبيه قبل الأذان:',
+      error,
+    )
+  }
+}
+
 /* ============================ إنهاء التطبيق ============================ */
 
 export async function exitNativeApp(): Promise<void> {
@@ -662,6 +796,7 @@ export async function exitNativeApp(): Promise<void> {
 
   try {
     await stopNativeAdhan()
+    await stopNativePreAdhans()
 
     const { App } = await import('@capacitor/app')
     await App.exitApp()

@@ -5,34 +5,39 @@ import { PageHeader } from '@/components/page-header'
 import { HADITHS, type Hadith } from '@/lib/hadiths'
 import { Search, X, BookOpen, Lightbulb } from 'lucide-react'
 import { cn } from '@/lib/utils'
-
-// استخراج التصنيفات من البيانات مع تحديد النوع صراحةً
-const CATEGORIES = ['الكل', ...Array.from(new Set(HADITHS.map((h: Hadith) => h.category)))]
+import { useLanguage } from '@/lib/language-context'
 
 export default function HadithPage() {
+  const { dict } = useLanguage()
   const [searchQuery, setSearchQuery] = useState('')
-  const [activeCategory, setActiveCategory] = useState('الكل')
+  const [activeCategory, setActiveCategory] = useState(dict.hadithPage.all)
   const [selectedHadith, setSelectedHadith] = useState<Hadith | null>(null)
 
-  // تحديد النوع (h: Hadith) يمنع تحذيرات TypeScript
+  // استخراج التصنيفات (مع إضافة "الكل" أو "All")
+  const CATEGORIES = useMemo(() => {
+    const cats = Array.from(new Set(HADITHS.map((h: Hadith) => h.category)))
+    return [dict.hadithPage.all, ...cats]
+  }, [dict.hadithPage.all])
+
+  // تصفية الأحاديث
   const filteredHadiths = useMemo(() => {
     return HADITHS.filter((h: Hadith) => {
-      const matchesCategory = activeCategory === 'الكل' || h.category === activeCategory
+      const matchesCategory = activeCategory === dict.hadithPage.all || h.category === activeCategory
       const matchesSearch = 
         h.title.includes(searchQuery) || 
         h.text.includes(searchQuery) || 
         h.explanation.includes(searchQuery)
       return matchesCategory && matchesSearch
     })
-  }, [searchQuery, activeCategory])
+  }, [searchQuery, activeCategory, dict.hadithPage.all])
 
   return (
-    <div className="min-h-[100dvh] bg-[#f7f3ea] pb-24" dir="rtl">
+    <div className="min-h-dvh bg-background pb-24">
       <div className="container mx-auto px-4 py-4 max-w-4xl">
         
         <PageHeader 
-          title="الحديث النبوي" 
-          subtitle="من جوامع كلم النبي صلى الله عليه وسلم" 
+          title={dict.hadithPage.title} 
+          subtitle={dict.hadithPage.subtitle} 
           backHref="/more" 
         />
 
@@ -40,12 +45,12 @@ export default function HadithPage() {
         <div className="relative w-full mt-4 mb-4">
           <input
             type="text"
-            placeholder="ابحث في نص الحديث، أو الشرح..."
+            placeholder={dict.hadithPage.searchPlaceholder}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-2xl border border-[#e8dccb] bg-white px-4 py-3.5 pr-12 text-sm text-[#0a1f1a] shadow-sm focus:outline-none focus:border-[#d4af37]"
+            className="w-full rounded-2xl border border-border bg-card px-4 py-3.5 pr-12 text-sm text-foreground shadow-sm focus:outline-none focus:border-primary"
           />
-          <Search className="absolute right-4 top-1/2 -translate-y-1/2 size-5 text-[#b89965]" />
+          <Search className="absolute right-4 top-1/2 -translate-y-1/2 size-5 text-muted-foreground" />
           {searchQuery && (
             <button 
               onClick={() => setSearchQuery('')}
@@ -65,8 +70,8 @@ export default function HadithPage() {
               className={cn(
                 "whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-medium transition-colors",
                 activeCategory === cat 
-                  ? "bg-[#0a1f1a] text-white shadow-md" 
-                  : "bg-white text-[#0a1f1a] border border-[#e8dccb] hover:bg-[#f4ece1]"
+                  ? "bg-primary text-primary-foreground shadow-md" 
+                  : "bg-card text-foreground border border-border hover:bg-secondary"
               )}
             >
               {cat}
@@ -81,15 +86,15 @@ export default function HadithPage() {
               <button
                 key={hadith.id}
                 onClick={() => setSelectedHadith(hadith)}
-                className="group flex flex-col items-start text-right rounded-2xl bg-white p-5 shadow-sm border border-[#e8dccb] transition-all hover:shadow-md hover:border-[#d4af37]/50 active:scale-[0.98]"
+                className="group flex flex-col items-start text-right rounded-2xl bg-card p-5 shadow-sm border border-border transition-all hover:shadow-md hover:border-primary/50 active:scale-[0.98]"
               >
                 <div className="flex items-center gap-2 mb-2 w-full justify-between">
-                  <span className="text-xs font-bold text-[#b89965] bg-[#f4ece1] px-2 py-1 rounded-md">
+                  <span className="text-xs font-bold text-primary bg-primary/10 px-2 py-1 rounded-md">
                     {hadith.category}
                   </span>
-                  <BookOpen className="size-4 text-[#d4af37] opacity-50 group-hover:opacity-100" />
+                  <BookOpen className="size-4 text-primary opacity-50 group-hover:opacity-100" />
                 </div>
-                <h3 className="font-bold text-[#0a1f1a] text-base leading-snug mb-1">{hadith.title}</h3>
+                <h3 className="font-bold text-foreground text-base leading-snug mb-1">{hadith.title}</h3>
                 <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
                   {hadith.text}
                 </p>
@@ -97,7 +102,7 @@ export default function HadithPage() {
             ))
           ) : (
             <div className="col-span-full py-10 text-center text-muted-foreground">
-              لا توجد أحاديث مطابقة لبحثك.
+              {dict.hadithPage.noResults}
             </div>
           )}
         </div>
@@ -106,15 +111,15 @@ export default function HadithPage() {
       {/* نافذة قراءة الحديث */}
       {selectedHadith && (
         <div 
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-in fade-in duration-200"
+          className="fixed inset-0 z-100 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-in fade-in duration-200"
           onClick={() => setSelectedHadith(null)}
         >
           <div 
-            className="relative w-full max-w-lg overflow-hidden rounded-3xl bg-[#fdfbf7] shadow-2xl ring-2 ring-[#d4af37]/50 animate-in zoom-in-95 duration-200 flex flex-col max-h-[85vh]"
+            className="relative w-full max-w-lg overflow-hidden rounded-3xl bg-card shadow-2xl ring-2 ring-primary/50 animate-in zoom-in-95 duration-200 flex flex-col max-h-[85vh]"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-[#e8dccb] p-4 bg-white/50 shrink-0">
-              <span className="text-xs font-bold text-[#b89965] bg-[#f4ece1] px-3 py-1.5 rounded-lg border border-[#e8dccb]">
+            <div className="flex items-center justify-between border-b border-border p-4 bg-card/50 shrink-0">
+              <span className="text-xs font-bold text-primary bg-primary/10 px-3 py-1.5 rounded-lg border border-border">
                 {selectedHadith.category}
               </span>
               <button
@@ -126,34 +131,34 @@ export default function HadithPage() {
             </div>
 
             <div className="overflow-y-auto custom-scrollbar p-6">
-              <h2 className="text-xl font-bold text-[#0a1f1a] mb-4 text-center">
+              <h2 className="text-xl font-bold text-foreground mb-4 text-center">
                 {selectedHadith.title}
               </h2>
               
-              <p className="font-quran text-xl leading-loose text-[#0a1f1a] text-center mb-6">
+              <p className="font-quran text-xl leading-loose text-foreground text-center mb-6">
                 «{selectedHadith.text}»
               </p>
               
-              <div className="bg-[#f4ece1]/50 rounded-xl p-4 mb-4">
-                <p className="text-sm text-[#0a1f1a] leading-relaxed">
-                  <span className="font-bold text-[#b89965] block mb-1">المصدر:</span> 
+              <div className="bg-secondary rounded-xl p-4 mb-4">
+                <p className="text-sm text-foreground leading-relaxed">
+                  <span className="font-bold text-primary block mb-1">{dict.hadithPage.source}</span> 
                   {selectedHadith.source}
                 </p>
               </div>
 
-              <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100">
-                <p className="text-sm text-emerald-900 leading-relaxed flex gap-2">
-                  <Lightbulb className="size-5 shrink-0 text-emerald-600 mt-0.5" />
+              <div className="bg-emerald-50 dark:bg-emerald-950/30 rounded-xl p-4 border border-emerald-100 dark:border-emerald-900/50">
+                <p className="text-sm text-emerald-900 dark:text-emerald-200 leading-relaxed flex gap-2">
+                  <Lightbulb className="size-5 shrink-0 text-emerald-600 dark:text-emerald-400 mt-0.5" />
                   <span>
-                    <span className="font-bold block mb-1">الشرح والفوائد:</span>
+                    <span className="font-bold block mb-1">{dict.hadithPage.explanation}</span>
                     {selectedHadith.explanation}
                   </span>
                 </p>
               </div>
             </div>
 
-            <div className="p-4 bg-white/50 border-t border-[#e8dccb] text-center shrink-0">
-              <p className="text-xs text-muted-foreground">اضغط في أي مكان خارج النافذة للإغلاق</p>
+            <div className="p-4 bg-card/50 border-t border-border text-center shrink-0">
+              <p className="text-xs text-muted-foreground">{dict.hadithPage.closeHint}</p>
             </div>
           </div>
         </div>

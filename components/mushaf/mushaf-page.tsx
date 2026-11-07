@@ -15,15 +15,13 @@ import {
 import type { MushafMeta, MushafPageData } from '@/lib/mushaf'
 
 const FONT_STACK = `'${MUSHAF_FONT}', var(--font-amiri-quran), var(--font-amiri), serif`
-/** إطار الصفحة: حدّان (2px) + حشوة (6px) من كل جهة */
+
+/** حدّان بمقدار 2px + حشوة 6px من كل جهة */
 const FRAME = 16
-/** ارتفاع السطر بوحدة em: يتسع لعلامات الضبط العليا والسفلى */
+
+/** ارتفاع السطر بوحدة em */
 const ROW_EM = 2.15
 
-/**
- * صفحة من المصحف للقراءة فقط بنص QPC Hafs وخط KFGQPC (انظر public/fonts/LICENSE-KFGQPC.txt).
- * تُستعمل في الورد اليومي ليظهر الضبط نفسه الذي في المصحف الأساسي.
- */
 export function MushafPageView({
   page,
   onSurah,
@@ -42,10 +40,10 @@ export function MushafPageView({
   const onSurahRef = useRef(onSurah)
   onSurahRef.current = onSurah
 
-  // البيانات الوصفية والخط
   useEffect(() => {
     let cancelled = false
     setError(false)
+
     Promise.all([loadMushafMeta(), loadMushafFont()])
       .then(([m]) => {
         if (cancelled) return
@@ -55,22 +53,28 @@ export function MushafPageView({
       .catch(() => {
         if (!cancelled) setError(true)
       })
+
     return () => {
       cancelled = true
     }
   }, [retry])
 
-  // الصفحة المطلوبة (تبقى السابقة ظاهرة حتى تصل الجديدة فلا يومض العرض)
   useEffect(() => {
     let cancelled = false
     setError(false)
+
     loadMushafPage(page)
-      .then((d) => {
+      .then(d => {
         if (cancelled) return
         setData(d)
+
         loadMushafMeta()
-          .then((m) => {
-            if (!cancelled) onSurahRef.current?.(m.surahNames[headerSurah(d) - 1] ?? null)
+          .then(m => {
+            if (!cancelled) {
+              onSurahRef.current?.(
+                m.surahNames[headerSurah(d) - 1] ?? null,
+              )
+            }
           })
           .catch(() => {})
       })
@@ -79,7 +83,9 @@ export function MushafPageView({
       })
 
     for (const n of [page + 1, page - 1]) {
-      if (n >= 1 && n <= MUSHAF_PAGES) loadMushafPage(n).catch(() => {})
+      if (n >= 1 && n <= MUSHAF_PAGES) {
+        loadMushafPage(n).catch(() => {})
+      }
     }
 
     return () => {
@@ -87,18 +93,25 @@ export function MushafPageView({
     }
   }, [page, retry])
 
-  // عرض الحاوية
   useEffect(() => {
     const el = boxRef.current
     if (!el) return
+
     const update = () => setWidth(el.clientWidth)
+
     update()
-    const ro = new ResizeObserver(update)
-    ro.observe(el)
-    return () => ro.disconnect()
+
+    const observer = new ResizeObserver(update)
+    observer.observe(el)
+
+    return () => observer.disconnect()
   }, [])
 
-  const fit = meta && width > 0 ? computeWidthFit(width - FRAME, meta) : null
+  const fit =
+    meta && width > 0
+      ? computeWidthFit(width - FRAME, meta)
+      : null
+
   const ready = !!(meta && data && fontReady && fit)
 
   return (
@@ -106,7 +119,10 @@ export function MushafPageView({
       {ready && meta && data && fit ? (
         <div
           className="mx-auto rounded-lg border-2 border-double border-primary/35 p-1.5 text-foreground"
-          style={{ width: fit.contentWidth + FRAME }}
+          style={{
+            width: '100%',
+            maxWidth: fit.contentWidth + FRAME,
+          }}
         >
           <div
             className="grid"
@@ -123,19 +139,23 @@ export function MushafPageView({
           </div>
         </div>
       ) : error ? (
-        <div className="flex flex-col items-center gap-3 py-10 text-center text-sm text-muted-foreground">
+        <div className="flex flex-col items-center gap-3 py-6 text-center text-sm text-muted-foreground">
           <p>تعذر تحميل الصفحة، تحقق من الاتصال بالإنترنت.</p>
+
           <button
             type="button"
-            onClick={() => setRetry((n) => n + 1)}
+            onClick={() => setRetry(n => n + 1)}
             className="rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground"
           >
             إعادة المحاولة
           </button>
         </div>
       ) : (
-        <div className="flex justify-center py-16">
-          <Loader2 className="size-6 animate-spin text-primary" aria-label="جارِ التحميل" />
+        <div className="flex justify-center py-6">
+          <Loader2
+            className="size-6 animate-spin text-primary"
+            aria-label="جارِ التحميل"
+          />
         </div>
       )}
     </div>

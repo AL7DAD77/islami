@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { Moon, Sun } from 'lucide-react'
+import { useLanguage } from '@/lib/language-context'
 
-/** بطاقة تبديل الوضع الداكن، بنفس شكل بطاقات الشبكة */
 export function ThemeToggle() {
+  const { dict } = useLanguage()
   const [isDark, setIsDark] = useState(false)
 
   useEffect(() => {
@@ -35,8 +36,12 @@ export function ThemeToggle() {
       <span className="flex size-10 items-center justify-center rounded-xl bg-accent text-accent-foreground">
         {isDark ? <Sun className="size-5" aria-hidden="true" /> : <Moon className="size-5" aria-hidden="true" />}
       </span>
-      <span className="line-clamp-2 block text-sm font-bold leading-snug">{isDark ? 'الوضع الفاتح' : 'الوضع الداكن'}</span>
-      <span className="line-clamp-1 block text-[11px] text-muted-foreground">تبديل مظهر التطبيق</span>
+      <span className="line-clamp-2 block text-sm font-bold leading-snug">
+        {isDark ? dict.themeToggle.lightMode : dict.themeToggle.darkMode}
+      </span>
+      <span className="line-clamp-1 block text-[11px] text-muted-foreground">
+        {dict.themeToggle.switchTheme}
+      </span>
     </button>
   )
 }

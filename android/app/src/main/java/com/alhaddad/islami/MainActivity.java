@@ -21,6 +21,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(AdhanSchedulerPlugin.class);
         registerPlugin(QuranPlayerPlugin.class);
         registerPlugin(SystemSettingsPlugin.class);
+        registerPlugin(PreAdhanScheduler.class);
 
         // 2. تشغيل Capacitor
         super.onCreate(savedInstanceState);

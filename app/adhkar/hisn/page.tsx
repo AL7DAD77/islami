@@ -1,22 +1,23 @@
+'use client'
+
 import Link from 'next/link'
-import type { Metadata } from 'next'
-import { Suspense } from 'react' // تمت الإضافة
+import { Suspense } from 'react'
 import { PageHeader } from '@/components/page-header'
 import { SearchButton } from '@/components/search-button'
 import { ADHKAR } from '@/lib/adhkar'
 import { toArabicNumber } from '@/lib/quran'
-
-export const metadata: Metadata = { title: 'حصن المسلم | إسلامي' }
+import { useLanguage } from '@/lib/language-context'
 
 export default function HisnPage() {
+  const { dict } = useLanguage()
   const chapters = ADHKAR.filter((c) => c.group === 'hisn')
   const total = chapters.reduce((sum, c) => sum + c.items.length, 0)
 
   return (
-    <div dir="rtl">
+    <div>
       <PageHeader
-        title="حصن المسلم"
-        subtitle={`${toArabicNumber(chapters.length)} باباً - ${toArabicNumber(total)} ذكراً`}
+        title={dict.hisnPage.title}
+        subtitle={`${toArabicNumber(chapters.length)} ${dict.hisnPage.babCount} - ${toArabicNumber(total)} ${dict.hisnPage.dhikrCount}`}
         backHref="/adhkar"
         action={
           <Suspense fallback={<div className="size-10" />}>
@@ -42,8 +43,7 @@ export default function HisnPage() {
       </ul>
 
       <p className="mt-8 text-center text-xs leading-relaxed text-muted-foreground">
-        النصوص من كتاب «حصن المسلم من أذكار الكتاب والسنة» لسعيد بن علي بن وهف القحطاني. لم يُضَف تخريج الأحاديث في هذا
-        القسم، فيُنصح بمراجعة الأذكار مع أهل العلم. تفاصيل المصدر في «المزيد» ← «حول التطبيق».
+        {dict.hisnPage.footer}
       </p>
     </div>
   )

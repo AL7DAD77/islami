@@ -7,6 +7,8 @@ import type { Dhikr } from '@/lib/adhkar'
 import { toArabicNumber } from '@/lib/quran'
 import { cn } from '@/lib/utils'
 import { usePinchZoom } from '@/lib/use-pinch-zoom'
+import { useLanguage } from '@/lib/language-context'
+import { useSettings } from '@/lib/settings' // ✅ استيراد الإعدادات
 
 const AUTO_SCROLL_KEY = 'dhikr-auto-scroll'
 const FONT_KEY = 'dhikr-font-size'
@@ -17,7 +19,8 @@ const BUZZ_DONE = [30, 50, 30]
 const BUZZ_NEXT = [120]
 const BUZZ_CATEGORY = [150, 100, 150, 100, 150]
 
-function vibrate(pattern: number | number[]) {
+function vibrate(pattern: number | number[], enabled: boolean) {
+  if (!enabled) return
   try {
     if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
       navigator.vibrate(pattern)
@@ -35,6 +38,9 @@ export function DhikrList({
   nextTitle?: string
 }) {
   const router = useRouter()
+  const { dict, locale } = useLanguage()
+  const [settings] = useSettings() // ✅ قراءة الإعدادات
+  const vibrationEnabled = settings.vibrationEnabled // ✅ قيمة الاهتزاز
 
   const [fontSize, setFontSize] = useState(DEFAULT_FONT)
   const [counts, setCounts] = useState<number[]>(() => items.map(() => 0))
@@ -51,6 +57,12 @@ export function DhikrList({
   const timers = useRef<Set<ReturnType<typeof setTimeout>>>(new Set())
   const countsRef = useRef<number[]>(items.map(() => 0))
   const autoScrollRef = useRef(true)
+  const vibrationEnabledRef = useRef(vibrationEnabled)
+
+  // ✅ تحديث المرجع عند تغيير الإعداد (لتجنب مشاكل الإغلاق)
+  useEffect(() => {
+    vibrationEnabledRef.current = vibrationEnabled
+  }, [vibrationEnabled])
 
   const clearTimers = useCallback(() => {
     timers.current.forEach((timer) => clearTimeout(timer))
@@ -155,12 +167,12 @@ export function DhikrList({
     setCounts(next)
 
     if (next[index] < item.count) {
-      vibrate(15)
+      vibrate(15, vibrationEnabledRef.current)
       return
     }
 
     setJustCompleted(index)
-    vibrate(BUZZ_DONE)
+    vibrate(BUZZ_DONE, vibrationEnabledRef.current)
 
     later(() => {
       setJustCompleted((currentIndex) => (currentIndex === index ? null : currentIndex))
@@ -182,7 +194,7 @@ export function DhikrList({
           }
         }
       }
-      vibrate(BUZZ_NEXT)
+      vibrate(BUZZ_NEXT, vibrationEnabledRef.current)
     }, 450)
   }
 
@@ -209,7 +221,7 @@ export function DhikrList({
 
   const goNext = useCallback(() => {
     if (!nextHref) return
-    vibrate(BUZZ_CATEGORY)
+    vibrate(BUZZ_CATEGORY, vibrationEnabledRef.current)
     router.push(nextHref)
   }, [nextHref, router])
 
@@ -246,12 +258,12 @@ export function DhikrList({
   }
 
   return (
-    <div className="flex flex-col h-[calc(100dvh-120px)] w-full overflow-hidden select-none" dir="rtl">
+    <div className="flex flex-col h-[calc(100dvh-120px)] w-full overflow-hidden select-none" dir={locale === 'ar' ? 'rtl' : 'ltr'}>
       
       <div className="shrink-0 flex flex-col gap-2 bg-background/95 px-4 py-2 border-b border-border/50 z-10">
         <div className="flex items-center justify-between">
           <p className="text-sm font-bold text-primary">
-            {`أنجزت ${toArabicNumber(done)} من ${toArabicNumber(items.length)}`}
+            {`${dict.dhikrList.completed} ${toArabicNumber(done)} ${dict.dhikrList.of} ${toArabicNumber(items.length)}`}
           </p>
           <button
             type="button"
@@ -259,7 +271,7 @@ export function DhikrList({
             className="flex items-center gap-1 rounded-full bg-muted px-3 py-1.5 text-xs font-medium hover:bg-muted/80 transition-colors"
           >
             <RotateCcw className="size-3.5" aria-hidden="true" />
-            {'إعادة'}
+            {dict.dhikrList.reset}
           </button>
         </div>
       </div>
@@ -274,7 +286,7 @@ export function DhikrList({
           const complete = count >= dhikr.count
           const isJustCompleted = justCompleted === index
           const progress = Math.min(1, count / dhikr.count)
-          const circumference = 2 * Math.PI * 74 // نصف قطر الدائرة 74
+          const circumference = 2 * Math.PI * 74
 
           return (
             <div
@@ -302,58 +314,45 @@ export function DhikrList({
                 </p>
               </div>
 
-              {/* ============ المسبحة الإلكترونية (تصميم الدائرة) ============ */}
               <div className="shrink-0 flex items-center justify-center relative py-6">
                 
-                {/* زر المشاركة (يطفو على الجانب) */}
                 <button
                   type="button"
                   onClick={() => share(dhikr)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 flex size-11 items-center justify-center rounded-full bg-white text-muted-foreground shadow-sm hover:bg-gray-50 transition-colors z-20 border border-border/50"
-                  aria-label="مشاركة الذكر"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 flex size-11 items-center justify-center rounded-full bg-card text-muted-foreground shadow-sm hover:bg-muted transition-colors z-20 border border-border"
+                  aria-label={dict.dhikrList.shareDhikr}
                 >
                   <Share2 className="size-5" />
                 </button>
 
-                {/* الدائرة الكبيرة */}
                 <button
                   type="button"
                   onClick={() => tap(index)}
                   disabled={complete}
                   className="relative flex flex-col items-center justify-center size-40 rounded-full group focus:outline-none z-10"
                 >
-                  {/* حلقة التقدم SVG */}
                   <svg className="absolute inset-0 size-full -rotate-90 pointer-events-none" viewBox="0 0 160 160">
+                    <circle cx="80" cy="80" r="74" fill="none" stroke="var(--border)" strokeWidth="6" />
                     <circle 
-                      cx="80" cy="80" r="74" 
-                      fill="none" 
-                      stroke="var(--border)" 
-                      strokeWidth="6" 
-                    />
-                    <circle 
-                      cx="80" cy="80" r="74" 
-                      fill="none" 
-                      stroke="var(--primary)" 
-                      strokeWidth="6" 
-                      strokeDasharray={circumference} 
-                      strokeDashoffset={circumference * (1 - progress)}
-                      strokeLinecap="round"
-                      style={{ transition: 'stroke-dashoffset 0.3s ease' }}
+                      cx="80" cy="80" r="74" fill="none" stroke="var(--primary)" strokeWidth="6" 
+                      strokeDasharray={circumference} strokeDashoffset={circumference * (1 - progress)}
+                      strokeLinecap="round" style={{ transition: 'stroke-dashoffset 0.3s ease' }}
                     />
                   </svg>
 
-                  {/* الجزء الداخلي (النقطة السوداء والعدد) */}
                   <div className="flex flex-col items-center justify-center size-32 rounded-full bg-card shadow-sm z-10 transition-transform group-active:scale-95 group-disabled:group-active:scale-100 border border-border/50">
                     {complete ? (
                       <div className="flex flex-col items-center text-primary">
                         <Check className="size-10 mb-1" />
-                        <span className="text-xs font-bold">تم بحمد الله</span>
+                        <span className="text-xs font-bold">{dict.dhikrList.done}</span>
                       </div>
                     ) : (
                       <>
-                        <div className="size-3 bg-[#1a1a1a] rounded-full mb-1" />
+                        <div className="size-3 bg-foreground rounded-full mb-1" />
                         <span className="text-4xl font-bold text-foreground">{toArabicNumber(count)}</span>
-                        <span className="text-[10px] text-muted-foreground mt-1">الهدف: {toArabicNumber(dhikr.count)} مرة</span>
+                        <span className="text-[10px] text-muted-foreground mt-1">
+                          {`${dict.dhikrList.goal}: ${toArabicNumber(dhikr.count)} ${dict.dhikrList.time}`}
+                        </span>
                       </>
                     )}
                   </div>
@@ -372,14 +371,16 @@ export function DhikrList({
               className="flex flex-col items-center gap-5 rounded-3xl bg-gradient-to-l from-emerald-600 to-emerald-700 p-8 text-center text-white shadow-xl"
             >
               <PartyPopper className="size-14 text-gold animate-bounce" aria-hidden="true" />
-              <p className="text-2xl font-bold">تقبّل الله منك، أتممت هذا القسم</p>
+              <p className="text-2xl font-bold">
+                {locale === 'ar' ? 'تقبّل الله منك، أتممت هذا القسم' : 'May Allah accept from you, you completed this section'}
+              </p>
               
               {nextHref ? (
                 <>
                   <p className="text-sm opacity-90">
                     {autoScroll && !cancelledNext
-                      ? `الانتقال إلى «${nextTitle}» بعد ${toArabicNumber(secondsLeft)} ثوانٍ`
-                      : `القسم التالي: ${nextTitle}`}
+                      ? `${dict.dhikrList.nextIn} «${nextTitle}» ${dict.dhikrList.after} ${toArabicNumber(secondsLeft)} ${dict.dhikrList.seconds}`
+                      : `${locale === 'ar' ? 'القسم التالي' : 'Next section'}: ${nextTitle}`}
                   </p>
                   <div className="flex w-full gap-3 mt-4">
                     <button
@@ -387,7 +388,7 @@ export function DhikrList({
                       onClick={goNext}
                       className="flex-1 rounded-xl bg-white py-3.5 text-sm font-bold text-emerald-700 shadow-sm hover:bg-gray-50 transition-colors"
                     >
-                      {'الانتقال الآن'}
+                      {dict.dhikrList.goNow}
                     </button>
                     {autoScroll && !cancelledNext && (
                       <button
@@ -395,13 +396,13 @@ export function DhikrList({
                         onClick={() => setCancelledNext(true)}
                         className="flex-1 rounded-xl bg-white/20 py-3.5 text-sm font-medium hover:bg-white/30 transition-colors"
                       >
-                        {'البقاء هنا'}
+                        {dict.dhikrList.stayHere}
                       </button>
                     )}
                   </div>
                 </>
               ) : (
-                <p className="text-sm opacity-90">هذا آخر قسم من الأذكار والأدعية</p>
+                <p className="text-sm opacity-90">{dict.dhikrList.lastSection}</p>
               )}
             </div>
           </div>

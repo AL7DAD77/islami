@@ -9,6 +9,8 @@ import android.content.IntentFilter;
 import android.content.pm.ServiceInfo;
 import android.content.res.AssetFileDescriptor;
 import android.media.AudioAttributes;
+import android.media.AudioFocusRequest;
+import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.os.Build;
 import android.os.IBinder;
@@ -37,15 +39,36 @@ public final class AdhanService extends Service {
 
     private MediaPlayer mediaPlayer;
 
-    // ✅ 1. مراقبة الشاشة (إطفاء وإضاءة) لإسكات الأذان في كل السيناريوهات
+    private AudioManager audioManager;
+    private AudioFocusRequest audioFocusRequest;
+
+    private final AudioManager.OnAudioFocusChangeListener audioFocusListener =
+            new AudioManager.OnAudioFocusChangeListener() {
+                @Override
+                public void onAudioFocusChange(int focusChange) {
+                    if (focusChange == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT && mediaPlayer != null) {
+                        try {
+                            mediaPlayer.setVolume(0.2f, 0.2f);
+                        } catch (Exception e) {
+                            Log.w(TAG, "خطأ في خفض الصوت عند فقدان التركيز المؤقت", e);
+                        }
+                    } else if (focusChange == AudioManager.AUDIOFOCUS_GAIN && mediaPlayer != null) {
+                        try {
+                            mediaPlayer.setVolume(1.0f, 1.0f);
+                        } catch (Exception e) {
+                            Log.w(TAG, "خطأ في استعادة الصوت بعد استعادة التركيز", e);
+                        }
+                    }
+                }
+            };
+
     private final BroadcastReceiver screenStateReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
-            // إذا تم إطفاء الشاشة (زر الطاقة) أو إضاءتها (فتح الهاتف)
             if (Intent.ACTION_SCREEN_OFF.equals(action) || Intent.ACTION_SCREEN_ON.equals(action)) {
-                Log.i(TAG, "تم تغيير حالة الشاشة (زر الطاقة) - جاري إسكات الأذان");
-                stopPlayback(); // استدعاء دالة الإيقاف الآمنة
+                Log.i(TAG, "تم تغيير حالة الشاشة - جاري إسكات الأذان");
+                stopPlayback();
             }
         }
     };
@@ -54,8 +77,8 @@ public final class AdhanService extends Service {
     public void onCreate() {
         super.onCreate();
         mediaPlayer = createMediaPlayer();
+        audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
 
-        // ✅ 2. تسجيل المستقبل عند إنشاء الخدمة للحدثين معاً
         IntentFilter filter = new IntentFilter();
         filter.addAction(Intent.ACTION_SCREEN_OFF);
         filter.addAction(Intent.ACTION_SCREEN_ON);
@@ -99,8 +122,6 @@ public final class AdhanService extends Service {
         return START_NOT_STICKY;
     }
 
-    /* ============================ تشغيل الأذان ============================ */
-
     private void playAdhan(String fileName, float volume) {
         try {
             if (mediaPlayer == null) {
@@ -108,7 +129,8 @@ public final class AdhanService extends Service {
             }
             mediaPlayer.reset();
 
-            // ✅ الطريقة الرسمية والآمنة لقراءة الملفات من مجلد assets في أندرويد
+            requestAudioFocus();
+
             AssetFileDescriptor afd = getAssets().openFd("public/audio/adhans/" + fileName);
             mediaPlayer.setDataSource(afd.getFileDescriptor(), afd.getStartOffset(), afd.getLength());
             afd.close();
@@ -143,7 +165,58 @@ public final class AdhanService extends Service {
         }
     }
 
-    /* ============================ إيقاف الأذان ============================ */
+    private void requestAudioFocus() {
+        try {
+            if (audioManager == null) {
+                audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+            }
+            if (audioManager == null) return;
+
+            AudioAttributes attributes = new AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ALARM)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                    .build();
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                audioFocusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+                        .setAudioAttributes(attributes)
+                        .setAcceptsDelayedFocusGain(true)
+                        .setOnAudioFocusChangeListener(audioFocusListener)
+                        .build();
+                audioManager.requestAudioFocus(audioFocusRequest);
+            } else {
+                audioManager.requestAudioFocus(
+                        audioFocusListener,
+                        AudioManager.STREAM_ALARM,
+                        AudioManager.AUDIOFOCUS_GAIN_TRANSIENT
+                );
+            }
+
+            audioManager.adjustStreamVolume(
+                    AudioManager.STREAM_ALARM,
+                    AudioManager.ADJUST_SAME,
+                    0
+            );
+
+            Log.i(TAG, "تم طلب AudioFocus وتوجيه أزرار الصوت إلى STREAM_ALARM");
+        } catch (Exception e) {
+            Log.e(TAG, "خطأ في طلب AudioFocus", e);
+        }
+    }
+
+    private void abandonAudioFocus() {
+        try {
+            if (audioManager == null) return;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && audioFocusRequest != null) {
+                audioManager.abandonAudioFocusRequest(audioFocusRequest);
+                audioFocusRequest = null;
+            } else {
+                audioManager.abandonAudioFocus(audioFocusListener);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "خطأ في تحرير AudioFocus", e);
+        }
+    }
 
     private void stopPlayback() {
         try {
@@ -161,9 +234,15 @@ public final class AdhanService extends Service {
         } catch (Exception e) {
             Log.w(TAG, "خطأ أثناء إيقاف مشغل الأذان", e);
         } finally {
+            abandonAudioFocus();
+
             stopForegroundService();
             stopSelf();
+
             NotificationHelper.updatePersistent(this);
+
+            // ✅ الإضافة الحاسمة: جدولة الصلاة التالية بعد انتهاء الأذان
+            AdhanScheduler.scheduleNextAdhan(this);
         }
     }
 
@@ -174,8 +253,6 @@ public final class AdhanService extends Service {
             stopForeground(true);
         }
     }
-
-    /* ============================ الخدمة الأمامية ============================ */
 
     private void startForegroundWithType(Notification notification) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
@@ -190,31 +267,26 @@ public final class AdhanService extends Service {
         startForeground(NotificationHelper.ID_PLAYING, notification);
     }
 
-    /* ============================ إنشاء المشغل ============================ */
-
     private MediaPlayer createMediaPlayer() {
         MediaPlayer player = new MediaPlayer();
-        
-        // ✅ تغيير النوع إلى ALARM لكي يصدح الأذان حتى لو كان الهاتف في الوضع الصامت
         player.setAudioAttributes(
                 new AudioAttributes.Builder()
                         .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                        .setUsage(AudioAttributes.USAGE_ALARM) 
+                        .setUsage(AudioAttributes.USAGE_ALARM)
                         .build()
         );
         return player;
     }
 
-    /* ============================ دورة الحياة ============================ */
-
     @Override
     public void onDestroy() {
-        // ✅ 3. إلغاء تسجيل المستقبل لمنع تسريب الذاكرة
         try {
             unregisterReceiver(screenStateReceiver);
         } catch (Exception e) {
             Log.w(TAG, "تمت محاولة إلغاء تسجيل مستقبل غير مسجل", e);
         }
+
+        abandonAudioFocus();
 
         releaseMediaPlayer();
         stopForegroundService();

@@ -38,33 +38,54 @@ export interface DayTimes {
   isha: Date
 }
 
-type CustomMethodKey = 'JordanAwqaf' | 'AlgeriaMinistry' | 'TunisiaMinistry' | 'MoroccoHabous'
+type CustomMethodKey =
+  | 'JordanAwqaf'
+  | 'AlgeriaMinistry'
+  | 'TunisiaMinistry'
+  | 'MoroccoHabous'
 
 function isCustomMethod(m: MethodKey): m is CustomMethodKey {
-  return m === 'JordanAwqaf' || m === 'AlgeriaMinistry' || m === 'TunisiaMinistry' || m === 'MoroccoHabous'
+  return (
+    m === 'JordanAwqaf' ||
+    m === 'AlgeriaMinistry' ||
+    m === 'TunisiaMinistry' ||
+    m === 'MoroccoHabous'
+  )
 }
 
 /**
- * طرق وطنية غير موجودة في مكتبة adhan، نبنيها فوق Other():
- * - الأردن (وزارة الأوقاف): فجر 18° وعشاء 18° و+5 دقائق للظهر والمغرب.
+ * طرق وطنية غير موجودة في مكتبة adhan.
+ *
+ * ملاحظة مهمة:
+ * لا نضيف إزاحات يدوية للمواقيت الرسمية،
+ * لأن ذلك قد يجعل وقت المغرب أسبق من الجدول الرسمي.
+ *
+ * طريقة الأردن الحالية هي حساب فلكي بزوايا 18° للفجر والعشاء.
+ * يجب مستقبلاً ربطها بمصدر رسمي موثق عند توفره.
  */
 function getCustomParams(method: CustomMethodKey) {
   const p = CalculationMethod.Other()
+
   switch (method) {
     case 'JordanAwqaf':
       p.fajrAngle = 18
       p.ishaAngle = 18
-      p.adjustments.maghrib = 5
-      p.adjustments.dhuhr = 5 
+
+      p.adjustments.dhuhr = 0
+      p.adjustments.maghrib = 0
+
       break
+
     case 'AlgeriaMinistry':
       p.fajrAngle = 18
       p.ishaAngle = 17
       break
+
     case 'TunisiaMinistry':
       p.fajrAngle = 18
       p.ishaAngle = 18
       break
+
     case 'MoroccoHabous':
       p.fajrAngle = 19
       p.ishaAngle = 17
@@ -73,32 +94,74 @@ function getCustomParams(method: CustomMethodKey) {
       p.adjustments.maghrib = 5
       break
   }
+
   return p
 }
 
 function getParams(method: MethodKey) {
-  if (isCustomMethod(method)) return getCustomParams(method)
+  if (isCustomMethod(method)) {
+    return getCustomParams(method)
+  }
+
   return (CalculationMethod[method] ?? CalculationMethod.UmmAlQura)()
 }
 
-export function getPrayerTimes(settings: AppSettings, date = new Date()): DayTimes {
-  const coords = new Coordinates(settings.location.lat, settings.location.lng)
+export function getPrayerTimes(
+  settings: AppSettings,
+  date: Date = new Date(),
+): DayTimes {
+  const coords = new Coordinates(
+    settings.location.lat,
+    settings.location.lng,
+  )
+
   const params = getParams(settings.method)
-  params.madhab = settings.madhab === 'hanafi' ? Madhab.Hanafi : Madhab.Shafi
+
+  params.madhab =
+    settings.madhab === 'hanafi' ? Madhab.Hanafi : Madhab.Shafi
+
   const t = new PrayerTimes(coords, date, params)
-  return { fajr: t.fajr, sunrise: t.sunrise, dhuhr: t.dhuhr, asr: t.asr, maghrib: t.maghrib, isha: t.isha }
+
+  return {
+    fajr: t.fajr,
+    sunrise: t.sunrise,
+    dhuhr: t.dhuhr,
+    asr: t.asr,
+    maghrib: t.maghrib,
+    isha: t.isha,
+  }
 }
 
-export const PRAYER_ORDER: PrayerKey[] = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']
+export const PRAYER_ORDER: PrayerKey[] = [
+  'fajr',
+  'dhuhr',
+  'asr',
+  'maghrib',
+  'isha',
+]
 
-export function getNextPrayer(settings: AppSettings, now = new Date()) {
+export function getNextPrayer(
+  settings: AppSettings,
+  now: Date = new Date(),
+) {
   const today = getPrayerTimes(settings, now)
+
   for (const key of PRAYER_ORDER) {
-    if (today[key] > now) return { key, time: today[key] }
+    if (today[key] > now) {
+      return {
+        key,
+        time: today[key],
+      }
+    }
   }
+
   const tomorrow = new Date(now)
   tomorrow.setDate(tomorrow.getDate() + 1)
-  return { key: 'fajr' as PrayerKey, time: getPrayerTimes(settings, tomorrow).fajr }
+
+  return {
+    key: 'fajr' as PrayerKey,
+    time: getPrayerTimes(settings, tomorrow).fajr,
+  }
 }
 
 export function getQiblaDirection(lat: number, lng: number) {
@@ -106,7 +169,10 @@ export function getQiblaDirection(lat: number, lng: number) {
 }
 
 export function formatTime(d: Date) {
-  return d.toLocaleTimeString('ar-EG', { hour: 'numeric', minute: '2-digit' })
+  return d.toLocaleTimeString('ar-EG', {
+    hour: 'numeric',
+    minute: '2-digit',
+  })
 }
 
 export function formatCountdown(ms: number) {
@@ -114,14 +180,29 @@ export function formatCountdown(ms: number) {
   const h = Math.floor(total / 3600)
   const m = Math.floor((total % 3600) / 60)
   const s = total % 60
-  return [h, m, s].map((n) => String(n).padStart(2, '0')).join(':')
+
+  return [h, m, s]
+    .map(n => String(n).padStart(2, '0'))
+    .join(':')
 }
 
-export function distanceKm(aLat: number, aLng: number, bLat: number, bLng: number) {
+export function distanceKm(
+  aLat: number,
+  aLng: number,
+  bLat: number,
+  bLng: number,
+) {
   const R = 6371
   const toRad = (x: number) => (x * Math.PI) / 180
+
   const dLat = toRad(bLat - aLat)
   const dLng = toRad(bLng - aLng)
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(dLng / 2) ** 2
+
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(aLat)) *
+      Math.cos(toRad(bLat)) *
+      Math.sin(dLng / 2) ** 2
+
   return 2 * R * Math.asin(Math.sqrt(h))
 }

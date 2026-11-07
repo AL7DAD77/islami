@@ -11,72 +11,132 @@ const PLACEHOLDER = 'موقعي الحالي'
 /** اسم المدينة: من الإنترنت، وإن فشل فأقرب مدينة معروفة، وإلا «موقعي الحالي». */
 export async function resolvePlace(lat: number, lng: number) {
   try {
-    const p = await reverseGeocode(lat, lng)
-    if (p.city) return p
-  } catch {}
+    const place = await reverseGeocode(lat, lng)
+
+    if (place.city) {
+      return place
+    }
+  } catch {
+    // لا يوجد إنترنت أو فشل خدمة تحديد المدينة
+  }
+
   const near = nearestCity(lat, lng, 40, CITIES)
-  if (near) return { city: near.name, country: near.country, countryCode: near.cc }
-  return { city: PLACEHOLDER, country: '', countryCode: '' }
+
+  if (near) {
+    return {
+      city: near.name,
+      country: near.country,
+      countryCode: near.cc,
+    }
+  }
+
+  return {
+    city: PLACEHOLDER,
+    country: '',
+    countryCode: '',
+  }
 }
 
 export type AutoLocationResult = 'ok' | 'denied' | 'error' | 'skipped'
 
 /**
  * يحدّث الموقع تلقائياً ويحفظ الحالة.
- * - لا يغيّر طريقة الحساب إلا عند تغيّر الدولة (فلا يُلغي اختيار المستخدم اليدوي لها).
- * - لا يعيد تحديد اسم المدينة إذا لم يتحرك المستخدم أكثر من ٥ كم.
+ * - لا يغيّر طريقة الحساب إلا عند تغيّر الدولة، حتى لا يُلغي اختيار المستخدم اليدوي.
+ * - لا يعيد تحديد اسم المدينة إذا لم يتحرك المستخدم أكثر من 5 كم.
  */
 export async function updateAutoLocation(
   opts: LocationOptions & { force?: boolean } = {},
 ): Promise<AutoLocationResult> {
   const current = getSettings()
-  if (!current.location.auto && !opts.force) return 'skipped'
 
-  const result = await getNativeLocation({
+  if (!current.location.auto && !opts.force) {
+    return 'skipped'
+  }
+
+  const locationResult = await getNativeLocation({
     askPermission: opts.askPermission,
     highAccuracy: opts.highAccuracy ?? false,
   })
 
-  if (result.status === 'denied') {
+  if (locationResult.status === 'denied') {
     updateSettings({ locationStatus: 'denied' })
     return 'denied'
   }
-  if (result.status === 'error') {
+
+  if (locationResult.status === 'error') {
     updateSettings({ locationStatus: 'error' })
     return 'error'
   }
 
-  const { lat, lng } = result
-  const loc = getSettings().location
-  const moved = distanceKm(loc.lat, loc.lng, lat, lng)
-  const needsName =
-    moved >= 5 ||
-    !loc.countryCode ||
-    loc.city === PLACEHOLDER ||
-    (loc.city === 'مكة المكرمة' && moved >= 1)
+  const { lat, lng } = locationResult
 
-  if (!needsName) {
-    updateSettings({ locationStatus: 'ok' })
+  if (
+    typeof lat !== 'number' ||
+    typeof lng !== 'number' ||
+    !Number.isFinite(lat) ||
+    !Number.isFinite(lng)
+  ) {
+    updateSettings({ locationStatus: 'error' })
+    return 'error'
+  }
+
+  const settings = getSettings()
+  const savedLocation = settings.location
+
+  const movedKm = distanceKm(
+    savedLocation.lat,
+    savedLocation.lng,
+    lat,
+    lng,
+  )
+
+  const needsPlaceName =
+    movedKm >= 5 ||
+    !savedLocation.countryCode ||
+    savedLocation.city === PLACEHOLDER ||
+    (savedLocation.city === 'مكة المكرمة' && movedKm >= 1)
+
+  if (!needsPlaceName) {
+    updateSettings({
+      locationStatus: 'ok',
+      location: {
+        ...savedLocation,
+        lat,
+        lng,
+      },
+    })
+
     return 'ok'
   }
 
   const place = await resolvePlace(lat, lng)
-  updateSettings((s: AppSettings) => {
-    const cc = place.countryCode || s.location.countryCode || ''
-    const countryChanged = !!place.countryCode && place.countryCode !== s.location.countryCode
+
+  updateSettings((settings: AppSettings) => {
+    const countryCode =
+      place.countryCode || settings.location.countryCode || ''
+
+    const countryChanged =
+      !!place.countryCode &&
+      place.countryCode !== settings.location.countryCode
+
+    const nextMethod = countryChanged
+      ? methodForCountry(place.countryCode, 'MuslimWorldLeague')
+      : settings.method
+
     return {
       locationStatus: 'ok',
       location: {
-        ...s.location,
+        ...settings.location,
         lat,
         lng,
         city: place.city,
-        country: place.country || s.location.country,
-        countryCode: cc,
+        country: place.country || settings.location.country,
+        countryCode,
         auto: true,
       },
-      method: countryChanged ? methodForCountry(place.countryCode, s.method) : s.method,
+      method: nextMethod,
     }
   })
+
   return 'ok'
 }

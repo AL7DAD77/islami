@@ -1,89 +1,129 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { MapPin, Calculator, Bell, BellRing, ChevronDown, RefreshCw, Check, Vibrate, ShieldAlert } from 'lucide-react'
-import { useSettings, useHydrated, type MethodKey, type PrayerKey } from '@/lib/settings'
+import {
+  MapPin,
+  Calculator,
+  Bell,
+  BellRing,
+  ChevronDown,
+  RefreshCw,
+  Check,
+  Vibrate,
+  ShieldAlert,
+  Languages,
+  Hash,
+  AlarmClock,
+} from 'lucide-react'
+import {
+  useSettings,
+  useHydrated,
+  type MethodKey,
+  type PrayerKey,
+  type NumberFormat,
+} from '@/lib/settings'
 import { PRAYER_NAMES, PRAYER_ORDER } from '@/lib/prayer'
 import { CITIES, type City } from '@/lib/places'
-import { methodForCountry, searchCities, searchCitiesOnline, normalizeArabic, type OnlineCity } from '@/lib/city-search'
+import {
+  methodForCountry,
+  searchCities,
+  searchCitiesOnline,
+  normalizeArabic,
+  type OnlineCity,
+} from '@/lib/city-search'
 import { updateAutoLocation } from '@/lib/location'
 import { cn } from '@/lib/utils'
-import { isNativePlatform, setPersistentNotification } from '@/lib/native'
+import {
+  isNativePlatform,
+  setPersistentNotification,
+} from '@/lib/native'
 import { registerPlugin } from '@capacitor/core'
-import { App } from '@capacitor/app' // ✅ استيراد App لمراقبة العودة للتطبيق
+import { App } from '@capacitor/app'
+import { useLanguage } from '@/lib/language-context'
 
-const SystemSettings = registerPlugin<any>('SystemSettings')
+const SystemSettings = isNativePlatform()
+  ? registerPlugin<any>('SystemSettings')
+  : null
 
-const METHODS: { id: MethodKey; name: string }[] = [
-  { id: 'UmmAlQura', name: 'أم القرى (السعودية)' },
-  { id: 'Egyptian', name: 'الهيئة المصرية' },
-  { id: 'MuslimWorldLeague', name: 'رابطة العالم الإسلامي' },
-  { id: 'JordanAwqaf', name: 'الأردن - وزارة الأوقاف' },
-  { id: 'AlgeriaMinistry', name: 'الجزائر - وزارة الشؤون الدينية' },
-  { id: 'TunisiaMinistry', name: 'تونس - وزارة الشؤون الدينية' },
-  { id: 'MoroccoHabous', name: 'المغرب - وزارة الأوقاف' },
-  { id: 'Karachi', name: 'كراتشي (باكستان)' },
-  { id: 'Dubai', name: 'دبي' },
-  { id: 'Kuwait', name: 'الكويت' },
-  { id: 'Qatar', name: 'قطر' },
-  { id: 'Turkey', name: 'تركيا' },
-  { id: 'NorthAmerica', name: 'أمريكا الشمالية' },
-  { id: 'Singapore', name: 'سنغافورة' },
+const METHODS: { id: MethodKey }[] = [
+  { id: 'UmmAlQura' },
+  { id: 'Egyptian' },
+  { id: 'MuslimWorldLeague' },
+  { id: 'JordanAwqaf' },
+  { id: 'AlgeriaMinistry' },
+  { id: 'TunisiaMinistry' },
+  { id: 'MoroccoHabous' },
+  { id: 'Karachi' },
+  { id: 'Dubai' },
+  { id: 'Kuwait' },
+  { id: 'Qatar' },
+  { id: 'Turkey' },
+  { id: 'NorthAmerica' },
+  { id: 'Singapore' },
+  { id: 'MoonsightingCommittee' },
 ]
+
+const PRE_ADHAN_MINUTES = [5, 10, 15, 30]
 
 export function PrayerSettings() {
   const [settings, update] = useSettings()
   const hydrated = useHydrated()
+  const { locale, setLocale, dict } = useLanguage()
+
   const [openCityPicker, setOpenCityPicker] = useState(false)
   const [openMethodPicker, setOpenMethodPicker] = useState(false)
   const [locating, setLocating] = useState(false)
   const [isNotifPending, setIsNotifPending] = useState(false)
-  
-  // ✅ حالة لتتبع صلاحية الظهور فوق التطبيقات
-  const [hasOverlay, setHasOverlay] = useState(true) 
+
+  const [hasOverlay, setHasOverlay] = useState(true)
 
   const [query, setQuery] = useState('')
   const [online, setOnline] = useState<OnlineCity[]>([])
   const [searching, setSearching] = useState(false)
 
-  // ✅ دالة فحص الصلاحية
   const checkOverlayStatus = async () => {
     try {
-      if (isNativePlatform()) {
+      if (SystemSettings) {
         const res = await SystemSettings.checkOverlayPermission()
         setHasOverlay(res.granted)
       }
     } catch (e) {
-      console.log("فشل فحص صلاحية الظهور", e)
+      console.log('Failed to check overlay permission', e)
     }
   }
 
   useEffect(() => {
     const syncNativeSettings = async () => {
       try {
-        if (isNativePlatform()) {
-          const res = await SystemSettings.getPreference({ key: 'vibration_enabled' })
+        if (SystemSettings) {
+          const res = await SystemSettings.getPreference({
+            key: 'vibration_enabled',
+          })
+
           if (res && res.value !== settings.vibrationEnabled) {
             update({ vibrationEnabled: res.value })
           }
         }
       } catch (e) {
-        console.log("لم يتم مزامنة إعدادات الأندرويد", e)
+        console.log('Failed to sync Android settings', e)
       }
     }
+
     if (hydrated) {
       syncNativeSettings()
-      checkOverlayStatus() // فحص أولي
+      checkOverlayStatus()
     }
 
-    // ✅ مستمع: عندما يعود المستخدم من الإعدادات، يتم الفحص مرة أخرى
     let listener: any = null
+
     if (isNativePlatform()) {
       App.addListener('appStateChange', ({ isActive }) => {
         if (isActive) {
           checkOverlayStatus()
         }
-      }).then(l => { listener = l })
+      }).then(l => {
+        listener = l
+      })
     }
 
     return () => {
@@ -93,35 +133,48 @@ export function PrayerSettings() {
 
   const detectLocation = async () => {
     setLocating(true)
-    const result = await updateAutoLocation({ force: true, askPermission: true, highAccuracy: true })
+
+    const result = await updateAutoLocation({
+      force: true,
+      askPermission: true,
+      highAccuracy: true,
+    })
+
     setLocating(false)
+
     if (result === 'denied') {
       alert(
         isNativePlatform()
-          ? '⚠️ لم يُسمح للتطبيق بالوصول إلى الموقع\n\nلتفعيله:\n١. إعدادات الهاتف ← التطبيقات ← إسلامي\n٢. الأذونات ← الموقع\n٣. اختر «السماح أثناء استخدام التطبيق»\n٤. ارجع واضغط «تحديد موقعي تلقائياً»'
-          : '⚠️ تم رفض الوصول للموقع\n\nلتفعيله:\n• اضغط على 🔒 بجانب الرابط\n• Site settings → Location → Allow',
+          ? dict.prayerSettingsPage.alerts.locationDenied
+          : dict.prayerSettingsPage.alerts.locationDeniedWeb,
       )
     } else if (result === 'error') {
-      alert('⚠️ تعذّر تحديد موقعك. تأكد من تشغيل خدمة الموقع (GPS) ثم أعد المحاولة.')
+      alert(dict.prayerSettingsPage.alerts.locationError)
     }
   }
 
   useEffect(() => {
     if (!openCityPicker) return
+
     const q = query.trim()
+
     if (q.length < 2) {
       setOnline([])
       return
     }
+
     const ctrl = new AbortController()
     const t = setTimeout(async () => {
       setSearching(true)
+
       const rows = await searchCitiesOnline(q, ctrl.signal)
+
       if (!ctrl.signal.aborted) {
         setOnline(rows)
         setSearching(false)
       }
     }, 450)
+
     return () => {
       clearTimeout(t)
       ctrl.abort()
@@ -129,49 +182,105 @@ export function PrayerSettings() {
     }
   }, [query, openCityPicker])
 
-  const applyManualCity = (name: string, country: string, cc: string, lat: number, lng: number, method?: MethodKey) => {
-    update((s) => {
+  const applyManualCity = (
+    name: string,
+    country: string,
+    cc: string,
+    lat: number,
+    lng: number,
+    method?: MethodKey,
+  ) => {
+    update(s => {
       const countryChanged = !!cc && cc !== s.location.countryCode
+
       return {
         locationStatus: 'ok',
-        location: { lat, lng, city: name, country, countryCode: cc, auto: false },
-        method: countryChanged ? (method ?? methodForCountry(cc, s.method)) : s.method,
+        location: {
+          lat,
+          lng,
+          city: name,
+          country,
+          countryCode: cc,
+          auto: false,
+        },
+        method: countryChanged
+          ? (method ?? methodForCountry(cc, s.method))
+          : s.method,
       }
     })
+
     setOpenCityPicker(false)
     setQuery('')
   }
 
-  const selectCity = (c: City) => applyManualCity(c.name, c.country, c.cc, c.lat, c.lng, c.method)
+  const selectCity = (c: City) =>
+    applyManualCity(c.name, c.country, c.cc, c.lat, c.lng, c.method)
+
   const selectOnline = (c: OnlineCity) =>
-    applyManualCity(c.admin && c.admin !== c.name ? `${c.name} - ${c.admin}` : c.name, c.country, c.cc, c.lat, c.lng)
+    applyManualCity(
+      c.admin && c.admin !== c.name ? `${c.name} - ${c.admin}` : c.name,
+      c.country,
+      c.cc,
+      c.lat,
+      c.lng,
+    )
 
   const localMatches = searchCities(query)
-  const localNames = new Set(localMatches.map((c) => normalizeArabic(c.name)))
-  const onlineMatches = online.filter((o) => !localNames.has(normalizeArabic(o.name)))
+  const localNames = new Set(localMatches.map(c => normalizeArabic(c.name)))
+  const onlineMatches = online.filter(
+    o => !localNames.has(normalizeArabic(o.name)),
+  )
 
   const toggleVibration = async () => {
     const nextValue = !settings.vibrationEnabled
+
     update({ vibrationEnabled: nextValue })
+
+    if (!SystemSettings) return
+
     try {
-      await SystemSettings.setPreference({ key: 'vibration_enabled', value: nextValue })
+      await SystemSettings.setPreference({
+        key: 'vibration_enabled',
+        value: nextValue,
+      })
     } catch (e) {
-      console.log("فشل حفظ إعداد الاهتزاز في الأندرويد", e)
+      console.log('Failed to save vibration setting on Android', e)
     }
   }
 
   const requestOverlayPermission = async () => {
     try {
-      if (isNativePlatform()) {
+      if (SystemSettings) {
         await SystemSettings.requestOverlayPermission()
       }
     } catch (e) {
-      console.log("فشل فتح شاشة صلاحية الظهور", e)
-      alert("يرجى تفعيل الصلاحية يدوياً من: الإعدادات > التطبيقات > إسلامي > الظهور فوق التطبيقات")
+      console.log('Failed to open overlay permission screen', e)
+      alert(dict.prayerSettingsPage.alerts.overlayManual)
     }
   }
 
-  if (!hydrated) return <div className="h-96 animate-pulse rounded-2xl bg-card" aria-hidden="true" />
+  const setNumberFormat = (format: NumberFormat) => {
+    update({ numberFormat: format })
+  }
+
+  const togglePreAdhan = () => {
+    update(s => ({
+      preAdhanEnabled: !s.preAdhanEnabled,
+    }))
+  }
+
+  const setPreAdhanMinutes = (minutes: number) => {
+    update({ preAdhanMinutes: minutes })
+  }
+
+  if (!hydrated) {
+    return (
+      <div
+        className="h-96 animate-pulse rounded-2xl bg-card"
+        aria-hidden="true"
+      />
+    )
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-lg flex-col gap-4 pt-[max(1rem,env(safe-area-inset-top))] pb-4">
@@ -181,15 +290,22 @@ export function PrayerSettings() {
           <span className="flex size-8 items-center justify-center rounded-xl bg-accent text-accent-foreground">
             <MapPin className="size-4" />
           </span>
-          <h3 className="font-bold text-zinc-800 dark:text-zinc-100">الموقع</h3>
+          <h3 className="font-bold text-foreground">
+            {dict.prayerSettingsPage.location}
+          </h3>
         </div>
+
         <div className="space-y-3">
           <div className="rounded-xl bg-muted/50 p-3">
-            <p className="text-xs text-muted-foreground">المدينة الحالية</p>
-            <p className="font-bold text-zinc-800 dark:text-zinc-100">
-              {settings.location.city} {settings.location.country && ` - ${settings.location.country}`}
+            <p className="text-xs text-muted-foreground">
+              {dict.prayerSettingsPage.currentCity}
+            </p>
+            <p className="font-bold text-foreground">
+              {settings.location.city}{' '}
+              {settings.location.country && ` - ${settings.location.country}`}
             </p>
           </div>
+
           <div className="flex gap-2">
             <button
               type="button"
@@ -197,46 +313,71 @@ export function PrayerSettings() {
               disabled={locating}
               className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-3 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-60"
             >
-              {locating ? <RefreshCw className="size-4 animate-spin" /> : <MapPin className="size-4" />}
-              {locating ? 'جارٍ التحديد...' : 'تحديد موقعي تلقائياً'}
+              {locating ? (
+                <RefreshCw className="size-4 animate-spin" />
+              ) : (
+                <MapPin className="size-4" />
+              )}
+              {locating
+                ? dict.prayerSettingsPage.detecting
+                : dict.prayerSettingsPage.detectLocation}
             </button>
+
             <button
               type="button"
               onClick={() => setOpenCityPicker(!openCityPicker)}
-              className="flex items-center justify-center gap-2 rounded-xl bg-muted px-3 py-2.5 text-sm"
+              className="flex items-center justify-center gap-2 rounded-xl bg-muted px-3 py-2.5 text-sm text-foreground"
             >
-              <ChevronDown className={cn('size-4 transition', openCityPicker && 'rotate-180')} />
-              اختيار يدوي
+              <ChevronDown
+                className={cn(
+                  'size-4 transition',
+                  openCityPicker && 'rotate-180',
+                )}
+              />
+              {dict.prayerSettingsPage.manualSelect}
             </button>
           </div>
+
           {openCityPicker && (
-            <div className="space-y-2 mt-2">
+            <div className="mt-2 space-y-2">
               <input
                 type="search"
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="ابحث عن مدينتك..."
-                className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm"
+                onChange={e => setQuery(e.target.value)}
+                placeholder={dict.prayerSettingsPage.searchCityPlaceholder}
+                className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm text-foreground"
               />
+
               <div className="max-h-72 overflow-y-auto rounded-xl border border-border">
-                {localMatches.map((c) => (
+                {localMatches.map(c => (
                   <button
                     key={`${c.cc}-${c.name}`}
                     type="button"
                     onClick={() => selectCity(c)}
                     className="flex w-full items-center justify-between border-b border-border px-3 py-2.5 text-right text-sm last:border-0 hover:bg-muted"
                   >
-                    <span>{c.name} <span className="text-xs text-muted-foreground">- {c.country}</span></span>
+                    <span>
+                      {c.name}{' '}
+                      <span className="text-xs text-muted-foreground">
+                        - {c.country}
+                      </span>
+                    </span>
                   </button>
                 ))}
-                {onlineMatches.map((c) => (
+
+                {onlineMatches.map(c => (
                   <button
                     key={`online-${c.lat}-${c.lng}`}
                     type="button"
                     onClick={() => selectOnline(c)}
                     className="flex w-full items-center justify-between border-b border-border px-3 py-2.5 text-right text-sm last:border-0 hover:bg-muted"
                   >
-                    <span>{c.name} <span className="text-xs text-muted-foreground">{` - ${[c.admin, c.country].filter(Boolean).join('، ')}`}</span></span>
+                    <span>
+                      {c.name}{' '}
+                      <span className="text-xs text-muted-foreground">
+                        {` - ${[c.admin, c.country].filter(Boolean).join(', ')}`}
+                      </span>
+                    </span>
                   </button>
                 ))}
               </div>
@@ -251,36 +392,87 @@ export function PrayerSettings() {
           <span className="flex size-8 items-center justify-center rounded-xl bg-accent text-accent-foreground">
             <Calculator className="size-4" />
           </span>
-          <h3 className="font-bold text-zinc-800 dark:text-zinc-100">طريقة الحساب</h3>
+          <h3 className="font-bold text-foreground">
+            {dict.prayerSettingsPage.calcMethod}
+          </h3>
         </div>
+
         <button
           type="button"
           onClick={() => setOpenMethodPicker(!openMethodPicker)}
-          className="flex w-full items-center justify-between rounded-xl bg-muted/50 px-3 py-3 text-right"
+          className="flex w-full items-center justify-between rounded-xl bg-muted/50 px-3 py-3 text-right text-foreground"
         >
-          <span className="font-medium">{METHODS.find((m) => m.id === settings.method)?.name ?? 'أم القرى'}</span>
-          <ChevronDown className={cn('size-4 transition', openMethodPicker && 'rotate-180')} />
+          <span className="font-medium">
+            {(dict.prayerSettingsPage.methods as Record<string, string>)[
+              settings.method
+            ] ?? dict.prayerSettingsPage.methods.UmmAlQura}
+          </span>
+          <ChevronDown
+            className={cn(
+              'size-4 transition',
+              openMethodPicker && 'rotate-180',
+            )}
+          />
         </button>
+
         {openMethodPicker && (
           <div className="mt-2 max-h-60 overflow-y-auto rounded-xl border border-border">
-            {METHODS.map((m) => (
+            {METHODS.map(m => (
               <button
                 key={m.id}
                 type="button"
-                onClick={() => { update({ method: m.id }); setOpenMethodPicker(false) }}
-                className="flex w-full items-center justify-between border-b border-border px-3 py-2.5 text-right text-sm last:border-0 hover:bg-muted"
+                onClick={() => {
+                  update({ method: m.id })
+                  setOpenMethodPicker(false)
+                }}
+                className="flex w-full items-center justify-between border-b border-border px-3 py-2.5 text-right text-sm text-foreground last:border-0 hover:bg-muted"
               >
-                <span>{m.name}</span>
-                {settings.method === m.id && <Check className="size-4 text-emerald-600" />}
+                <span>
+                  {
+                    (dict.prayerSettingsPage.methods as Record<string, string>)[
+                      m.id
+                    ]
+                  }
+                </span>
+                {settings.method === m.id && (
+                  <Check className="size-4 text-emerald-600" />
+                )}
               </button>
             ))}
           </div>
         )}
+
         <div className="mt-3">
-          <p className="mb-2 text-xs text-muted-foreground">مذهب حساب العصر</p>
+          <p className="mb-2 text-xs text-muted-foreground">
+            {dict.prayerSettingsPage.asrMadhab}
+          </p>
+
           <div className="flex gap-2">
-            <button type="button" onClick={() => update({ madhab: 'shafi' })} className={cn('flex-1 rounded-xl px-3 py-2 text-sm', settings.madhab === 'shafi' ? 'bg-primary text-primary-foreground' : 'bg-muted')}>شافعي / مالكي / حنبلي</button>
-            <button type="button" onClick={() => update({ madhab: 'hanafi' })} className={cn('flex-1 rounded-xl px-3 py-2 text-sm', settings.madhab === 'hanafi' ? 'bg-primary text-primary-foreground' : 'bg-muted')}>حنفي</button>
+            <button
+              type="button"
+              onClick={() => update({ madhab: 'shafi' })}
+              className={cn(
+                'flex-1 rounded-xl px-3 py-2 text-sm',
+                settings.madhab === 'shafi'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-foreground',
+              )}
+            >
+              {dict.prayerSettingsPage.shafiMalikiHanbali}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => update({ madhab: 'hanafi' })}
+              className={cn(
+                'flex-1 rounded-xl px-3 py-2 text-sm',
+                settings.madhab === 'hanafi'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-foreground',
+              )}
+            >
+              {dict.prayerSettingsPage.hanafi}
+            </button>
           </div>
         </div>
       </section>
@@ -291,18 +483,36 @@ export function PrayerSettings() {
           <span className="flex size-8 items-center justify-center rounded-xl bg-accent text-accent-foreground">
             <Bell className="size-4" />
           </span>
-          <h3 className="font-bold text-zinc-800 dark:text-zinc-100">تفعيل الأذان</h3>
+          <h3 className="font-bold text-foreground">
+            {dict.prayerSettingsPage.adhanActivation}
+          </h3>
         </div>
+
         <div className="space-y-4">
           <div>
-            <p className="mb-2 text-xs text-muted-foreground">اختر الصلوات التي تريد سماع الأذان لها</p>
+            <p className="mb-2 text-xs text-muted-foreground">
+              {dict.prayerSettingsPage.adhanSelectPrayers}
+            </p>
+
             <div className="grid grid-cols-5 gap-2">
               {PRAYER_ORDER.map((key: PrayerKey) => (
                 <button
                   key={key}
                   type="button"
-                  onClick={() => update((s) => ({ adhanEnabled: { ...s.adhanEnabled, [key]: !s.adhanEnabled[key] } }))}
-                  className={cn('rounded-xl px-2 py-2 text-xs font-medium transition', settings.adhanEnabled[key] ? 'bg-emerald-600 text-white' : 'bg-muted text-muted-foreground')}
+                  onClick={() =>
+                    update(s => ({
+                      adhanEnabled: {
+                        ...s.adhanEnabled,
+                        [key]: !s.adhanEnabled[key],
+                      },
+                    }))
+                  }
+                  className={cn(
+                    'rounded-xl px-2 py-2 text-xs font-medium transition',
+                    settings.adhanEnabled[key]
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-muted text-muted-foreground',
+                  )}
                 >
                   {PRAYER_NAMES[key]}
                 </button>
@@ -312,22 +522,106 @@ export function PrayerSettings() {
         </div>
       </section>
 
+      {/* تنبيه قبل الأذان */}
+      <section className="rounded-2xl bg-card p-4 shadow-sm ring-1 ring-border">
+        <div className="mb-3 flex items-center gap-2">
+          <span className="flex size-8 items-center justify-center rounded-xl bg-accent text-accent-foreground">
+            <AlarmClock className="size-4" />
+          </span>
+          <h3 className="font-bold text-foreground">
+            {dict.prayerSettingsPage.preAdhanTitle}
+          </h3>
+        </div>
+
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-3 rounded-xl bg-muted/50 p-3">
+            <div className="flex-1">
+              <p className="font-medium text-foreground">
+                {dict.prayerSettingsPage.preAdhanEnable}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {dict.prayerSettingsPage.preAdhanEnableDesc}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              role="switch"
+              aria-checked={settings.preAdhanEnabled}
+              onClick={togglePreAdhan}
+              className={cn(
+                'relative h-6 w-11 shrink-0 rounded-full transition-colors',
+                settings.preAdhanEnabled
+                  ? 'bg-emerald-600'
+                  : 'bg-zinc-400',
+              )}
+            >
+              <span
+                className={cn(
+                  'absolute top-0.5 size-5 rounded-full bg-white transition-all',
+                  settings.preAdhanEnabled
+                    ? 'right-0.5'
+                    : 'right-5.5',
+                )}
+              />
+            </button>
+          </div>
+
+          {settings.preAdhanEnabled && (
+            <div className="rounded-xl bg-muted/50 p-3">
+              <p className="mb-2 text-xs text-muted-foreground">
+                {dict.prayerSettingsPage.preAdhanMinutesTitle}
+              </p>
+
+              <div className="grid grid-cols-4 gap-2">
+                {PRE_ADHAN_MINUTES.map(minutes => (
+                  <button
+                    key={minutes}
+                    type="button"
+                    onClick={() => setPreAdhanMinutes(minutes)}
+                    className={cn(
+                      'rounded-xl px-2 py-2 text-xs font-medium transition',
+                      settings.preAdhanMinutes === minutes
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-muted text-muted-foreground',
+                    )}
+                  >
+                    {
+                      (dict.prayerSettingsPage.preAdhanMinutes as Record<
+                        string,
+                        string
+                      >)[String(minutes)]
+                    }
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+
       {/* الإشعارات والاهتزاز */}
       <section className="rounded-2xl bg-card p-4 shadow-sm ring-1 ring-border">
         <div className="mb-3 flex items-center gap-2">
           <span className="flex size-8 items-center justify-center rounded-xl bg-accent text-accent-foreground">
             <BellRing className="size-4" />
           </span>
-          <h3 className="font-bold text-zinc-800 dark:text-zinc-100">الإشعارات</h3>
+          <h3 className="font-bold text-foreground">
+            {dict.prayerSettingsPage.notifications}
+          </h3>
         </div>
-        
+
         <div className="space-y-3">
-          {/* إشعار دائم */}
           <div className="flex items-center justify-between gap-3 rounded-xl bg-muted/50 p-3">
             <div className="flex-1">
-              <p className="font-medium text-zinc-800 dark:text-zinc-100">إشعار دائم بالصلاة القادمة</p>
-              <p className="text-xs text-muted-foreground">يبقى ظاهراً في الخلفية ويعرض الوقت المتبقي</p>
+              <p className="font-medium text-foreground">
+                {dict.prayerSettingsPage.persistentNotification}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {dict.prayerSettingsPage.persistentNotificationDesc}
+              </p>
             </div>
+
             <button
               type="button"
               role="switch"
@@ -335,63 +629,157 @@ export function PrayerSettings() {
               disabled={isNotifPending}
               onClick={async () => {
                 setIsNotifPending(true)
+
                 const next = !settings.persistentNotification
+
                 update({ persistentNotification: next })
+
                 try {
                   await setPersistentNotification(next)
                 } catch (e) {
                   update({ persistentNotification: !next })
-                  alert('حدث خطأ في الاتصال بنظام الإشعارات.')
+                  alert(dict.prayerSettingsPage.alerts.notificationError)
                 } finally {
                   setIsNotifPending(false)
                 }
               }}
-              className={cn('relative h-6 w-11 shrink-0 rounded-full transition-colors', settings.persistentNotification ? 'bg-emerald-600' : 'bg-zinc-400', isNotifPending && 'opacity-50')}
+              className={cn(
+                'relative h-6 w-11 shrink-0 rounded-full transition-colors',
+                settings.persistentNotification
+                  ? 'bg-emerald-600'
+                  : 'bg-zinc-400',
+                isNotifPending && 'opacity-50',
+              )}
             >
-              <span className={cn('absolute top-0.5 size-5 rounded-full bg-white transition-all', settings.persistentNotification ? 'right-0.5' : 'right-5.5')} />
+              <span
+                className={cn(
+                  'absolute top-0.5 size-5 rounded-full bg-white transition-all',
+                  settings.persistentNotification
+                    ? 'right-0.5'
+                    : 'right-5.5',
+                )}
+              />
             </button>
           </div>
 
-          {/* تفعيل الاهتزاز */}
           <div className="flex items-center justify-between gap-3 rounded-xl bg-muted/50 p-3">
-            <div className="flex items-center gap-2 flex-1">
+            <div className="flex flex-1 items-center gap-2">
               <Vibrate className="size-5 text-muted-foreground" />
               <div>
-                <p className="font-medium text-zinc-800 dark:text-zinc-100">الاهتزاز</p>
-                <p className="text-xs text-muted-foreground">اهتزاز عند تفاعل التطبيق وعند الإشعارات</p>
+                <p className="font-medium text-foreground">
+                  {dict.prayerSettingsPage.vibration}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {dict.prayerSettingsPage.vibrationDesc}
+                </p>
               </div>
             </div>
+
             <button
               type="button"
               role="switch"
               aria-checked={settings.vibrationEnabled}
               onClick={toggleVibration}
-              className={cn('relative h-6 w-11 shrink-0 rounded-full transition-colors', settings.vibrationEnabled ? 'bg-emerald-600' : 'bg-zinc-400')}
+              className={cn(
+                'relative h-6 w-11 shrink-0 rounded-full transition-colors',
+                settings.vibrationEnabled
+                  ? 'bg-emerald-600'
+                  : 'bg-zinc-400',
+              )}
             >
-              <span className={cn('absolute top-0.5 size-5 rounded-full bg-white transition-all', settings.vibrationEnabled ? 'right-0.5' : 'right-5.5')} />
+              <span
+                className={cn(
+                  'absolute top-0.5 size-5 rounded-full bg-white transition-all',
+                  settings.vibrationEnabled ? 'right-0.5' : 'right-5.5',
+                )}
+              />
             </button>
           </div>
 
-          {/* ✅ صلاحية الظهور فوق التطبيقات (تختفي إذا كانت مفعلة) */}
           {!hasOverlay && (
             <div className="flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-900/50 dark:bg-amber-950/30 animate-in fade-in">
-              <div className="flex items-center gap-2 flex-1">
+              <div className="flex flex-1 items-center gap-2">
                 <ShieldAlert className="size-5 text-amber-600 dark:text-amber-500" />
                 <div>
-                  <p className="font-medium text-amber-900 dark:text-amber-100">الظهور فوق التطبيقات</p>
-                  <p className="text-xs text-amber-800 dark:text-amber-200">ضروري لضمان عمل الأذان حتى لو أُغلق التطبيق</p>
+                  <p className="font-medium text-amber-900 dark:text-amber-100">
+                    {dict.prayerSettingsPage.overlayPermission}
+                  </p>
+                  <p className="text-xs text-amber-800 dark:text-amber-200">
+                    {dict.prayerSettingsPage.overlayPermissionDesc}
+                  </p>
                 </div>
               </div>
+
               <button
                 type="button"
                 onClick={requestOverlayPermission}
-                className="rounded-lg bg-amber-600 px-3 py-2 text-xs font-bold text-white hover:bg-amber-700 transition active:scale-95"
+                className="rounded-lg bg-amber-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-amber-700 active:scale-95"
               >
-                تفعيل
+                {dict.prayerSettingsPage.enable}
               </button>
             </div>
           )}
 
+          <div className="flex items-center justify-between gap-3 rounded-xl bg-muted/50 p-3 mt-4 border border-border">
+            <div className="flex items-center gap-2 flex-1">
+              <Languages className="size-5 text-muted-foreground" />
+              <div>
+                <p className="font-medium text-foreground">
+                  {dict.prayerSettingsPage.appLanguage}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {dict.prayerSettingsPage.appLanguageDesc}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setLocale(locale === 'ar' ? 'en' : 'ar')}
+              className="rounded-lg bg-primary px-4 py-2 text-xs font-bold text-primary-foreground transition active:scale-95 shadow-sm"
+            >
+              {locale === 'ar' ? 'English' : 'العربية'}
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* تنسيق الأرقام */}
+      <section className="rounded-2xl bg-card p-4 shadow-sm ring-1 ring-border">
+        <div className="mb-3 flex items-center gap-2">
+          <span className="flex size-8 items-center justify-center rounded-xl bg-accent text-accent-foreground">
+            <Hash className="size-4" />
+          </span>
+          <h3 className="font-bold text-foreground">
+            تنسيق الأرقام
+          </h3>
+        </div>
+
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setNumberFormat('arabic')}
+            className={cn(
+              'flex-1 rounded-xl px-3 py-2 text-sm font-medium transition',
+              settings.numberFormat === 'arabic'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-foreground',
+            )}
+          >
+            ١٢٣ عربية
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setNumberFormat('english')}
+            className={cn(
+              'flex-1 rounded-xl px-3 py-2 text-sm font-medium transition',
+              settings.numberFormat === 'english'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-foreground',
+            )}
+          >
+            123 إنجليزية
+          </button>
         </div>
       </section>
     </div>

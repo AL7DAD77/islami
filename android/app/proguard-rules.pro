@@ -19,12 +19,26 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# الحفاظ على الـAnnotations المهمة لـ Capacitor وAndroid
+-keepattributes *Annotation*
+
 # الحفاظ على كلاسات Capacitor الأساسية
 -keep class com.getcapacitor.** { *; }
+
+# الحفاظ على تعليقات Capacitor المستخدمة في الإضافات
+-keep class com.getcapacitor.annotation.** { *; }
+
+# الحفاظ على كلاسات Capacitor Plugin
 -keep @com.getcapacitor.annotation.CapacitorPlugin public class * {
     @com.getcapacitor.annotation.PermissionCallback <methods>;
     @com.getcapacitor.annotation.ActivityCallback <methods>;
-    @com.getcapacitor.PluginMethod public <methods>;
+    @com.getcapacitor.annotation.PluginMethod public <methods>;
+}
+
+# الحفاظ على واجهة JavaScript في WebView
+-keepclassmembers class * {
+    @android.webkit.JavascriptInterface <methods>;
 }
 
 # الحفاظ على كلاساتنا الخاصة (الصوت، الأذان، الإشعارات)

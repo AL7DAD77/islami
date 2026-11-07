@@ -6,8 +6,10 @@ import type { QuizQuestion } from '@/lib/learn'
 import { pickQuizRound } from '@/lib/kids-quiz-pool'
 import { toArabicNumber } from '@/lib/quran'
 import { cn } from '@/lib/utils'
+import { useLanguage } from '@/lib/language-context' // ✅ استيراد مزود اللغة
 
 export function KidsQuiz() {
+  const { dict, locale } = useLanguage() // ✅ جلب اللغة
   const [round, setRound] = useState<QuizQuestion[]>([])
   const [index, setIndex] = useState(0)
   const [picked, setPicked] = useState<number | null>(null)
@@ -27,11 +29,16 @@ export function KidsQuiz() {
 
   const finished = index >= round.length
 
+  // دالة مساعدة لتنسيق الأرقام
+  const formatNumber = (num: number) => locale === 'ar' ? toArabicNumber(num) : num.toString()
+
   if (finished) {
     return (
       <div className="flex flex-col items-center justify-center gap-4 rounded-3xl bg-gold/20 p-6 py-10 text-center">
         <PartyPopper className="size-12 text-primary" aria-hidden="true" />
-        <p className="text-xl font-bold">{`أحسنت! نتيجتك ${toArabicNumber(score)} من ${toArabicNumber(round.length)}`}</p>
+        <p className="text-xl font-bold">
+          {`${dict.kidsPage.wellDone} ${formatNumber(score)} ${dict.kidsPage.of} ${formatNumber(round.length)}`}
+        </p>
         <button
           type="button"
           onClick={() => {
@@ -43,7 +50,7 @@ export function KidsQuiz() {
           className="mt-2 flex items-center gap-2 rounded-full bg-primary px-6 py-2.5 text-sm font-bold text-primary-foreground shadow-md hover:bg-primary/90 transition-colors"
         >
           <RotateCcw className="size-4" aria-hidden="true" />
-          {'العب مرة أخرى'}
+          {dict.kidsPage.playAgain}
         </button>
       </div>
     )
@@ -63,9 +70,11 @@ export function KidsQuiz() {
 
   return (
     <div className="rounded-3xl bg-card p-5 shadow-sm ring-1 ring-border flex flex-col">
-      <p className="text-xs text-muted-foreground">{`سؤال ${toArabicNumber(index + 1)} من ${toArabicNumber(round.length)}`}</p>
+      <p className="text-xs text-muted-foreground">
+        {`${dict.kidsPage.question} ${formatNumber(index + 1)} ${dict.kidsPage.of} ${formatNumber(round.length)}`}
+      </p>
       <p className="mt-3 mb-4 text-lg font-bold leading-relaxed">{q.q}</p>
-      <div className="grid gap-2" role="group" aria-label="الخيارات">
+      <div className="grid gap-2" role="group" aria-label={dict.kidsPage.options}>
         {q.options.map((o, i) => {
           const isCorrect = picked !== null && i === q.answer
           const isWrong = picked === i && i !== q.answer

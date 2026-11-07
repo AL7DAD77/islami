@@ -1,30 +1,30 @@
-import type { Metadata } from 'next'
+'use client'
+
 import { ChevronDown } from 'lucide-react'
 import { PageHeader } from '@/components/page-header'
 import { FORGOTTEN_SUNAN, RAWATIB, RAWATIB_HADITH, RAWATIB_SOURCE } from '@/lib/sunan'
 import { toArabicNumber } from '@/lib/quran'
-
-export const metadata: Metadata = { title: 'السنن المستحبة في اليوم والليلة | إسلامي' }
+import { useLanguage } from '@/lib/language-context'
 
 export default function SunanPage() {
+  const { dict } = useLanguage()
   const total = RAWATIB.reduce((n, r) => n + r.rakaat, 0)
 
   return (
     <>
       <PageHeader
-        title="السنن المستحبة في اليوم والليلة"
-        subtitle="السنن الرواتب وأهم السنن المهجورة"
+        title={dict.sunanPage.title}
+        subtitle={dict.sunanPage.subtitle}
         backHref="/more"
       />
 
       <div className="flex flex-col gap-8">
-        {/* ============ السنن الرواتب ============ */}
         <section aria-labelledby="rawatib">
           <h2 id="rawatib" className="mb-3 font-bold">
-            {`🕌 السنن الرواتب (${toArabicNumber(total)} ركعة)`}
+            {dict.sunanPage.rawatibTitle.replace('{count}', toArabicNumber(total))}
           </h2>
 
-          <div className="rounded-2xl bg-gradient-to-l from-emerald-600 to-emerald-700 p-4 text-white shadow-sm">
+          <div className="rounded-2xl bg-linear-to-l from-emerald-600 to-emerald-700 p-4 text-white shadow-sm">
             <p className="font-quran text-lg leading-loose">{`«${RAWATIB_HADITH}»`}</p>
             <p className="mt-2 text-xs opacity-80">{RAWATIB_SOURCE}</p>
           </div>
@@ -35,10 +35,10 @@ export default function SunanPage() {
                 <div className="flex items-center gap-3">
                   <span className="flex size-12 shrink-0 flex-col items-center justify-center rounded-xl bg-accent text-accent-foreground">
                     <span className="text-lg font-bold leading-none">{toArabicNumber(r.rakaat)}</span>
-                    <span className="text-[10px]">{'ركعات'}</span>
+                    <span className="text-[10px]">{dict.sunanPage.rakaat}</span>
                   </span>
                   <div className="flex-1">
-                    <p className="font-bold">{`سنة ${r.prayer}`}</p>
+                    <p className="font-bold">{`${dict.sunanPage.sunnahOf} ${r.prayer}`}</p>
                     <p className="text-xs text-muted-foreground">{r.position}</p>
                   </div>
                 </div>
@@ -48,13 +48,12 @@ export default function SunanPage() {
           </ul>
         </section>
 
-        {/* ============ السنن المهجورة ============ */}
         <section aria-labelledby="forgotten">
           <h2 id="forgotten" className="mb-1 font-bold">
-            {'🌱 أهم السنن المهجورة'}
+            {dict.sunanPage.forgottenTitle}
           </h2>
           <p className="mb-3 text-xs text-muted-foreground">
-            {'سنن ثابتة قلّ من يعمل بها، فأحيِها تُؤجر على إحيائها. اضغط على السنة لقراءة دليلها.'}
+            {dict.sunanPage.forgottenDesc}
           </p>
 
           <div className="flex flex-col gap-3">
@@ -73,7 +72,7 @@ export default function SunanPage() {
                 <div className="border-t p-4">
                   <p className="font-quran text-lg leading-loose">{s.hadith}</p>
                   {s.note && <p className="mt-2 rounded-xl bg-muted/50 p-3 text-sm leading-relaxed">{s.note}</p>}
-                  <p className="mt-2 text-xs text-muted-foreground">{`المصدر: ${s.source}`}</p>
+                  <p className="mt-2 text-xs text-muted-foreground">{`${dict.sunanPage.source} ${s.source}`}</p>
                 </div>
               </details>
             ))}
@@ -82,7 +81,7 @@ export default function SunanPage() {
       </div>
 
       <p className="mt-8 text-center text-xs leading-relaxed text-muted-foreground">
-        {'النصوص منقولة مع تخريجها كما وردت في مصادرها. وللاستزادة أو التثبت من درجة الحديث يُرجع إلى أهل العلم.'}
+        {dict.sunanPage.footer}
       </p>
     </>
   )

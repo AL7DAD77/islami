@@ -1,0 +1,499 @@
+{
+  "nav": {
+    "more": "More",
+    "qibla": "Qibla",
+    "kids": "Kids",
+    "adhkar": "Adhkar",
+    "quran": "Quran",
+    "prayer": "Prayer"
+  },
+  "common": {
+    "settings": "Settings",
+    "share": "Share",
+    "close": "Close",
+    "save": "Save",
+    "cancel": "Cancel"
+  },
+  "settings": {
+    "prayer": {
+      "title": "Prayer Settings",
+      "subtitle": "Location, notifications, and calculation method"
+    }
+  },
+  "prayerPage": {
+    "title": "Prayer Times",
+    "subtitle": "Based on your current location",
+    "adhanSound": "Adhan Sound",
+    "weekTimes": "Week Times",
+    "calendarLabel": "Hijri Calendar"
+  },
+  "prayers": {
+    "fajr": "Fajr",
+    "sunrise": "Sunrise",
+    "dhuhr": "Dhuhr",
+    "asr": "Asr",
+    "maghrib": "Maghrib",
+    "isha": "Isha"
+  },
+  "morePage": {
+    "title": "More",
+    "subtitle": "Learn, tools, and app information",
+    "tools": "Tools",
+    "learn": "Learn",
+    "appSettings": "App Settings",
+    "support": "Help & Support",
+    "about": "About App",
+    "quran": "Holy Quran",
+    "hadith": "Prophet's Hadith",
+    "sahihayn": "The Two Sahihs (Bukhari & Muslim)",
+    "seerah": "Prophetic Biography",
+    "prophets": "Stories of Prophets",
+    "sunan": "Recommended Sunnah",
+    "guide": "Guide",
+    "calendar": "Calendar",
+    "ibadati": "My Worship",
+    "search": "Search",
+    "reminders": "Salawat on Prophet ﷺ",
+    "prayerSettings": "Settings",
+    "rate": "Rate App",
+    "share": "Share App",
+    "qr": "QR Code",
+    "exit": "Exit",
+    "supportTile": "Support & Contact",
+    "aboutApp": "About App",
+    "privacy": "Privacy Policy",
+    "disclaimer": "Disclaimer"
+  },
+  "morePageExtra": {
+    "copied": "Copied!",
+    "copyLink": "Copy Link"
+  },
+  "quranPage": {
+    "title": "Holy Quran",
+    "subtitle": "Uthmani script with recitations of famous reciters",
+    "dailyWird": "Daily Wird",
+    "dailyWirdDesc": "Plan to finish the Quran",
+    "reciters": "Reciters & Recitations",
+    "recitersDesc": "More than 200 reciters",
+    "surahIndex": "Surah Index"
+  },
+  "adhkarPage": {
+    "title": "Adhkar & Duas",
+    "subtitle": "Your daily fortress from Quran and Sunnah",
+    "tasbih": "Electronic Tasbih",
+    "tasbihDesc": "Glorify and keep your adhkar with auto-transition",
+    "hisn": "Hisn Al-Muslim (Full)",
+    "ruqyah": "Ruqyah (Healing)",
+    "daily": "Daily Adhkar",
+    "situations": "Situations & Occasions",
+    "dua": "Duas & Glorification",
+    "asmaulHusna": "Names of Allah",
+    "asmaulHusnaDesc": "Reflect on the meanings of Allah's names",
+    "footer": "Adhkar are taken from the Holy Quran, Hisn Al-Muslim, and Sunnah books, limiting to what is authentic or good according to scholars.",
+    "dhikrCount": "Dhikr",
+    "babCount": "Chapters"
+  },
+  "dhikrList": {
+    "completed": "Completed",
+    "of": "of",
+    "reset": "Reset",
+    "done": "Done",
+    "goal": "Goal",
+    "time": "times",
+    "nextIn": "Moving to",
+    "after": "in",
+    "seconds": "seconds",
+    "goNow": "Go Now",
+    "stayHere": "Stay Here",
+    "lastSection": "This is the last section of Adhkar",
+    "shareDhikr": "Share Dhikr"
+  },
+  "surahList": {
+    "surah": "Surah",
+    "ayahs": "Ayahs",
+    "meccan": "Meccan",
+    "medinan": "Medinan"
+  },
+  "qiblaPage": {
+    "title": "Qibla Direction",
+    "subtitle": "Accurate compass based on your location",
+    "verse": "We have certainly seen the turning of your face, [O Muhammad], toward the heaven, and We will surely turn you to a qiblah with which you will be pleased. So turn your face toward al-Masjid al-Haram.",
+    "verseSource": "Surah Al-Baqarah - Ayah 144",
+    "north": "N",
+    "east": "E",
+    "south": "S",
+    "west": "W",
+    "kaaba": "Kaaba",
+    "qiblaDir": "Qibla Direction",
+    "fromNorth": "from North",
+    "distanceToMakkah": "Distance to Makkah",
+    "km": "km",
+    "facingQibla": "You are facing the Qibla",
+    "startCompass": "Start Compass",
+    "calibrate": "Move your phone in a figure 8 to calibrate the compass...",
+    "sensorError": "Your device does not support a compass sensor. Use the degree direction below.",
+    "permissionError": "Permission to access the orientation sensor was denied.",
+    "instructions": "Place the phone horizontally away from metals and electronics for higher accuracy."
+  },
+  "kidsPage": {
+    "title": "Kids Corner",
+    "subtitle": "Learn our religion with love and fun",
+    "shortSurahs": "📖 Memorize Short Surahs",
+    "quiz": "🏆 Test Your Knowledge",
+    "duas": "🤲 Small Duas I Memorize",
+    "letters": "🔤 Arabic Letters",
+    "lessons": "📚 Illustrated Lessons",
+    "wellDone": "Well done! Your score",
+    "of": "of",
+    "playAgain": "Play Again",
+    "question": "Question",
+    "options": "Options",
+    "source": "Source"
+  },
+  "weekPrayerTimes": {
+    "today": "Today",
+    "days": {
+      "0": "Sunday",
+      "1": "Monday",
+      "2": "Tuesday",
+      "3": "Wednesday",
+      "4": "Thursday",
+      "5": "Friday",
+      "6": "Saturday"
+    },
+    "months": {
+      "0": "January",
+      "1": "February",
+      "2": "March",
+      "3": "April",
+      "4": "May",
+      "5": "June",
+      "6": "July",
+      "7": "August",
+      "8": "September",
+      "9": "October",
+      "10": "November",
+      "11": "December"
+    }
+  },
+  "locationBanner": {
+    "notDetermined": "Location not determined",
+    "message": "The times shown are for",
+    "messageEnd": ". Please enable location permission or select your city manually.",
+    "openSettings": "Open Location Settings"
+  },
+  "ibadatiCard": {
+    "title": "My Worship",
+    "dailyTracking": "Daily Tracking",
+    "todayProgress": "Today's Progress"
+  },
+  "notificationPrompt": {
+    "title": "Enable Adhan Notifications",
+    "desc": "To alert you of prayer times and Adhan on time",
+    "enable": "Enable Notifications",
+    "successTitle": "Notifications Enabled",
+    "successBody": "You will receive prayer and Adhan alerts on time"
+  },
+  "adhanSettingsPage": {
+    "title": "Adhan Sound",
+    "subtitle": "Choose your preferred sound"
+  },
+  "adhanSettings": {
+    "batteryTitle": "Enable Background Work",
+    "batteryDesc": "To ensure the Adhan plays exactly on time and doesn't stop when the screen is off, please allow the app to run in the background (ignore battery optimization).",
+    "batteryButton": "Allow Background Work",
+    "perPrayerTitle": "Adhan for each prayer",
+    "perPrayerDesc": "Choose the Adhan you want for each prayer. Prayers without a specific choice will use the default voice.",
+    "adhanFor": "Adhan for",
+    "useDefault": "Use Default",
+    "play": "Preview",
+    "stop": "Stop",
+    "defaultVoiceTitle": "Default voice for prayers without a specific choice",
+    "defaultVoiceSelect": "Select Default Voice"
+  },
+  "hijriCalendar": {
+    "prevMonth": "Previous Month",
+    "nextMonth": "Next Month",
+    "monthOccasions": "Occasions this month",
+    "noOccasions": "No major occasions this month. It is recommended to fast the White Days (13th, 14th, 15th of each Hijri month).",
+    "calendarNote": "The calendar is based on Umm Al-Qura calculation and may vary by a day depending on moon sighting in your country. You can adjust the date from prayer settings.",
+    "weekdays": {
+      "0": "Sun",
+      "1": "Mon",
+      "2": "Tue",
+      "3": "Wed",
+      "4": "Thu",
+      "5": "Fri",
+      "6": "Sat"
+    }
+  },
+  "ibadatiPage": {
+    "title": "My Worship",
+    "subtitle": "Daily tracking of your deeds, starts fresh every day",
+    "todayProgress": "Today's Progress",
+    "of": "of",
+    "saveNotice": "Saved on your device only, and the list resets every day.",
+    "groups": {
+      "prayer": "Prayers",
+      "dhikr": "Adhkar",
+      "quran": "Quran"
+    },
+    "dailyChallenge": "Daily Challenge",
+    "items": {
+      "fajr": "Fajr Prayer",
+      "dhuhr": "Dhuhr Prayer",
+      "asr": "Asr Prayer",
+      "maghrib": "Maghrib Prayer",
+      "isha": "Isha Prayer",
+      "morning": "Morning Adhkar",
+      "evening": "Evening Adhkar",
+      "sleep": "Sleep Adhkar",
+      "quran": "Quran Wird"
+    },
+    "challenges": [
+      "Read a page of the Quran with reflection",
+      "Seek Allah's forgiveness 100 times",
+      "Give charity, even if small",
+      "Maintain family ties with a call or visit",
+      "Smile in the face of your brother, it is charity",
+      "Increase Salawat on the Prophet ﷺ today",
+      "Help a family member without being asked",
+      "Read a hadith from the selected hadiths in the app"
+    ]
+  },
+  "legal": {
+    "privacy": {
+      "title": "Privacy Policy",
+      "updated": "October 2026"
+    },
+    "disclaimer": {
+      "title": "Disclaimer",
+      "updated": "October 2026"
+    }
+  },
+  "supportPage": {
+    "title": "Support & Contact",
+    "intro": "We are happy to hear from you! If you face any issue with the app, or have a suggestion or feedback, please don't hesitate to email us. We read every message and continuously work on improvements.",
+    "emailTitle": "Email",
+    "howCanWeHelp": "How can we help you?",
+    "helpItems": [
+      "Report a problem or bug in the app.",
+      "Suggest a new feature or improvement.",
+      "Feedback on content (text, audio, translation).",
+      "Request related to copyright or content."
+    ],
+    "responseTimeTitle": "⏱️ Response Time",
+    "responseTimeDesc": "We strive to respond to all messages within 24 to 48 hours, by Allah's permission.",
+    "footer": "May Allah reward you for using the app 🤲"
+  },
+  "remindersPage": {
+    "title": "Salawat on Prophet ﷺ",
+    "subtitle": "Make your day full of remembrance and Salawat on the Beloved",
+    "exactAlarmTitle": "Reminders won't work accurately!",
+    "exactAlarmDesc": "The phone system prevents the app from setting exact alarms. Please tap the button below and allow it to ensure reminders work.",
+    "exactAlarmButton": "Allow Exact Alarms",
+    "salawatTitle": "Salawat on Prophet ﷺ",
+    "salawatDesc": "Reminder to send Salawat on the Beloved",
+    "reminderEvery": "Remind every:",
+    "customize": "Customize",
+    "back": "Back",
+    "save": "Save",
+    "saving": "Saving...",
+    "tone": "Reminder tone:",
+    "adhkarTitle": "Adhkar & Quran Reminder",
+    "adhkarDesc": "Gentle notifications asking: Did you read your wird?",
+    "intervals": {
+      "30min": "30 min",
+      "1h": "1 hour",
+      "2h": "2 hours",
+      "3h": "3 hours",
+      "6h": "6 hours",
+      "12h": "12 hours",
+      "min": "min",
+      "hr": "hr",
+      "count": "Count"
+    },
+    "sounds": {
+      "1": "First sound (default)",
+      "2": "Second sound",
+      "3": "Third sound"
+    },
+    "errors": {
+      "invalidMinutes": "Please enter a valid time (at least 1 minute).",
+      "invalidNumber": "Please enter a valid number",
+      "audioNotFound": "Audio file not found.",
+      "scheduleError": "An error occurred! Please ensure the \"Alarms\" permission is granted to the app."
+    }
+  },
+  "themeToggle": {
+    "lightMode": "Light Mode",
+    "darkMode": "Dark Mode",
+    "switchTheme": "Switch app theme"
+  },
+  "dailyMessageToggle": {
+    "title": "Daily Dua",
+    "active": "Shows once daily",
+    "inactive": "Disabled"
+  },
+  "searchPage": {
+    "title": "Search",
+    "subtitle": "In adhkar, prophets, hadiths, battles, and sunnahs",
+    "placeholder": "Search for a dhikr, prophet, hadith, battle, sunnah...",
+    "srLabel": "Search app content",
+    "noResults": "No results found. Try another word."
+  },
+  "hadithPage": {
+    "title": "Prophet's Hadith",
+    "subtitle": "From the comprehensive words of the Prophet (PBUH)",
+    "searchPlaceholder": "Search in hadith text or explanation...",
+    "all": "All",
+    "noResults": "No hadiths match your search.",
+    "source": "Source:",
+    "explanation": "Explanation & Benefits:",
+    "closeHint": "Tap anywhere outside the window to close"
+  },
+  "ghazawatPage": {
+    "title": "Prophet's Battles ﷺ",
+    "subtitle": "Most prominent battles arranged chronologically",
+    "lesson": "Lesson:",
+    "footer": "Dates and events according to what is famous in Seerah books, and some narrations differ in details. For more, refer to approved Seerah books."
+  },
+  "asmaulHusnaPage": {
+    "title": "Names of Allah",
+    "subtitle": "Reflect on the meanings of Allah's names",
+    "closeHint": "Tap anywhere to close"
+  },
+  "hisnPage": {
+    "title": "Hisn Al-Muslim",
+    "babCount": "chapters",
+    "dhikrCount": "adhkar",
+    "footer": "Texts from the book 'Hisn Al-Muslim from the Adhkar of the Book and Sunnah' by Saeed bin Ali bin Wahf Al-Qahtani. Hadith takhrij was not added in this section, so reviewing adhkar with scholars is recommended. Source details in 'More' → 'About App'."
+  },
+  "prophetsPage": {
+    "title": "Stories of Prophets",
+    "subtitle": "Brief overview of the {count} prophets mentioned in the Holy Quran",
+    "peaceBeUponHim": "(PBUH)",
+    "footer": "Brief excerpts taken from the Holy Quran, books of tafsir, and stories of prophets."
+  },
+  "sunanPage": {
+    "title": "Recommended Sunnahs Day and Night",
+    "subtitle": "Regular Sunnahs and the most important forgotten Sunnahs",
+    "rawatibTitle": "🕌 Regular Sunnahs ({count} rak'ahs)",
+    "rakaat": "rak'ahs",
+    "sunnahOf": "Sunnah of",
+    "forgottenTitle": "🌱 Most Important Forgotten Sunnahs",
+    "forgottenDesc": "Established sunnahs that few practice; revive them and you will be rewarded for reviving them. Tap on a sunnah to read its evidence.",
+    "source": "Source:",
+    "footer": "Texts are transmitted with their takhrij as stated in their sources. To learn more or verify the hadith grade, refer to scholars."
+  },
+  "guidePage": {
+    "title": "Muslim's Guide",
+    "subtitle": "Wudu, prayer, purification, fasting, zakat, and other rulings"
+  },
+  "prayerSettingsPage": {
+    "location": "Location",
+    "currentCity": "Current City",
+    "detectLocation": "Detect My Location",
+    "detecting": "Detecting...",
+    "manualSelect": "Manual Select",
+    "searchCityPlaceholder": "Search for your city...",
+    "calcMethod": "Calculation Method",
+    "asrMadhab": "Asr Calculation Madhab",
+    "shafiMalikiHanbali": "Shafi'i / Maliki / Hanbali",
+    "hanafi": "Hanafi",
+    "adhanActivation": "Adhan Activation",
+    "adhanSelectPrayers": "Select prayers you want to hear Adhan for",
+    "notifications": "Notifications",
+    "persistentNotification": "Persistent notification for next prayer",
+    "persistentNotificationDesc": "Stays visible in background showing remaining time",
+    "vibration": "Vibration",
+    "vibrationDesc": "Vibrate on app interaction and notifications",
+    "overlayPermission": "Display over other apps",
+    "overlayPermissionDesc": "Required to ensure Adhan works even if app is closed",
+    "enable": "Enable",
+    "appLanguage": "App Language / لغة التطبيق",
+    "appLanguageDesc": "Change the entire interface language",
+    "preAdhanTitle": "Pre-Adhan Alert",
+"preAdhanEnable": "Enable pre-adhan alert",
+"preAdhanEnableDesc": "A notification before the adhan time, without affecting the adhan or countdown.",
+"preAdhanMinutesTitle": "Choose alert time before adhan",
+"preAdhanMinutes": {
+  "5": "5 min",
+  "10": "10 min",
+  "15": "15 min",
+  "30": "30 min"
+},
+    "methods": {
+      "UmmAlQura": "Umm Al-Qura (Saudi Arabia)",
+      "Egyptian": "Egyptian Authority",
+      "MuslimWorldLeague": "Muslim World League",
+      "JordanAwqaf": "Jordan - Ministry of Awqaf",
+      "AlgeriaMinistry": "Algeria - Ministry of Religious Affairs",
+      "TunisiaMinistry": "Tunisia - Ministry of Religious Affairs",
+      "MoroccoHabous": "Morocco - Ministry of Awqaf",
+      "Karachi": "Karachi (Pakistan)",
+      "Dubai": "Dubai",
+      "Kuwait": "Kuwait",
+      "Qatar": "Qatar",
+      "Turkey": "Turkey",
+      "NorthAmerica": "North America",
+      "Singapore": "Singapore",
+      "MoonsightingCommittee": "Moonsighting Committee"
+    },
+    "alerts": {
+      "locationDenied": "⚠️ App was not allowed to access location\n\nTo enable:\n1. Phone settings → Apps → Islami\n2. Permissions → Location\n3. Choose 'Allow while using app'\n4. Return and tap 'Detect My Location'",
+      "locationDeniedWeb": "⚠️ Location access denied\n\nTo enable:\n• Click 🔒 next to the URL\n• Site settings → Location → Allow",
+      "locationError": "⚠️ Could not detect your location. Make sure GPS is on, then try again.",
+      "notificationError": "Error connecting to notification system.",
+      "overlayManual": "Please enable the permission manually from: Settings > Apps > Islami > Display over other apps"
+    }
+  },
+  "quranComponents": {
+    "bookmarks": {
+      "continueReading": "Continue Reading",
+      "surahLabel": "Surah",
+      "pageLabel": "Page",
+      "bookmarksTitle": "Bookmarks",
+      "deleteAria": "Delete bookmark"
+    },
+    "lastPlayed": {
+      "continueListening": "Resume listening where you stopped",
+      "hideAria": "Hide",
+      "surahPrefix": "Surah"
+    },
+    "khatmah": {
+      "title": "Khatmah Tracker",
+      "startJourney": "Start your Quran journey today",
+      "youAreAtPage": "You are on page {page}",
+      "completedKhatmah": "MashaAllah! You completed the Khatmah",
+      "pagesRemaining": "{count} pages remaining",
+      "duaTitle": "Khatmah Completion Dua",
+      "duaSubtitle": "May Allah make it in the scale of your good deeds"
+    },
+    "khatmahDuaPage": {
+      "title": "Khatmah Completion Dua",
+      "subtitle": "May Allah make it in the scale of your good deeds",
+      "footer": "May Allah accept from us and from you the good deeds"
+    },
+    "recitersBrowser": {
+      "searchPlaceholder": "Search by reciter name...",
+      "noResults": "No results match your search.",
+      "defaultReciter": "Reciter",
+      "moshafMurattal": "Murattal Mushaf"
+    }
+  },
+  "sahihaynPage": {
+    "title": "The Two Sahihs",
+    "subtitle": "Sahih Al-Bukhari and Sahih Muslim",
+    "bukhari": "Sahih Al-Bukhari",
+    "muslim": "Sahih Muslim",
+    "chapters": "Books & Chapters",
+    "searchPlaceholder": "Search hadiths...",
+    "noResults": "No results match your search.",
+    "source": "Source:",
+    "sourceValue": "Sunnah.com (arrangement)",
+    "disclaimer": "Source: Sunnah.com. Rights of arrangement reserved for them. Texts are transmitted for educational purposes; refer to official printed sources for verification.",
+    "hadithNumber": "Hadith No.",
+    "narrator": "Narrator:"
+  }
+}

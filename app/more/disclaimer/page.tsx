@@ -1,128 +1,48 @@
-import type { Metadata } from 'next'
-import { LegalLayout, LegalSection, Contact } from '@/components/legal/legal-layout'
+'use client'
 
-export const metadata: Metadata = { title: 'إخلاء المسؤولية | إسلامي' }
+import { LegalLayout, LegalSection, Contact } from '@/components/legal/legal-layout'
+import { useLanguage } from '@/lib/language-context'
 
 export default function DisclaimerPage() {
+  const { dict, locale } = useLanguage()
+  const isAr = locale === 'ar'
+
+  const content = isAr ? {
+    intro: <>يُقدَّم تطبيق <strong>«إسلامي»</strong> لأغراض تعليمية وتذكيرية وشخصية. استخدامك له يعني قبولك لما يلي.</>,
+    sections: [
+      { title: '١. الطبيعة الدينية للمحتوى', body: <><p>المحتوى الشرعي في التطبيق (الأذكار والأدعية والسنن والأحاديث والسيرة وقصص الأنبياء) للإعلام والتعليم، وليس فتوى ولا بديلًا عن العلماء المعتمدين. في المسائل الفقهية والعقدية يُرجع إلى أهل العلم الثقات.</p><p>درجات الأحاديث تختلف فيها أقوال أهل العلم، وقد نُقلت الأحكام على الحديث كما ذكرها المخرِّج أو المصدر المعتمد. نرجو التثبت من المصادر عند الحاجة، ونرحّب بأي تصحيح علمي يصلنا.</p></> },
+      { title: '٢. دقة المعلومات', body: <><p>نبذل جهدنا لدقة النصوص والمواقيت، لكن:</p><ul className="list-inside list-disc space-y-1"><li>مواقيت الصلاة <strong>تقديرية</strong> وتعتمد على موقعك وطريقة الحساب المختارة، وقد تختلف دقائق عن الجهات الرسمية في بلدك. اعتمد على مسجدك أو الجهة المختصة عند الشك.</li><li>اتجاه القبلة يعتمد على البوصلة في هاتفك، وتتأثر دقته بالأجسام المغناطيسية، ويحتاج معايرة من وقت لآخر.</li><li>قد تقع أخطاء مطبعية أو في الترقيم رغم المراجعة، ونعمل على تصحيحها عند اكتشافها.</li></ul></> },
+      { title: '٣. الأذان والتنبيهات', body: <p>تعتمد التنبيهات وتشغيل الأذان <strong>وكذلك التذكيرات الذكية (الصلاة على النبي والأذكار)</strong> على إعدادات هاتفك ونظامه. قد تتأخر أو لا تعمل إن أغلقت الشركة المصنّعة التطبيق في الخلفية، أو كان الهاتف على الصامت أو وضع عدم الإزعاج، أو منعت صلاحية الإشعارات أو المنبهات. <strong>لا نضمن تشغيل التنبيه في وقته في كل الظروف</strong>، فلا تعتمد عليه وحده في أمر لا يُحتمل فيه التأخير.</p> },
+      { title: '٤. الاتصال بالإنترنت والخدمات الخارجية', body: <><p>بعض الميزات (المصحف والتلاوات والأوراد والبحث عن المدن) تحتاج اتصالًا بالإنترنت، وتعتمد على خدمات طرف ثالث قد تتوقف أو تتغير دون إشعار مسبق. لا نتحمل مسؤولية انقطاع هذه الخدمات أو تغير محتواها.</p><p>عند الاستماع للتلاوات الصوتية في الخلفية، يعتمد التطبيق على نظام التشغيل (Media Session) لعرض أزرار التحكم، وقد تتأثر جودة التشغيل بذاكرة الهاتف أو التطبيقات الأخرى.</p></> },
+      { title: '٥. الحقوق والمحتوى', body: <><p>النصوص والتسجيلات الصوتية في التطبيق مأخوذة من مصادر عامة أو مصرّح بها، وقد ذكرنا مصدرها حيث أمكن. نحترم حقوق الملكية الفكرية، فإن كنت صاحب حق في محتوى يظهر في التطبيق وترى أن استخدامه غير مناسب، فراسلنا لنراجعه ونزيله سريعًا.</p><Contact /></> },
+      { title: '٦. مصادر المحتوى ومراجعته', body: <><p><strong>المصحف الشريف:</strong></p><ul className="list-inside list-disc space-y-1"><li>الخط: <strong>KFGQPC HAFS Uthmanic Script</strong> (الإصدار 2.2) الصادر عن مجمع الملك فهد لطباعة المصحف الشريف بالمدينة المنورة. حقوقه محفوظة للمجمع، ويُستخدم في التطبيق دون أي تعديل وفق ترخيصه المجاني المرفق مع الخط.</li><li>نص «QPC Hafs» كلمةً بكلمة وتخطيط الصفحات (٦٠٤ صفحة، ١٥ سطراً بترقيم مصحف المدينة): من مكتبة <strong>Quranic Universal Library (QUL)</strong> التابعة لـ Tarteel.</li><li>التلاوات الصوتية وقوائم القرّاء: من موقع <strong>mp3quran.net</strong>. وبيانات السور: من واجهة <strong>alquran.cloud</strong>.</li></ul><p><strong>المراجعة:</strong> أعلن مجمع الملك فهد أن خط الرسم العثماني (حفص) ونصه مراجَع ومعتمد من اللجنة العلمية لمراجعة المصحف الشريف بالمجمع، وهي التي تراجع مصحف المدينة النبوية على أمهات كتب القراءات والرسم والضبط والفواصل والوقف والابتداء.</p><p><strong>تنبيه مهم:</strong> هذه المراجعة صادرة عن المجمع لخطه ونصه، ولم تُجرِها جهة التطبيق. ونص التطبيق منقول عبر مكتبة QUL، ولا نصفه بأنه نسخة رسمية معتمدة من المجمع، ولا نضمن مطابقته حرفاً بحرف للمصحف المطبوع. وما أجريناه فحوص آلية لسلامة البيانات فقط (عدد الكلمات والآيات وبدايات الأجزاء وتطابق تقسيم الصفحات مع مصحف المدينة)، ولم تُراجَع الكلمات كلمةً كلمةً على مصحف مطبوع.</p><p>قد تصدر عن الباحثين ملاحظات على النصوص الحاسوبية للمصحف (كوصل الكلمات وفصلها). فالمرجع المعتمد عند أي شك في رسم كلمة أو ضبطها هو مصحف المدينة النبوية المطبوع من المجمع وأهل القراءات، وننصح بالاستعانة بالمصحف المطبوع ومعلّم متقن لتعلّم التلاوة. وإن لاحظت خطأً فنرجو إبلاغنا ليُصحَّح.</p><p><strong>حصن المسلم:</strong> نصوصه من كتاب «حصن المسلم من أذكار الكتاب والسنة» لسعيد بن علي بن وهف القحطاني، عبر ملف JSON منشور على GitHub بواسطة rn0x (مستودع Adhkar-json)، وصاحب الملف يتيح استخدامه مجاناً. حقوق الكتاب محفوظة لمؤلفه، ونُقلت نصوصه هنا لنشر الفائدة دون أي مقابل. ولم يتضمن هذا المصدر تخريج الأحاديث وأحكامها، ونوصي بمراجعة الأذكار مع أهل العلم.</p></> },
+      { title: '٦.١. مصادر الصحيحين', body: <><p><strong>صحيح البخاري وصحيح مسلم:</strong> النصوص منقولة من موقع <strong>Sunnah.com</strong> عبر مستودع مفتوح المصدر على GitHub (AhmedBaset/hadith-json). حقوق الترتيب والتبويب والتحقيق محفوظة لموقع Sunnah.com. التطبيق يستخدم هذه النصوص لغرض تعليمي غير ربحي. ولم يقم فريق التطبيق بإعادة تخريج الأحاديث أو الحكم عليها. والمرجع المعتمد عند أي شك هو المطبوعات الرسمية للصحيحين.</p></> },
+      { title: '٧. مجاني وبلا إعلانات', body: <p>التطبيق مجاني بالكامل ويعمل بدون إعلانات أو اشتراكات. أي تغيير في ذلك في المستقبل سيُعلن هنا وفي المتجر قبل تطبيقه.</p> },
+      { title: '٨. حدود المسؤولية', body: <><p>يُقدَّم التطبيق <strong>«كما هو»</strong> دون ضمان صريح أو ضمني بدقة كل المعلومات أو توفرها الدائم. وإلى أقصى حد يسمح به القانون، لا يتحمل المطوّر مسؤولية عن أي خسارة أو ضرر ناتج عن استخدام التطبيق أو الاعتماد عليه، بما في ذلك فوات تنبيه أو اعتماد على معلومة غير دقيقة.</p><p>وإن كان لبلدك قوانين تمنع استبعاد بعض المسؤوليات، فهذه القوانين هي التي تسري في تلك الحدود.</p></> },
+      { title: '٩. التعديلات', body: <p>قد نحدّث هذه الصفحة لتتوافق مع تطور التطبيق. يُعتبر استمرارك في استخدامه بعد التحديث موافقة على الصيغة الجديدة.</p> },
+    ]
+  } : {
+    intro: <>The <strong>"Islami"</strong> app is provided for educational, reminder, and personal purposes. Your use of it means your acceptance of the following.</>,
+    sections: [
+      { title: '1. Religious Nature of Content', body: <><p>The Islamic content in the app (adhkar, duas, sunnahs, hadiths, seerah, and stories of prophets) is for information and education, and is not a fatwa nor a substitute for trusted scholars. In jurisprudential and creedal matters, refer to trustworthy scholars.</p><p>Hadith grades vary among scholars, and the rulings on hadith have been transmitted as stated by the compiler or approved source. Please verify from sources when needed, and we welcome any scholarly correction that reaches us.</p></> },
+      { title: '2. Accuracy of Information', body: <><p>We strive for accuracy in texts and timings, but:</p><ul className="list-inside list-disc space-y-1"><li>Prayer times are <strong>estimates</strong> and depend on your location and chosen calculation method, and may differ by minutes from official authorities in your country. Rely on your mosque or the relevant authority when in doubt.</li><li>Qibla direction depends on your phone's compass, its accuracy is affected by magnetic objects, and it needs calibration from time to time.</li><li>Typographical or numbering errors may occur despite review, and we work to correct them when discovered.</li></ul></> },
+      { title: '3. Adhan and Alerts', body: <p>Alerts and Adhan playback <strong>as well as smart reminders (Salawat on the Prophet and Adhkar)</strong> depend on your phone settings and system. They may be delayed or not work if the manufacturer closes the app in the background, or the phone is on silent or Do Not Disturb mode, or notification or alarm permission is denied. <strong>We do not guarantee the alert will work on time in all circumstances</strong>, so do not rely on it alone for matters where delay cannot be tolerated.</p> },
+      { title: '4. Internet and External Services', body: <><p>Some features (Mushaf, recitations, wirds, and city search) need internet connection, and depend on third-party services that may stop or change without prior notice. We are not responsible for the interruption of these services or changes in their content.</p><p>When listening to audio recitations in the background, the app relies on the operating system (Media Session) to display control buttons, and playback quality may be affected by phone memory or other apps.</p></> },
+      { title: '5. Rights and Content', body: <><p>Texts and audio recordings in the app are taken from public or authorized sources, and we have mentioned their source where possible. We respect intellectual property rights, so if you are a rights holder of content appearing in the app and believe its use is inappropriate, contact us to review and remove it quickly.</p><Contact /></> },
+      { title: '6. Sources and Review', body: <><p><strong>The Holy Quran:</strong></p><ul className="list-inside list-disc space-y-1"><li>Font: <strong>KFGQPC HAFS Uthmanic Script</strong> (version 2.2) issued by the King Fahd Complex for Printing the Holy Quran in Madinah. Its rights are reserved for the Complex, and it is used in the app without modification according to its free license attached to the font.</li><li>"QPC Hafs" word-by-word text and page layout (604 pages, 15 lines with Madinah Mushaf numbering): from the <strong>Quranic Universal Library (QUL)</strong> by Tarteel.</li><li>Audio recitations and reciter lists: from <strong>mp3quran.net</strong>. Surah data: from the <strong>alquran.cloud</strong> API.</li></ul><p><strong>Review:</strong> The King Fahd Complex announced that the Uthmanic script (Hafs) font and its text are reviewed and approved by the scientific committee for reviewing the Holy Quran at the Complex, which reviews the Madinah Mushaf against the main books of recitations, script, diacritics, verse markers, and stop/start rules.</p><p><strong>Important note:</strong> This review is issued by the Complex for its font and text, and was not conducted by the app's developer. The app's text is transmitted via the QUL library, and we do not describe it as an official version approved by the Complex, nor do we guarantee its letter-by-letter conformity to the printed Mushaf. What we conducted is only automated checks for data integrity (word and verse counts, juz beginnings, and page division conformity with the Madinah Mushaf), and words have not been reviewed word-by-word against a printed Mushaf.</p><p>Researchers may have notes on computer Quranic texts (such as word joining and separation). The approved reference for any doubt about a word's script or diacritics is the Madinah Mushaf printed by the Complex and scholars of recitations, and we recommend using the printed Mushaf and a skilled teacher to learn recitation. If you notice an error, please inform us so it can be corrected.</p><p><strong>Hisn Al-Muslim:</strong> Its texts are from the book "Hisn Al-Muslim from the Adhkar of the Book and Sunnah" by Saeed bin Ali bin Wahf Al-Qahtani, via a JSON file published on GitHub by rn0x (Adhkar-json repository), and the file owner allows its free use. The book's rights are reserved for its author, and its texts were transmitted here to spread benefit without any compensation. This source did not include hadith takhrij and rulings, and we recommend reviewing adhkar with scholars.</p></> },
+      { title: '6.1. Sources of the Two Sahihs', body: <><p><strong>Sahih Al-Bukhari and Sahih Muslim:</strong> Texts are transmitted from <strong>Sunnah.com</strong> via an open-source repository on GitHub (AhmedBaset/hadith-json). Rights of arrangement and indexing are reserved for Sunnah.com. The app uses these texts for non-profit educational purposes. The app team has not re-verified the hadiths or their rulings. The approved reference for any doubt is the official printed editions of the Two Sahihs.</p></> },
+      { title: '7. Free and Ad-Free', body: <p>The app is completely free and works without ads or subscriptions. Any change to this in the future will be announced here and in the store before implementation.</p> },
+      { title: '8. Limitation of Liability', body: <><p>The app is provided <strong>"as is"</strong> without express or implied warranty of the accuracy of all information or its continuous availability. To the maximum extent permitted by law, the developer is not liable for any loss or damage resulting from the use of or reliance on the app, including missed alerts or reliance on inaccurate information.</p><p>If your country's laws prohibit the exclusion of certain liabilities, those laws prevail within those limits.</p></> },
+      { title: '9. Modifications', body: <p>We may update this page to keep pace with the app's development. Your continued use after the update is considered acceptance of the new version.</p> },
+    ]
+  }
+
   return (
-    <LegalLayout title="إخلاء المسؤولية" updated="أكتوبر 2026">
-      <p>
-        يُقدَّم تطبيق <strong>«إسلامي»</strong> لأغراض تعليمية وتذكيرية وشخصية. استخدامك له يعني قبولك لما يلي.
-      </p>
-
-      <LegalSection title="١. الطبيعة الدينية للمحتوى">
-        <p>
-          المحتوى الشرعي في التطبيق (الأذكار والأدعية والسنن والأحاديث والسيرة وقصص الأنبياء) للإعلام والتعليم، وليس فتوى
-          ولا بديلًا عن العلماء المعتمدين. في المسائل الفقهية والعقدية يُرجع إلى أهل العلم الثقات.
-        </p>
-        <p>
-          درجات الأحاديث تختلف فيها أقوال أهل العلم، وقد نُقلت الأحكام على الحديث كما ذكرها المخرِّج أو المصدر المعتمد.
-          نرجو التثبت من المصادر عند الحاجة، ونرحّب بأي تصحيح علمي يصلنا.
-        </p>
-      </LegalSection>
-
-      <LegalSection title="٢. دقة المعلومات">
-        <p>
-          نبذل جهدنا لدقة النصوص والمواقيت، لكن:
-        </p>
-        <ul className="list-inside list-disc space-y-1">
-          <li>مواقيت الصلاة <strong>تقديرية</strong> وتعتمد على موقعك وطريقة الحساب المختارة، وقد تختلف دقائق عن الجهات الرسمية في بلدك. اعتمد على مسجدك أو الجهة المختصة عند الشك.</li>
-          <li>اتجاه القبلة يعتمد على البوصلة في هاتفك، وتتأثر دقته بالأجسام المغناطيسية، ويحتاج معايرة من وقت لآخر.</li>
-          <li>قد تقع أخطاء مطبعية أو في الترقيم رغم المراجعة، ونعمل على تصحيحها عند اكتشافها.</li>
-        </ul>
-      </LegalSection>
-
-      <LegalSection title="٣. الأذان والتنبيهات">
-        <p>
-          تعتمد التنبيهات وتشغيل الأذان <strong>وكذلك التذكيرات الذكية (الصلاة على النبي والأذكار)</strong> على إعدادات هاتفك ونظامه. قد تتأخر أو لا تعمل إن أغلقت الشركة المصنّعة التطبيق في
-          الخلفية، أو كان الهاتف على الصامت أو وضع عدم الإزعاج، أو منعت صلاحية الإشعارات أو المنبهات. <strong>لا
-          نضمن تشغيل التنبيه في وقته في كل الظروف</strong>، فلا تعتمد عليه وحده في أمر لا يُحتمل فيه التأخير.
-        </p>
-      </LegalSection>
-
-      <LegalSection title="٤. الاتصال بالإنترنت والخدمات الخارجية">
-        <p>
-          بعض الميزات (المصحف والتلاوات والأوراد والبحث عن المدن) تحتاج اتصالًا بالإنترنت، وتعتمد على خدمات طرف ثالث قد
-          تتوقف أو تتغير دون إشعار مسبق. لا نتحمل مسؤولية انقطاع هذه الخدمات أو تغير محتواها. 
-        </p>
-        <p>
-          عند الاستماع للتلاوات الصوتية في الخلفية، يعتمد التطبيق على نظام التشغيل (Media Session) لعرض أزرار التحكم، وقد تتأثر جودة التشغيل بذاكرة الهاتف أو التطبيقات الأخرى.
-        </p>
-      </LegalSection>
-
-      <LegalSection title="٥. الحقوق والمحتوى">
-        <p>
-          النصوص والتسجيلات الصوتية في التطبيق مأخوذة من مصادر عامة أو مصرّح بها، وقد ذكرنا مصدرها حيث أمكن. نحترم حقوق
-          الملكية الفكرية، فإن كنت صاحب حق في محتوى يظهر في التطبيق وترى أن استخدامه غير مناسب، فراسلنا لنراجعه ونزيله
-          سريعًا.
-        </p>
-        <Contact />
-      </LegalSection>
-
-      <LegalSection title="٦. مصادر المحتوى ومراجعته">
-        <p>
-          <strong>المصحف الشريف:</strong>
-        </p>
-        <ul className="list-inside list-disc space-y-1">
-          <li>
-            الخط: <strong>KFGQPC HAFS Uthmanic Script</strong> (الإصدار 2.2) الصادر عن مجمع الملك فهد لطباعة المصحف الشريف
-            بالمدينة المنورة. حقوقه محفوظة للمجمع، ويُستخدم في التطبيق دون أي تعديل وفق ترخيصه المجاني المرفق مع الخط.
-          </li>
-          <li>
-            نص «QPC Hafs» كلمةً بكلمة وتخطيط الصفحات (٦٠٤ صفحة، ١٥ سطراً بترقيم مصحف المدينة): من مكتبة{' '}
-            <strong>Quranic Universal Library (QUL)</strong> التابعة لـ Tarteel.
-          </li>
-          <li>
-            التلاوات الصوتية وقوائم القرّاء: من موقع <strong>mp3quran.net</strong>. وبيانات السور: من واجهة{' '}
-            <strong>alquran.cloud</strong>.
-          </li>
-        </ul>
-        <p>
-          <strong>المراجعة:</strong> أعلن مجمع الملك فهد أن خط الرسم العثماني (حفص) ونصه مراجَع ومعتمد من اللجنة العلمية
-          لمراجعة المصحف الشريف بالمجمع، وهي التي تراجع مصحف المدينة النبوية على أمهات كتب القراءات والرسم والضبط والفواصل
-          والوقف والابتداء.
-        </p>
-        <p>
-          <strong>تنبيه مهم:</strong> هذه المراجعة صادرة عن المجمع لخطه ونصه، ولم تُجرِها جهة التطبيق. ونص التطبيق منقول
-          عبر مكتبة QUL، ولا نصفه بأنه نسخة رسمية معتمدة من المجمع، ولا نضمن مطابقته حرفاً بحرف للمصحف المطبوع. وما
-          أجريناه فحوص آلية لسلامة البيانات فقط (عدد الكلمات والآيات وبدايات الأجزاء وتطابق تقسيم الصفحات مع مصحف
-          المدينة)، ولم تُراجَع الكلمات كلمةً كلمةً على مصحف مطبوع.
-        </p>
-        <p>
-          قد تصدر عن الباحثين ملاحظات على النصوص الحاسوبية للمصحف (كوصل الكلمات وفصلها). فالمرجع المعتمد عند أي شك في رسم
-          كلمة أو ضبطها هو مصحف المدينة النبوية المطبوع من المجمع وأهل القراءات، وننصح بالاستعانة بالمصحف المطبوع ومعلّم
-          متقن لتعلّم التلاوة. وإن لاحظت خطأً فنرجو إبلاغنا ليُصحَّح.
-        </p>
-        <p>
-          <strong>حصن المسلم:</strong> نصوصه من كتاب «حصن المسلم من أذكار الكتاب والسنة» لسعيد بن علي بن وهف القحطاني، عبر
-          ملف JSON منشور على GitHub بواسطة rn0x (مستودع Adhkar-json)، وصاحب الملف يتيح استخدامه مجاناً. حقوق الكتاب
-          محفوظة لمؤلفه، ونُقلت نصوصه هنا لنشر الفائدة دون أي مقابل. ولم يتضمن هذا المصدر تخريج الأحاديث وأحكامها، ونوصي
-          بمراجعة الأذكار مع أهل العلم.
-        </p>
-      </LegalSection>
-
-      <LegalSection title="٧. مجاني وبلا إعلانات">
-        <p>
-          التطبيق مجاني بالكامل ويعمل بدون إعلانات أو اشتراكات. أي تغيير في ذلك في المستقبل سيُعلن هنا وفي المتجر قبل تطبيقه.
-        </p>
-      </LegalSection>
-
-      <LegalSection title="٨. حدود المسؤولية">
-        <p>
-          يُقدَّم التطبيق <strong>«كما هو»</strong> دون ضمان صريح أو ضمني بدقة كل المعلومات أو توفرها الدائم. وإلى أقصى حد
-          يسمح به القانون، لا يتحمل المطوّر مسؤولية عن أي خسارة أو ضرر ناتج عن استخدام التطبيق أو الاعتماد عليه، بما في
-          ذلك فوات تنبيه أو اعتماد على معلومة غير دقيقة.
-        </p>
-        <p>
-          وإن كان لبلدك قوانين تمنع استبعاد بعض المسؤوليات، فهذه القوانين هي التي تسري في تلك الحدود.
-        </p>
-      </LegalSection>
-
-      <LegalSection title="٩. التعديلات">
-        <p>
-          قد نحدّث هذه الصفحة لتتوافق مع تطور التطبيق. يُعتبر استمرارك في استخدامه بعد التحديث موافقة على الصيغة الجديدة.
-        </p>
-      </LegalSection>
+    <LegalLayout title={dict.legal.disclaimer.title} updated={dict.legal.disclaimer.updated}>
+      <p>{content.intro}</p>
+      {content.sections.map((s, i) => (
+        <LegalSection key={i} title={s.title}>{s.body}</LegalSection>
+      ))}
     </LegalLayout>
   )
 }

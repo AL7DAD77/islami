@@ -1,7 +1,12 @@
+'use client'
+
 import { ChevronDown } from 'lucide-react'
 import type { Lesson } from '@/lib/learn'
+import { useLanguage } from '@/lib/language-context' // ✅ استيراد مزود اللغة
 
 export function LessonList({ lessons }: { lessons: Lesson[] }) {
+  const { dict, locale } = useLanguage() // ✅ جلب اللغة
+
   return (
     <div className="flex flex-col gap-3">
       {lessons.map((l) => (
@@ -21,7 +26,10 @@ export function LessonList({ lessons }: { lessons: Lesson[] }) {
               </li>
             ))}
           </ol>
-          <p className="px-4 pb-4 text-xs text-muted-foreground">{`المصدر: ${l.source}`}</p>
+          <p className="px-4 pb-4 text-xs text-muted-foreground">
+            {/* ✅ ترجمة كلمة المصدر */}
+            {`${dict.kidsPage.source}: ${l.source}`}
+          </p>
         </details>
       ))}
     </div>

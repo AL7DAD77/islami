@@ -1,5 +1,8 @@
+'use client'
+
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
+import { useLanguage } from '@/lib/language-context'
 
 export function PageHeader({
   title,
@@ -12,17 +15,17 @@ export function PageHeader({
   backHref?: string
   action?: React.ReactNode
 }) {
+  const { locale } = useLanguage()
+
   return (
-    // ✅ التعديل هنا: استبدلنا pt-4 بـ pt-[max(1rem,env(safe-area-inset-top))]
-    // هذا الكود يجبر الصفحة على ترك مسافة لشريط إشعارات الهاتف تلقائياً
     <header className="flex items-center gap-3 pb-4 pt-[max(1rem,env(safe-area-inset-top))]">
       {backHref && (
         <Link
           href={backHref}
           className="flex size-10 shrink-0 items-center justify-center rounded-full bg-card shadow-sm ring-1 ring-border hover:bg-muted"
-          aria-label="رجوع"
+          aria-label={locale === 'ar' ? 'رجوع' : 'Back'}
         >
-          <ChevronRight className="size-5" />
+          <ChevronRight className={`size-5 ${locale === 'en' ? 'rotate-180' : ''}`} />
         </Link>
       )}
       <div className="min-w-0 flex-1">

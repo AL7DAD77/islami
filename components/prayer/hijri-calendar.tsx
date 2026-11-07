@@ -5,12 +5,12 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useHydrated, useSettings } from '@/lib/settings'
 import { ISLAMIC_OCCASIONS, getOccasion, toArabicDigits, toHijri } from '@/lib/hijri'
 import { cn } from '@/lib/utils'
-
-const WEEKDAYS = ['أحد', 'إثنين', 'ثلاثاء', 'أربعاء', 'خميس', 'جمعة', 'سبت']
+import { useLanguage } from '@/lib/language-context'
 
 export function HijriCalendar() {
   const [settings] = useSettings()
   const hydrated = useHydrated()
+  const { dict, locale } = useLanguage()
   const [offset, setOffset] = useState(0)
 
   if (!hydrated) return <div className="h-96 animate-pulse rounded-3xl bg-card" aria-hidden="true" />
@@ -23,6 +23,8 @@ export function HijriCalendar() {
 
   const firstH = toHijri(days[0], settings.hijriAdjust)
   const lastH = toHijri(days[days.length - 1], settings.hijriAdjust)
+  
+  // عنوان التقويم (نستخدم أسماء الأشهر العربية كما هي من المكتبة)
   const hijriTitle =
     firstH.month === lastH.month
       ? `${firstH.monthName} ${toArabicDigits(firstH.year)}`
@@ -33,34 +35,35 @@ export function HijriCalendar() {
     .filter(({ h }) => ISLAMIC_OCCASIONS.some((o) => o.month === h.month && o.day === h.day))
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4" dir={locale === 'ar' ? 'rtl' : 'ltr'}>
       <section className="rounded-3xl bg-card p-4 shadow-sm ring-1 ring-border">
         <div className="mb-4 flex items-center justify-between">
           <button
             type="button"
             onClick={() => setOffset((o) => o - 1)}
             className="flex size-10 items-center justify-center rounded-full hover:bg-muted"
-            aria-label="الشهر السابق"
+            aria-label={dict.hijriCalendar.prevMonth}
           >
             <ChevronRight className="size-5" />
           </button>
           <div className="text-center">
             <p className="text-lg font-bold text-primary">{hijriTitle}</p>
             <p className="text-sm text-muted-foreground">
-              {base.toLocaleDateString('ar-EG', { month: 'long', year: 'numeric' })}
+              {base.toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-US', { month: 'long', year: 'numeric' })}
             </p>
           </div>
           <button
             type="button"
             onClick={() => setOffset((o) => o + 1)}
             className="flex size-10 items-center justify-center rounded-full hover:bg-muted"
-            aria-label="الشهر التالي"
+            aria-label={dict.hijriCalendar.nextMonth}
           >
             <ChevronLeft className="size-5" />
           </button>
         </div>
         <div className="grid grid-cols-7 gap-1 text-center" role="grid">
-          {WEEKDAYS.map((w) => (
+          {/* أيام الأسبوع */}
+          {Object.values(dict.hijriCalendar.weekdays).map((w) => (
             <div key={w} className="py-1 text-xs font-medium text-muted-foreground" role="columnheader">
               {w}
             </div>
@@ -93,23 +96,23 @@ export function HijriCalendar() {
       </section>
 
       <section className="rounded-3xl bg-card p-5 shadow-sm ring-1 ring-border">
-        <h2 className="mb-3 text-lg font-bold">{'مناسبات هذا الشهر'}</h2>
+        <h2 className="mb-3 text-lg font-bold">{dict.hijriCalendar.monthOccasions}</h2>
         {occasions.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{'لا توجد مناسبات بارزة هذا الشهر. يُستحب صيام الأيام البيض (١٣، ١٤، ١٥ من كل شهر هجري).'}</p>
+          <p className="text-sm text-muted-foreground">{dict.hijriCalendar.noOccasions}</p>
         ) : (
           <ul className="flex flex-col gap-2">
             {occasions.map(({ d, h }) => (
               <li key={d.toISOString()} className="flex items-center justify-between gap-3 rounded-2xl bg-muted/60 px-4 py-3">
                 <span className="font-medium">{getOccasion(h)}</span>
                 <span className="text-sm text-muted-foreground">
-                  {d.toLocaleDateString('ar-EG', { weekday: 'short', day: 'numeric', month: 'short' })}
+                  {d.toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-US', { weekday: 'short', day: 'numeric', month: 'short' })}
                 </span>
               </li>
             ))}
           </ul>
         )}
         <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
-          {'يعتمد التقويم على حساب أم القرى، وقد يختلف يوماً حسب رؤية الهلال في بلدك. يمكنك تعديل التاريخ من إعدادات مواقيت الصلاة.'}
+          {dict.hijriCalendar.calendarNote}
         </p>
       </section>
     </div>

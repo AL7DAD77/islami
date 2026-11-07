@@ -6,6 +6,7 @@ import { distanceKm, getQiblaDirection } from '@/lib/prayer'
 import { toArabicNumber } from '@/lib/quran'
 import { useHydrated, useSettings } from '@/lib/settings'
 import { cn } from '@/lib/utils'
+import { useLanguage } from '@/lib/language-context'
 
 type OrientationEvt = DeviceOrientationEvent & { webkitCompassHeading?: number }
 type PermissionCapable = typeof DeviceOrientationEvent & { requestPermission?: () => Promise<'granted' | 'denied'> }
@@ -13,6 +14,8 @@ type PermissionCapable = typeof DeviceOrientationEvent & { requestPermission?: (
 export function QiblaCompass() {
   const [settings] = useSettings()
   const hydrated = useHydrated()
+  const { dict, locale } = useLanguage()
+  
   const [heading, setHeading] = useState<number | null>(null)
   const [active, setActive] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -33,13 +36,13 @@ export function QiblaCompass() {
     setError(null)
     const DOE = (typeof DeviceOrientationEvent !== 'undefined' ? DeviceOrientationEvent : null) as PermissionCapable | null
     if (!DOE) {
-      setError('جهازك لا يدعم مستشعر البوصلة. استخدم اتجاه القبلة بالدرجات أدناه.')
+      setError(dict.qiblaPage.sensorError)
       return
     }
     if (typeof DOE.requestPermission === 'function') {
       const res = await DOE.requestPermission().catch(() => 'denied' as const)
       if (res !== 'granted') {
-        setError('لم يتم السماح بالوصول إلى مستشعر الاتجاه.')
+        setError(dict.qiblaPage.permissionError)
         return
       }
     }
@@ -55,6 +58,8 @@ export function QiblaCompass() {
   const diff = heading === null ? null : Math.abs(((qibla - heading + 540) % 360) - 180)
   const aligned = diff !== null && diff < 5
 
+  const formatNumber = (num: number) => locale === 'ar' ? toArabicNumber(num) : num.toString()
+
   return (
     <div className="flex flex-col items-center gap-6">
       <div
@@ -64,9 +69,10 @@ export function QiblaCompass() {
         )}
       >
         <div className="absolute inset-0 transition-transform duration-200" style={{ transform: `rotate(${dialRotation}deg)` }}>
-          {['ش', 'شر', 'ج', 'غ'].map((d, i) => (
+          {/* ✅ تم تعديل الـ key إلى index لتجنب تحذير React */}
+          {[dict.qiblaPage.north, dict.qiblaPage.east, dict.qiblaPage.south, dict.qiblaPage.west].map((d, i) => (
             <span
-              key={d}
+              key={i}
               className={cn('absolute left-1/2 top-1/2 text-sm font-bold', i === 0 ? 'text-destructive' : 'text-muted-foreground')}
               style={{ transform: `translate(-50%, -50%) rotate(${i * 90}deg) translateY(-8.5rem) rotate(${-i * 90}deg)` }}
             >
@@ -84,7 +90,7 @@ export function QiblaCompass() {
           <div className="absolute left-1/2 top-1/2 h-1/2 w-1 origin-top" style={{ transform: `translateX(-50%) rotate(${qibla + 180}deg)` }}>
             <div className="absolute bottom-6 left-1/2 flex -translate-x-1/2 rotate-180 flex-col items-center">
               <span className="flex size-10 items-center justify-center rounded-lg bg-foreground text-[10px] font-bold text-gold shadow-md">
-                {'الكعبة'}
+                {dict.qiblaPage.kaaba}
               </span>
             </div>
             <div className="mx-auto h-[calc(100%-4.5rem)] w-1 rounded-full bg-primary" />
@@ -96,14 +102,14 @@ export function QiblaCompass() {
 
       <div className="grid w-full grid-cols-2 gap-3">
         <div className="rounded-2xl bg-card p-4 text-center shadow-sm ring-1 ring-border">
-          <p className="text-xs text-muted-foreground">{'اتجاه القبلة'}</p>
-          <p className="text-2xl font-bold text-primary">{`${toArabicNumber(Math.round(qibla))}°`}</p>
-          <p className="text-xs text-muted-foreground">{'من الشمال'}</p>
+          <p className="text-xs text-muted-foreground">{dict.qiblaPage.qiblaDir}</p>
+          <p className="text-2xl font-bold text-primary">{`${formatNumber(Math.round(qibla))}°`}</p>
+          <p className="text-xs text-muted-foreground">{dict.qiblaPage.fromNorth}</p>
         </div>
         <div className="rounded-2xl bg-card p-4 text-center shadow-sm ring-1 ring-border">
-          <p className="text-xs text-muted-foreground">{'المسافة إلى مكة'}</p>
-          <p className="text-2xl font-bold text-primary">{toArabicNumber(Math.round(distance))}</p>
-          <p className="text-xs text-muted-foreground">{'كيلومتر'}</p>
+          <p className="text-xs text-muted-foreground">{dict.qiblaPage.distanceToMakkah}</p>
+          <p className="text-2xl font-bold text-primary">{formatNumber(distance)}</p>
+          <p className="text-xs text-muted-foreground">{dict.qiblaPage.km}</p>
         </div>
       </div>
 
@@ -112,7 +118,7 @@ export function QiblaCompass() {
         {city}
       </p>
 
-      {aligned && <p className="rounded-full bg-primary px-4 py-2 text-sm font-bold text-primary-foreground" role="status">{'أنت متجه نحو القبلة'}</p>}
+      {aligned && <p className="rounded-full bg-primary px-4 py-2 text-sm font-bold text-primary-foreground" role="status">{dict.qiblaPage.facingQibla}</p>}
 
       {!active ? (
         <button
@@ -121,14 +127,14 @@ export function QiblaCompass() {
           className="flex items-center gap-2 rounded-2xl bg-primary px-6 py-3.5 font-bold text-primary-foreground shadow-sm"
         >
           <Compass className="size-5" aria-hidden="true" />
-          {'تشغيل البوصلة'}
+          {dict.qiblaPage.startCompass}
         </button>
       ) : (
-        heading === null && <p className="text-center text-sm text-muted-foreground">{'حرّك هاتفك على شكل رقم ٨ لمعايرة البوصلة...'}</p>
+        heading === null && <p className="text-center text-sm text-muted-foreground">{dict.qiblaPage.calibrate}</p>
       )}
       {error && <p className="text-center text-sm text-destructive">{error}</p>}
       <p className="text-center text-xs leading-relaxed text-muted-foreground">
-        {'ضع الهاتف بشكل أفقي بعيداً عن المعادن والأجهزة الكهربائية للحصول على دقة أعلى.'}
+        {dict.qiblaPage.instructions}
       </p>
     </div>
   )

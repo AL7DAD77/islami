@@ -4,10 +4,14 @@ import Link from 'next/link'
 import { Bookmark, BookOpenCheck, ChevronDown, Trash2 } from 'lucide-react'
 import { removeBookmark, useBookmarkState } from '@/lib/bookmarks'
 import { toArabicNumber } from '@/lib/quran'
+import { useLanguage } from '@/lib/language-context'
 
 export function BookmarksCard() {
+  const { dict, locale } = useLanguage()
   const { bookmarks, position } = useBookmarkState()
   if (!position && bookmarks.length === 0) return null
+
+  const formatNumber = (n: number) => locale === 'ar' ? toArabicNumber(n) : n.toString()
 
   return (
     <>
@@ -20,9 +24,9 @@ export function BookmarksCard() {
             <BookOpenCheck className="size-5" aria-hidden="true" />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block text-[11px] text-muted-foreground">{'متابعة القراءة'}</span>
+            <span className="block text-[11px] text-muted-foreground">{dict.quranComponents.bookmarks.continueReading}</span>
             <span className="block truncate font-bold">
-              {`سورة ${position.surahName || toArabicNumber(position.surah)} · صفحة ${toArabicNumber(position.page)}`}
+              {`${dict.quranComponents.bookmarks.surahLabel} ${position.surahName || formatNumber(position.surah)} · ${dict.quranComponents.bookmarks.pageLabel} ${formatNumber(position.page)}`}
             </span>
           </span>
         </Link>
@@ -34,7 +38,7 @@ export function BookmarksCard() {
             <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-accent text-gold">
               <Bookmark className="size-5" aria-hidden="true" />
             </span>
-            <span className="flex-1 font-bold">{`العلامات المرجعية (${toArabicNumber(bookmarks.length)})`}</span>
+            <span className="flex-1 font-bold">{`${dict.quranComponents.bookmarks.bookmarksTitle} (${formatNumber(bookmarks.length)})`}</span>
             <ChevronDown
               className="size-4 text-muted-foreground transition-transform group-open:rotate-180"
               aria-hidden="true"
@@ -44,11 +48,12 @@ export function BookmarksCard() {
             {bookmarks.map((b) => (
               <li key={b.id} className="flex items-center gap-2 py-2">
                 <Link href={`/quran/${b.surah}?page=${b.page}`} className="flex-1 text-sm">
-                  {`سورة ${b.surahName || toArabicNumber(b.surah)} · صفحة ${toArabicNumber(b.page)}`}
+                  {`${dict.quranComponents.bookmarks.surahLabel} ${b.surahName || formatNumber(b.surah)} · ${dict.quranComponents.bookmarks.pageLabel} ${formatNumber(b.page)}`}
                 </Link>
                 <button
                   type="button"
                   onClick={() => removeBookmark(b.id)}
+                  aria-label={dict.quranComponents.bookmarks.deleteAria}
                   className="flex size-8 items-center justify-center rounded-full bg-muted text-muted-foreground hover:text-destructive"
                 >
                   <Trash2 className="size-4" aria-hidden="true" />

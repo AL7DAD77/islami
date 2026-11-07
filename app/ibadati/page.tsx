@@ -1,13 +1,19 @@
-import type { Metadata } from 'next'
+'use client'
+
 import { PageHeader } from '@/components/page-header'
 import { IbadatiView } from '@/components/ibadati/ibadati-view'
-
-export const metadata: Metadata = { title: 'عباداتي | إسلامي' }
+import { useLanguage } from '@/lib/language-context'
 
 export default function IbadatiPage() {
+  const { dict } = useLanguage()
+
   return (
     <>
-      <PageHeader title="عباداتي" subtitle="متابعة يومية لأعمالك، تبدأ من جديد كل يوم" backHref="/more" />
+      <PageHeader 
+        title={dict.ibadatiPage.title} 
+        subtitle={dict.ibadatiPage.subtitle} 
+        backHref="/more" 
+      />
       <IbadatiView />
     </>
   )

@@ -14,7 +14,10 @@ import {
   isAdhanSchedulerAvailable,
   scheduleNativeAdhans,
   stopNativeAdhan,
+  isPreAdhanSchedulerAvailable,
+  scheduleNativePreAdhans,
   type ScheduledItem,
+  type PreAdhanItem,
 } from '@/lib/native'
 import type { AppSettings } from '@/lib/settings'
 
@@ -27,6 +30,7 @@ const MIDNIGHT_EVENT_BASE_ID = 100000
 const PHASE_EVENT_BASE_ID = 200000
 const SALAWAT_EVENT_BASE_ID = 300000
 const ADHKAR_EVENT_BASE_ID = 400000
+const PRE_ADHAN_EVENT_BASE_ID = 500000
 
 const SHORT_ADHAN_FILE = 'takbeeratain.mp3'
 const ADHAN_SPEECH_RATE = 0.9
@@ -166,7 +170,7 @@ function createPrayerEvents(
         return
       }
 
-      // ✅ تم حذف التنبيه المسبق نهائياً، والاكتفاء بالأذان الفعلي فقط
+      // ✅ الأذان الفعلي فقط، بدون أي تنبيه مسبق داخل مسار الأذان
       createAdhanEvent(
         context,
         items,
@@ -331,6 +335,74 @@ function buildSchedule(settings: AppSettings): ScheduledItem[] {
   return items.sort((a, b) => a.at - b.at)
 }
 
+/* ==================== بناء جدولة التنبيه قبل الأذان ==================== */
+
+function createPreAdhanEvents(
+  context: ScheduleContext,
+  items: PreAdhanItem[],
+): void {
+  const { settings, now } = context
+
+  if (!settings.preAdhanEnabled) {
+    return
+  }
+
+  const minutes = settings.preAdhanMinutes
+
+  if (!minutes || minutes <= 0) {
+    return
+  }
+
+  const preAdhanOffset = minutes * MINUTE_MS
+
+  for (let dayOffset = -1; dayOffset < SCHEDULE_DAYS; dayOffset++) {
+    const date = new Date()
+    date.setDate(date.getDate() + dayOffset)
+
+    const times = getPrayerTimes(settings, date)
+
+    PRAYER_ORDER.forEach((key, index) => {
+      const prayerTime = times[key].getTime()
+      const preAdhanTime = prayerTime - preAdhanOffset
+
+      const isAdhanEnabled = settings.adhanEnabled[key]
+      const prayerName = PRAYER_NAMES[key]
+
+      if (!isAdhanEnabled || preAdhanTime <= now) {
+        return
+      }
+
+      // حماية صريحة: لا نسمح بأن يكون التنبيه قريباً جداً من الأذان
+      if (prayerTime - preAdhanTime < 5 * MINUTE_MS) {
+        return
+      }
+
+      items.push({
+        id: PRE_ADHAN_EVENT_BASE_ID + dayOffset * 10 + index,
+        at: preAdhanTime,
+        kind: 'pre_adhan',
+        prayer: key,
+        prayerName,
+        title: `تنبيه قبل أذان ${prayerName}`,
+        body: `باقي ${minutes} دقيقة على أذان ${prayerName}`,
+      })
+    })
+  }
+}
+
+function buildPreAdhanSchedule(
+  settings: AppSettings,
+): PreAdhanItem[] {
+  const now = Date.now()
+  const context: ScheduleContext = { settings, now }
+
+  const items: PreAdhanItem[] = []
+
+  createPreAdhanEvents(context, items)
+
+  return items.sort((a, b) => a.at - b.at)
+}
+
 /* ============================ مكوّن المحرك ============================ */
 
 export function AdhanEngine() {
@@ -447,7 +519,6 @@ export function AdhanEngine() {
       settings.adhanVoice,
       settings.fajrVoice,
       settings.prayerVoices,
-      // ✅ تم حذف reminderMinutes من هنا
       settings.persistentNotification,
       settings.salawatEnabled,
       settings.salawatInterval,
@@ -490,6 +561,48 @@ export function AdhanEngine() {
 
     return registerAppStateListener(scheduleAdhans)
   }, [scheduleKey])
+
+  /* ------------------ جدولة التنبيه قبل الأذان ------------------ */
+
+  const preAdhanScheduleKey = useMemo(() => {
+    return JSON.stringify([
+      settings.location.lat,
+      settings.location.lng,
+      settings.location.city,
+      settings.method,
+      settings.madhab,
+      settings.adhanEnabled,
+      settings.preAdhanEnabled,
+      settings.preAdhanMinutes,
+    ])
+  }, [
+    settings.location.lat,
+    settings.location.lng,
+    settings.location.city,
+    settings.method,
+    settings.madhab,
+    settings.adhanEnabled,
+    settings.preAdhanEnabled,
+    settings.preAdhanMinutes,
+  ])
+
+  useEffect(() => {
+    if (!isPreAdhanSchedulerAvailable()) {
+      return
+    }
+
+    const schedulePreAdhans = (): void => {
+      const currentSettings = getSettings()
+
+      scheduleNativePreAdhans(
+        buildPreAdhanSchedule(currentSettings),
+      )
+    }
+
+    schedulePreAdhans()
+
+    return registerAppStateListener(schedulePreAdhans)
+  }, [preAdhanScheduleKey])
 
   /* --------------------------- إيقاف الأذان --------------------------- */
 

@@ -1,15 +1,17 @@
-import type { Metadata } from 'next'
+'use client'
+
 import { PageHeader } from '@/components/page-header'
 import { PrayerSettings } from '@/components/prayer/prayer-settings'
-
-export const metadata: Metadata = { title: 'إعدادات الصلاة | إسلامي' }
+import { useLanguage } from '@/lib/language-context'
 
 export default function PrayerSettingsPage() {
+  const { dict } = useLanguage()
+
   return (
     <>
       <PageHeader
-        title="إعدادات الصلاة"
-        subtitle="الموقع والإشعارات وطريقة الحساب"
+        title={dict.settings.prayer.title}
+        subtitle={dict.settings.prayer.subtitle}
         backHref="/prayer"
       />
       <PrayerSettings />

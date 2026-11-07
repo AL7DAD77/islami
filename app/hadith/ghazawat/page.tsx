@@ -1,14 +1,21 @@
-import type { Metadata } from 'next'
+'use client'
+
 import { PageHeader } from '@/components/page-header'
 import { GHAZAWAT } from '@/lib/ghazawat'
 import { toArabicNumber } from '@/lib/quran'
-
-export const metadata: Metadata = { title: 'غزوات النبي ﷺ | إسلامي' }
+import { useLanguage } from '@/lib/language-context'
 
 export default function GhazawatPage() {
+  const { dict, locale } = useLanguage()
+  const isAr = locale === 'ar'
+
   return (
     <>
-      <PageHeader title="غزوات النبي ﷺ" subtitle="أبرز الغزوات مرتبة زمنياً" backHref="/hadith" />
+      <PageHeader 
+        title={dict.ghazawatPage.title} 
+        subtitle={dict.ghazawatPage.subtitle} 
+        backHref="/hadith" 
+      />
 
       <ol className="flex flex-col gap-3">
         {GHAZAWAT.map((g, i) => (
@@ -24,7 +31,7 @@ export default function GhazawatPage() {
             </div>
             <p className="mt-3 text-sm leading-relaxed">{g.summary}</p>
             <p className="mt-3 rounded-xl bg-muted/50 p-3 text-sm leading-relaxed">
-              <span className="font-bold">{'العبرة: '}</span>
+              <span className="font-bold">{dict.ghazawatPage.lesson} </span>
               {g.lesson}
             </p>
           </li>
@@ -32,7 +39,7 @@ export default function GhazawatPage() {
       </ol>
 
       <p className="mt-8 text-center text-xs leading-relaxed text-muted-foreground">
-        {'التواريخ والأحداث وفق المشهور في كتب السيرة، وتختلف بعض الروايات في التفاصيل. للاستزادة يُرجع إلى كتب السيرة المعتمدة.'}
+        {dict.ghazawatPage.footer}
       </p>
     </>
   )

@@ -1,17 +1,19 @@
-import type { Metadata } from 'next'
+'use client'
+
 import { ChevronDown } from 'lucide-react'
 import { PageHeader } from '@/components/page-header'
 import { PROPHETS } from '@/lib/prophets'
 import { toArabicNumber } from '@/lib/quran'
-
-export const metadata: Metadata = { title: 'قصص الأنبياء | إسلامي' }
+import { useLanguage } from '@/lib/language-context'
 
 export default function ProphetsPage() {
+  const { dict } = useLanguage()
+
   return (
     <>
       <PageHeader
-        title="قصص الأنبياء"
-        subtitle={`نبذة مختصرة عن الأنبياء الـ${toArabicNumber(PROPHETS.length)} المذكورين في القرآن الكريم`}
+        title={dict.prophetsPage.title}
+        subtitle={dict.prophetsPage.subtitle.replace('{count}', toArabicNumber(PROPHETS.length))}
         backHref="/more"
       />
 
@@ -23,7 +25,7 @@ export default function ProphetsPage() {
                 {toArabicNumber(i + 1)}
               </span>
               <span className="flex-1">
-                <span className="block font-bold">{`${p.name} ${p.id === 'muhammad' ? '' : 'عليه السلام'}`.trim()}</span>
+                <span className="block font-bold">{`${p.name} ${p.id === 'muhammad' ? '' : dict.prophetsPage.peaceBeUponHim}`.trim()}</span>
                 {p.title && <span className="text-xs text-muted-foreground">{p.title}</span>}
               </span>
               <ChevronDown
@@ -37,7 +39,7 @@ export default function ProphetsPage() {
       </div>
 
       <p className="mt-8 text-center text-xs leading-relaxed text-muted-foreground">
-        {'نبذ مختصرة مأخوذة من القرآن الكريم وكتب التفسير وقصص الأنبياء.'}
+        {dict.prophetsPage.footer}
       </p>
     </>
   )

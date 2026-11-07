@@ -5,20 +5,20 @@ import { CalendarDays } from 'lucide-react'
 import { useSettings, useHydrated } from '@/lib/settings'
 import { getPrayerTimes, PRAYER_NAMES, PRAYER_ORDER } from '@/lib/prayer'
 import { toArabicNumber } from '@/lib/quran'
+import { useLanguage } from '@/lib/language-context'
 
-const ARABIC_DAYS = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
-const ARABIC_MONTHS = [
-  'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
-  'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر',
-]
-
-function formatTime(date: Date) {
-  return date.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', hour12: true })
+function formatTime(date: Date, locale: string) {
+  return date.toLocaleTimeString(locale === 'ar' ? 'ar-EG' : 'en-US', { 
+    hour: '2-digit', 
+    minute: '2-digit', 
+    hour12: true 
+  })
 }
 
 export function WeekPrayerTimes() {
   const [settings] = useSettings()
   const hydrated = useHydrated()
+  const { dict, locale } = useLanguage()
 
   const days = useMemo(() => {
     if (!hydrated) return []
@@ -37,6 +37,15 @@ export function WeekPrayerTimes() {
     return <div className="h-96 animate-pulse rounded-3xl bg-card" aria-hidden="true" />
   }
 
+  // دالة مساعدة لتنسيق الأرقام
+  const formatNumber = (num: number) => locale === 'ar' ? toArabicNumber(num) : num.toString()
+
+  // دالة لجلب اسم الصلاة من الترجمة
+  const getPrayerName = (key: string) => {
+    const dictKey = key.toLowerCase() as keyof typeof dict.prayers
+    return dict.prayers[dictKey] || PRAYER_NAMES[key as keyof typeof PRAYER_NAMES]
+  }
+
   return (
     <div className="flex flex-col gap-4">
       {days.map((day, index) => (
@@ -52,18 +61,20 @@ export function WeekPrayerTimes() {
             <div className="flex items-center gap-2">
               <CalendarDays className="size-4" aria-hidden="true" />
               <span className="font-bold">
-                {day.isToday ? 'اليوم' : ARABIC_DAYS[day.date.getDay()]}
+                {/* ترجمة كلمة اليوم وأيام الأسبوع */}
+                {day.isToday ? dict.weekPrayerTimes.today : dict.weekPrayerTimes.days[day.date.getDay() as unknown as keyof typeof dict.weekPrayerTimes.days]}
               </span>
             </div>
             <span className="text-xs opacity-80">
-              {`${toArabicNumber(day.date.getDate())} ${ARABIC_MONTHS[day.date.getMonth()]}`}
+              {/* ترجمة الشهور والأرقام */}
+              {`${formatNumber(day.date.getDate())} ${dict.weekPrayerTimes.months[day.date.getMonth() as unknown as keyof typeof dict.weekPrayerTimes.months]}`}
             </span>
           </header>
           <div className="grid grid-cols-5 divide-x divide-x-reverse">
             {PRAYER_ORDER.map((key) => (
               <div key={key} className="flex flex-col items-center gap-1 px-2 py-3">
-                <span className="text-xs opacity-70">{PRAYER_NAMES[key]}</span>
-                <span className="text-sm font-bold">{formatTime(day.times[key])}</span>
+                <span className="text-xs opacity-70">{getPrayerName(key)}</span>
+                <span className="text-sm font-bold">{formatTime(day.times[key], locale)}</span>
               </div>
             ))}
           </div>

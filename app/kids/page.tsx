@@ -1,23 +1,29 @@
+'use client'
+
 import Link from 'next/link'
-import type { Metadata } from 'next'
 import { PageHeader } from '@/components/page-header'
 import { LessonList } from '@/components/learn/lesson-list'
 import { KidsQuiz } from '@/components/learn/kids-quiz'
 import { KIDS_LESSONS, SHORT_SURAHS } from '@/lib/learn'
 import { KIDS_DUAS } from '@/lib/kids-duas'
 import { ARABIC_LETTERS } from '@/lib/kids-letters'
-
-export const metadata: Metadata = { title: 'ركن الأطفال | إسلامي' }
+import { useLanguage } from '@/lib/language-context'
 
 export default function KidsPage() {
+  const { dict, locale } = useLanguage()
+
   return (
-    <div className="min-h-[100dvh] bg-background pb-24 flex flex-col gap-8" dir="rtl">
-      <PageHeader title="ركن الأطفال" subtitle="نتعلم ديننا بحب ومتعة" backHref="/more" />
+    <div className="min-h-[100dvh] bg-background pb-24 flex flex-col gap-8" dir={locale === 'ar' ? 'rtl' : 'ltr'}>
+      <PageHeader 
+        title={dict.kidsPage.title} 
+        subtitle={dict.kidsPage.subtitle} 
+        backHref="/more" 
+      />
       
       {/* ============ 1. قصار السور ============ */}
       <section aria-labelledby="memorize">
         <h2 id="memorize" className="mb-3 font-bold text-lg text-primary">
-          {'📖 احفظ قصار السور'}
+          {dict.kidsPage.shortSurahs}
         </h2>
         <ul className="grid grid-cols-3 gap-3 sm:grid-cols-4">
           {SHORT_SURAHS.map((s) => (
@@ -33,10 +39,10 @@ export default function KidsPage() {
         </ul>
       </section>
 
-      {/* ============ 2. الاختبار (تم نقله للأعلى) ============ */}
+      {/* ============ 2. الاختبار ============ */}
       <section aria-labelledby="quiz">
         <h2 id="quiz" className="mb-3 font-bold text-lg text-primary">
-          {'🏆 اختبر معلوماتك'}
+          {dict.kidsPage.quiz}
         </h2>
         <KidsQuiz />
       </section>
@@ -44,7 +50,7 @@ export default function KidsPage() {
       {/* ============ 3. الأدعية اليومية ============ */}
       <section aria-labelledby="duas">
         <h2 id="duas" className="mb-3 font-bold text-lg text-primary">
-          {'🤲 أدعية صغيرة أحفظها'}
+          {dict.kidsPage.duas}
         </h2>
         <ul className="grid gap-3 sm:grid-cols-2">
           {KIDS_DUAS.map((d) => (
@@ -65,7 +71,7 @@ export default function KidsPage() {
       {/* ============ 4. الحروف العربية ============ */}
       <section aria-labelledby="letters">
         <h2 id="letters" className="mb-3 font-bold text-lg text-primary">
-          {'🔤 الحروف العربية'}
+          {dict.kidsPage.letters}
         </h2>
         <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
           {ARABIC_LETTERS.map((l) => (
@@ -85,10 +91,10 @@ export default function KidsPage() {
         </ul>
       </section>
 
-      {/* ============ 5. الدروس (تم نقلها للأسفل) ============ */}
+      {/* ============ 5. الدروس ============ */}
       <section aria-labelledby="lessons">
         <h2 id="lessons" className="mb-3 font-bold text-lg text-primary">
-          {'📚 دروس مصورة'}
+          {dict.kidsPage.lessons}
         </h2>
         <LessonList lessons={KIDS_LESSONS} />
       </section>
