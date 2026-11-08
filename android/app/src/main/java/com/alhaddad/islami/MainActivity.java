@@ -1,7 +1,6 @@
 package com.alhaddad.islami;
 
 import android.Manifest;
-import android.content.Context;
 import android.content.pm.PackageManager;
 import android.media.AudioManager;
 import android.os.Build;
@@ -26,8 +25,7 @@ public class MainActivity extends BridgeActivity {
         // 2. تشغيل Capacitor
         super.onCreate(savedInstanceState);
 
-        // ✅ 3. توجيه أزرار الصوت الجانبية للتحكم في صوت الأذان (Alarm) بدلاً من الوسائط
-        // هذا يضمن أنه إذا ضغط المستخدم على أزرار الصوت أثناء الأذان، فإنها ستخفض/ترفع صوت الأذان.
+        // ✅ 3. توجيه أزرار الصوت الجانبية للتحكم في صوت الأذان (Alarm)
         setVolumeControlStream(AudioManager.STREAM_ALARM);
 
         // 4. إنشاء قنوات الإشعارات
@@ -53,6 +51,19 @@ public class MainActivity extends BridgeActivity {
             AdhanMaintenanceWorker.schedule(this);
         } catch (Exception e) {
             e.printStackTrace();
+        }
+    }
+
+    // ✅ 7. التحكم في زر الرجوع
+    @Override
+    public void onBackPressed() {
+        if (getBridge() != null) {
+            // نرسل حدث "backButton" إلى JavaScript
+            // React سيقرر: هل يرجع صفحة داخلية؟ أم يغلق التطبيق؟
+            getBridge().triggerJSEvent("backButton", "window");
+        } else {
+            // إذا لم يكن هناك جسر، اخرج من التطبيق
+            super.onBackPressed();
         }
     }
 }

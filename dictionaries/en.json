@@ -5,7 +5,8 @@
     "kids": "Kids",
     "adhkar": "Adhkar",
     "quran": "Quran",
-    "prayer": "Prayer"
+    "prayer": "Prayer",
+    "sahihayn": "Sahihayn"
   },
   "common": {
     "settings": "Settings",
@@ -62,7 +63,8 @@
     "supportTile": "Support & Contact",
     "aboutApp": "About App",
     "privacy": "Privacy Policy",
-    "disclaimer": "Disclaimer"
+    "disclaimer": "Disclaimer",
+    "kids": "Kids"
   },
   "morePageExtra": {
     "copied": "Copied!",
@@ -209,7 +211,8 @@
     "play": "Preview",
     "stop": "Stop",
     "defaultVoiceTitle": "Default voice for prayers without a specific choice",
-    "defaultVoiceSelect": "Select Default Voice"
+    "defaultVoiceSelect": "Select Default Voice",
+    "fajrVoiceTitle": "Default Fajr Voice"
   },
   "hijriCalendar": {
     "prevMonth": "Previous Month",
@@ -414,15 +417,15 @@
     "appLanguage": "App Language / لغة التطبيق",
     "appLanguageDesc": "Change the entire interface language",
     "preAdhanTitle": "Pre-Adhan Alert",
-"preAdhanEnable": "Enable pre-adhan alert",
-"preAdhanEnableDesc": "A notification before the adhan time, without affecting the adhan or countdown.",
-"preAdhanMinutesTitle": "Choose alert time before adhan",
-"preAdhanMinutes": {
-  "5": "5 min",
-  "10": "10 min",
-  "15": "15 min",
-  "30": "30 min"
-},
+    "preAdhanEnable": "Enable pre-adhan alert",
+    "preAdhanEnableDesc": "A notification before the adhan time, without affecting the adhan or countdown.",
+    "preAdhanMinutesTitle": "Choose alert time before adhan",
+    "preAdhanMinutes": {
+      "5": "5 min",
+      "10": "10 min",
+      "15": "15 min",
+      "30": "30 min"
+    },
     "methods": {
       "UmmAlQura": "Umm Al-Qura (Saudi Arabia)",
       "Egyptian": "Egyptian Authority",
@@ -494,6 +497,7 @@
     "sourceValue": "Sunnah.com (arrangement)",
     "disclaimer": "Source: Sunnah.com. Rights of arrangement reserved for them. Texts are transmitted for educational purposes; refer to official printed sources for verification.",
     "hadithNumber": "Hadith No.",
-    "narrator": "Narrator:"
+    "narrator": "Narrator:",
+    "hadithLibrary": "Hadith Library"
   }
 }

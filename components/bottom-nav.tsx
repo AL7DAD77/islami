@@ -2,16 +2,17 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { BookOpen, Clock, Compass, LayoutGrid, Sparkles, Baby } from 'lucide-react'
+import { BookOpen, Clock, Compass, LayoutGrid, Sparkles, BookMarked } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useLanguage } from '@/lib/language-context' // ✅ استيراد مزود اللغة
+import { useLanguage } from '@/lib/language-context'
 
 // قمنا بإزالة الكلمات الثابتة (label) واستبدالها بمفاتيح (key) تقرأ من ملف الترجمة
 const ITEMS = [
   { href: '/prayer', key: 'prayer', icon: Clock, also: ['/calendar'] },
   { href: '/quran', key: 'quran', icon: BookOpen, also: [] as string[] },
   { href: '/adhkar', key: 'adhkar', icon: Sparkles, also: ['/tasbih'] },
-  { href: '/kids', key: 'kids', icon: Baby, also: [] as string[] },
+  // ✅ استبدال "الأطفال" بـ "الصحيحين" في نفس المكان
+  { href: '/sahihayn', key: 'sahihayn', icon: BookMarked, also: ['/hadith'] },
   { href: '/qibla', key: 'qibla', icon: Compass, also: [] as string[] },
   { href: '/more', key: 'more', icon: LayoutGrid, also: ['/seerah', '/prophets', '/sunan', '/guide'] },
 ]
@@ -32,8 +33,8 @@ export function BottomNav() {
         {ITEMS.map(({ href, key, icon: Icon, also }) => {
           const active = matches(pathname, href) || also.some((b) => matches(pathname, b))
           
-          // ✅ قراءة اسم الزر من ملف الترجمة
-          const label = dict.nav[key as keyof typeof dict.nav]
+          // ✅ قراءة اسم الزر من ملف الترجمة، مع Fallback "الصحيحين"
+          const label = (dict.nav as any)[key] || (key === 'sahihayn' ? 'الصحيحين' : key)
 
           return (
             <li key={href} className="flex-1">

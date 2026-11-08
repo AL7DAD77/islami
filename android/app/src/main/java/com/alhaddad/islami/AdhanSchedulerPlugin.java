@@ -223,8 +223,9 @@ public final class AdhanSchedulerPlugin extends Plugin {
         long intervalMillis = call.getLong("intervalMillis", 3600000L);
         String title = call.getString("title", "تذكير");
         String body = call.getString("body", "");
+        boolean isSilent = call.getBoolean("isSilent", false); // ✅
         
-        AdhanScheduler.scheduleReminderAlarm(context, id, intervalMillis, title, body);
+        AdhanScheduler.scheduleReminderAlarm(context, id, intervalMillis, title, body, isSilent); // ✅
         call.resolve();
     }
 

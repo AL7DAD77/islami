@@ -40,9 +40,9 @@ export async function resolvePlace(lat: number, lng: number) {
 export type AutoLocationResult = 'ok' | 'denied' | 'error' | 'skipped'
 
 /**
- * يحدّث الموقع تلقائياً ويحفظ الحالة.
- * - لا يغيّر طريقة الحساب إلا عند تغيّر الدولة، حتى لا يُلغي اختيار المستخدم اليدوي.
- * - لا يعيد تحديد اسم المدينة إذا لم يتحرك المستخدم أكثر من 5 كم.
+ * يحدّث الموقع ويحفظ الإحداثيات الخام دائماً.
+ * - الطريقة تُختار من الدولة المكتشفة من الإحداثيات نفسها، لا من الاختيار السابق.
+ * - اسم المدينة يُعاد تحديده فقط عند الحاجة (تحرك أكثر من 5 كم أو اسم غير معروف).
  */
 export async function updateAutoLocation(
   opts: LocationOptions & { force?: boolean } = {},
@@ -96,47 +96,46 @@ export async function updateAutoLocation(
     savedLocation.city === PLACEHOLDER ||
     (savedLocation.city === 'مكة المكرمة' && movedKm >= 1)
 
-  if (!needsPlaceName) {
-    updateSettings({
-      locationStatus: 'ok',
-      location: {
-        ...savedLocation,
-        lat,
-        lng,
-      },
-    })
+  // ✅ تشخيص مؤقت: احذف هذا السطر بعد التحقق
+  console.log('[LOCATION-DEBUG] raw', { lat, lng, movedKm, needsPlaceName, savedCountry: savedLocation.countryCode, savedMethod: settings.method })
 
-    return 'ok'
+  let place: { city: string; country: string; countryCode: string } = {
+    city: savedLocation.city,
+    country: savedLocation.country,
+    countryCode: savedLocation.countryCode,
   }
 
-  const place = await resolvePlace(lat, lng)
+  if (needsPlaceName) {
+    place = await resolvePlace(lat, lng)
+  }
 
-  updateSettings((settings: AppSettings) => {
-    const countryCode =
-      place.countryCode || settings.location.countryCode || ''
+  updateSettings((latest: AppSettings) => {
+    const detectedCountry = place.countryCode || latest.location.countryCode || ''
 
-    const countryChanged =
-      !!place.countryCode &&
-      place.countryCode !== settings.location.countryCode
-
-    const nextMethod = countryChanged
-      ? methodForCountry(place.countryCode, 'MuslimWorldLeague')
-      : settings.method
+    // الطريقة تتبع الدولة المكتشفة دائماً عند معرفتها
+    const nextMethod = place.countryCode
+      ? methodForCountry(place.countryCode, latest.method)
+      : latest.method
 
     return {
       locationStatus: 'ok',
       location: {
-        ...settings.location,
+        ...latest.location,
         lat,
         lng,
-        city: place.city,
-        country: place.country || settings.location.country,
-        countryCode,
+        city: needsPlaceName ? place.city : latest.location.city,
+        country: needsPlaceName
+          ? place.country || latest.location.country
+          : latest.location.country,
+        countryCode: detectedCountry,
         auto: true,
       },
       method: nextMethod,
     }
   })
+
+  // ✅ تشخيص مؤقت: احذف هذا السطر بعد التحقق
+  console.log('[LOCATION-DEBUG] saved', getSettings().location, getSettings().method)
 
   return 'ok'
 }

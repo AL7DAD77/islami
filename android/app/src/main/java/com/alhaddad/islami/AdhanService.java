@@ -42,6 +42,9 @@ public final class AdhanService extends Service {
     private AudioFocusRequest audioFocusRequest;
     private boolean screenReceiverRegistered = false;
 
+    // ✅ إبقاء مرجع لـ AssetFileDescriptor مفتوحاً حتى ينتهي التشغيل
+    private AssetFileDescriptor currentAfd = null;
+
     private final AudioManager.OnAudioFocusChangeListener audioFocusListener =
             new AudioManager.OnAudioFocusChangeListener() {
                 @Override
@@ -59,7 +62,6 @@ public final class AdhanService extends Service {
                 }
             };
 
-    // يستقبل إطفاء الشاشة (زر الباور) ويوقف الأذان فوراً
     private final android.content.BroadcastReceiver screenOffReceiver =
             new android.content.BroadcastReceiver() {
                 @Override
@@ -91,7 +93,6 @@ public final class AdhanService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        // لازم نستدعي startForeground في كل الحالات قبل أي return، وإلا يحصل انهيار
         if (intent == null || ACTION_STOP_ADHAN.equals(intent.getAction())) {
             startForegroundWithType(NotificationHelper.buildPlaying(this, DEFAULT_TITLE, DEFAULT_BODY));
             stopPlayback(true);
@@ -121,7 +122,6 @@ public final class AdhanService extends Service {
     }
 
     private void playAdhan(String fileName, float volume) {
-        AssetFileDescriptor afd = null;
         try {
             if (mediaPlayer == null) {
                 mediaPlayer = createMediaPlayer();
@@ -129,8 +129,16 @@ public final class AdhanService extends Service {
             mediaPlayer.reset();
             requestAudioFocus();
 
-            afd = getAssets().openFd("public/audio/adhans/" + fileName);
-            mediaPlayer.setDataSource(afd.getFileDescriptor(), afd.getStartOffset(), afd.getLength());
+            // ✅ إغلاق أي AFD سابق قبل فتح جديد
+            closeCurrentAfd();
+
+            currentAfd = getAssets().openFd("public/audio/adhans/" + fileName);
+
+            mediaPlayer.setDataSource(
+                    currentAfd.getFileDescriptor(),
+                    currentAfd.getStartOffset(),
+                    currentAfd.getLength()
+            );
             mediaPlayer.setVolume(volume, volume);
 
             mediaPlayer.setOnPreparedListener(player -> {
@@ -158,13 +166,16 @@ public final class AdhanService extends Service {
         } catch (Exception e) {
             Log.e(TAG, "خطأ في تحميل ملف الأذان: " + fileName, e);
             stopPlayback(true);
-        } finally {
-            if (afd != null) {
-                try {
-                    afd.close();
-                } catch (Exception ignored) {
-                }
-            }
+        }
+    }
+
+    // ✅ إغلاق AFD بشكل آمن
+    private void closeCurrentAfd() {
+        if (currentAfd != null) {
+            try {
+                currentAfd.close();
+            } catch (Exception ignored) {}
+            currentAfd = null;
         }
     }
 
@@ -214,10 +225,6 @@ public final class AdhanService extends Service {
         }
     }
 
-    /**
-     * إيقاف الأذان وتنظيف الخدمة.
-     * @param scheduleNext هل تُجدول الصلاة التالية؟
-     */
     private void stopPlayback(boolean scheduleNext) {
         try {
             if (mediaPlayer != null) {
@@ -233,6 +240,7 @@ public final class AdhanService extends Service {
             Log.w(TAG, "خطأ أثناء إيقاف مشغل الأذان", e);
         } finally {
             abandonAudioFocus();
+            closeCurrentAfd(); // ✅ إغلاق AFD هنا بعد التوقف
             stopForegroundService();
             stopSelf();
             NotificationHelper.updatePersistent(this);
@@ -286,6 +294,7 @@ public final class AdhanService extends Service {
         }
 
         abandonAudioFocus();
+        closeCurrentAfd(); // ✅ إغلاق AFD قبل تحرير المشغل
         releaseMediaPlayer();
         stopForegroundService();
         super.onDestroy();

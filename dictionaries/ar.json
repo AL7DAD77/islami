@@ -5,7 +5,8 @@
     "kids": "الأطفال",
     "adhkar": "الأذكار",
     "quran": "القرآن",
-    "prayer": "الصلاة"
+    "prayer": "الصلاة",
+    "sahihayn": "الصحيحين"
   },
   "common": {
     "settings": "الإعدادات",
@@ -62,7 +63,8 @@
     "supportTile": "الدعم والتواصل",
     "aboutApp": "عن التطبيق",
     "privacy": "سياسة الخصوصية",
-    "disclaimer": "إخلاء المسؤولية"
+    "disclaimer": "إخلاء المسؤولية",
+    "kids": "الأطفال"
   },
   "morePageExtra": {
     "copied": "تم النسخ",
@@ -209,7 +211,8 @@
     "play": "تجربة",
     "stop": "إيقاف",
     "defaultVoiceTitle": "الصوت الافتراضي للصلوات التي لم تختر لها",
-    "defaultVoiceSelect": "اختر الصوت الافتراضي"
+    "defaultVoiceSelect": "اختر الصوت الافتراضي",
+    "fajrVoiceTitle": "صوت الفجر الافتراضي"
   },
   "hijriCalendar": {
     "prevMonth": "الشهر السابق",
@@ -414,15 +417,15 @@
     "appLanguage": "لغة التطبيق / App Language",
     "appLanguageDesc": "تغيير لغة الواجهة بالكامل",
     "preAdhanTitle": "تنبيه قبل الأذان",
-"preAdhanEnable": "تفعيل التنبيه قبل الأذان",
-"preAdhanEnableDesc": "إشعار قبل وقت الأذان، دون التأثير على الأذان أو عدّاد الوقت.",
-"preAdhanMinutesTitle": "اختر مدة التنبيه قبل الأذان",
-"preAdhanMinutes": {
-  "5": "5 دقائق",
-  "10": "10 دقائق",
-  "15": "15 دقيقة",
-  "30": "30 دقيقة"
-},
+    "preAdhanEnable": "تفعيل التنبيه قبل الأذان",
+    "preAdhanEnableDesc": "إشعار قبل وقت الأذان، دون التأثير على الأذان أو عدّاد الوقت.",
+    "preAdhanMinutesTitle": "اختر مدة التنبيه قبل الأذان",
+    "preAdhanMinutes": {
+      "5": "5 دقائق",
+      "10": "10 دقائق",
+      "15": "15 دقيقة",
+      "30": "30 دقيقة"
+    },
     "methods": {
       "UmmAlQura": "أم القرى (السعودية)",
       "Egyptian": "الهيئة المصرية",
@@ -494,6 +497,7 @@
     "sourceValue": "Sunnah.com (ترتيب وتبويب)",
     "disclaimer": "المصدر: موقع Sunnah.com. حقوق الترتيب والتبويب محفوظة لهم. النصوص منقولة لغرض تعليمي، ويُرجع للمصادر المطبوعة الرسمية عند التحقق.",
     "hadithNumber": "حديث رقم",
-    "narrator": "الراوي:"
+    "narrator": "الراوي:",
+    "hadithLibrary": "مكتبة الحديث النبوي"
   }
 }

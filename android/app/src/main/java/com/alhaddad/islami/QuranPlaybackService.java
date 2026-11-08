@@ -94,8 +94,8 @@ public class QuranPlaybackService extends MediaSessionService {
         manager.createNotificationChannel(channel);
     }
 
-    /** هل الصوت شغال أو مطلوب تشغيله حالياً؟ */
-    private boolean isPlaybackOngoing() {
+    /** هل تلاوة القرآن شغالة أو مطلوب تشغيلها حالياً؟ */
+    private boolean isQuranAudioActive() {
         return player != null && (player.isPlaying() || player.getPlayWhenReady());
     }
 
@@ -107,7 +107,7 @@ public class QuranPlaybackService extends MediaSessionService {
 
     @Override
     public void onTaskRemoved(@Nullable Intent rootIntent) {
-        if (!isPlaybackOngoing()) {
+        if (!isQuranAudioActive()) {
             stopSelf();
         }
     }

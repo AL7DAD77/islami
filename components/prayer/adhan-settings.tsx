@@ -90,10 +90,22 @@ export function AdhanSettings() {
     })
   }
 
+  // ✅ التعديل الجوهري: حفظ في prayerVoices[key] لكل صلاة على حدة
   const setPrayerVoice = (prayer: PrayerKey, id: string) => {
     stopPreview()
     setPlaying(null)
-    update({ adhanVoice: id })
+
+    update((s) => {
+      const nextVoices = { ...s.prayerVoices }
+
+      if (!id) {
+        delete nextVoices[prayer]
+      } else {
+        nextVoices[prayer] = id
+      }
+
+      return { prayerVoices: nextVoices }
+    })
   }
 
   const setDefaultVoice = (id: string) => {
@@ -102,7 +114,14 @@ export function AdhanSettings() {
     update({ adhanVoice: id })
   }
 
+  const setFajrDefaultVoice = (id: string) => {
+    stopPreview()
+    setPlaying(null)
+    update({ fajrVoice: id })
+  }
+
   const defaultVoice = getAdhanVoice(settings.adhanVoice) || ADHAN_VOICES[0]
+  const fajrDefaultVoice = getAdhanVoice(settings.fajrVoice) || ADHAN_VOICES[0]
 
   const getPrayerName = (key: string) => {
     const dictKey = key.toLowerCase() as keyof typeof dict.prayers
@@ -144,10 +163,15 @@ export function AdhanSettings() {
 
         <div className="flex flex-col gap-2">
           {PRAYER_ORDER.map((key: PrayerKey) => {
-            const chosen = settings.adhanVoice
-            const voice = getAdhanVoice(chosen) || ADHAN_VOICES[0]
+            const customVoiceId = settings.prayerVoices[key]
+            const hasOwn = customVoiceId !== undefined
+
+            const effectiveVoiceId =
+              customVoiceId ??
+              (key === 'fajr' ? settings.fajrVoice : settings.adhanVoice)
+
+            const voice = getAdhanVoice(effectiveVoiceId) || ADHAN_VOICES[0]
             const isPlaying = playingId === voice.id
-            const hasOwn = false
 
             return (
               <div
@@ -245,6 +269,39 @@ export function AdhanSettings() {
             }`}
           >
             {playingId === defaultVoice.id ? <Square className="size-4" /> : <Play className="size-4" />}
+          </button>
+        </div>
+
+        {/* ✅ صوت الفجر الافتراضي (منفصل) - بدون مفتاح ترجمة جديد */}
+        <h3 className="mb-2 mt-4 text-sm font-bold text-muted-foreground">
+          صوت الفجر الافتراضي
+        </h3>
+
+        <div className="flex items-center gap-2 rounded-2xl border border-border bg-card p-3">
+          <select
+            value={settings.fajrVoice}
+            onChange={(e) => setFajrDefaultVoice(e.target.value)}
+            aria-label="صوت الفجر الافتراضي"
+            className="flex-1 rounded-xl border border-border bg-background px-3 py-2.5 text-sm"
+          >
+            {ADHAN_VOICES.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.name}
+              </option>
+            ))}
+          </select>
+
+          <button
+            type="button"
+            onClick={() => preview(fajrDefaultVoice.id)}
+            aria-label={playingId === fajrDefaultVoice.id ? dict.adhanSettings.stop : dict.adhanSettings.play}
+            className={`flex size-10 shrink-0 items-center justify-center rounded-full transition ${
+              playingId === fajrDefaultVoice.id
+                ? 'bg-emerald-600 text-white'
+                : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-400'
+            }`}
+          >
+            {playingId === fajrDefaultVoice.id ? <Square className="size-4" /> : <Play className="size-4" />}
           </button>
         </div>
       </section>

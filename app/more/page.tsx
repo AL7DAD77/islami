@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import {
-  BookOpen,
   CalendarDays,
   ClipboardCheck,
   Search,
@@ -23,7 +22,8 @@ import {
   QrCode,
   X,
   Copy,
-  BookMarked, // ✅ أيقونة جديدة للصحيحين
+  BookOpen,
+  Baby,
 } from 'lucide-react'
 import { PageHeader } from '@/components/page-header'
 import { TileLink, SectionTitle } from '@/components/ui-kit'
@@ -52,7 +52,7 @@ function ActionTile({ title, subtitle, icon, onClick }: { title: string; subtitl
 }
 
 export default function MorePage() {
-  const { dict } = useLanguage()
+  const { dict, locale } = useLanguage()
   const [copied, setCopied] = useState(false)
   const [isApp, setIsApp] = useState(false)
   const [showQR, setShowQR] = useState(false)
@@ -93,13 +93,13 @@ export default function MorePage() {
   }
 
   const LEARN = [
-    { href: '/hadith', title: dict.morePage.hadith, subtitle: '', icon: <BookOpen className="size-5" /> },
-    { href: '/sahihayn', title: dict.morePage.sahihayn, subtitle: '', icon: <BookMarked className="size-5" /> }, // ✅ الصحيحان
     { href: '/seerah', title: dict.morePage.seerah, subtitle: '', icon: <Landmark className="size-5" /> },
     { href: '/prophets', title: dict.morePage.prophets, subtitle: '', icon: <BookOpen className="size-5" /> },
     { href: '/sunan', title: dict.morePage.sunan, subtitle: '', icon: <Moon className="size-5" /> },
     { href: '/guide', title: dict.morePage.guide, subtitle: '', icon: <Library className="size-5" /> },
     { href: '/calendar', title: dict.morePage.calendar, subtitle: '', icon: <CalendarDays className="size-5" /> },
+    // ✅ الأطفال (اسم مباشر لضمان الظهور)
+    { href: '/kids', title: locale === 'ar' ? 'ركن الأطفال' : 'Kids Corner', subtitle: '', icon: <Baby className="size-5" /> },
   ]
 
   const INFO_LINKS = [

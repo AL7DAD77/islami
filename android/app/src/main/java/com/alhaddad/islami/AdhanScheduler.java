@@ -30,6 +30,7 @@ public final class AdhanScheduler {
     private static final String EXTRA_BODY = "body";
     private static final String EXTRA_FILE = "file";
     private static final String EXTRA_VOLUME = "volume";
+    private static final String EXTRA_IS_SILENT = "isSilent"; // ✅
 
     private static final int TEST_ALARM_ID = 90001;
 
@@ -113,17 +114,19 @@ public final class AdhanScheduler {
 
     /* ======================= جدولة التذكيرات (مستقلة) ======================= */
 
-    public static void scheduleReminderAlarm(Context context, int id, long intervalMillis, String title, String body) {
+    // ✅ تمت إضافة isSilent
+    public static void scheduleReminderAlarm(Context context, int id, long intervalMillis, String title, String body, boolean isSilent) {
         AlarmManager alarmManager = getAlarmManager(context);
         if (alarmManager == null) return;
 
-        saveReminderState(context, id, intervalMillis, title, body);
+        saveReminderState(context, id, intervalMillis, title, body, isSilent);
 
         Intent intent = createReminderIntent(context, id);
         intent.putExtra(EXTRA_ID, id);
         intent.putExtra(EXTRA_TITLE, title);
         intent.putExtra(EXTRA_BODY, body);
         intent.putExtra("intervalMillis", intervalMillis);
+        intent.putExtra(EXTRA_IS_SILENT, isSilent); // ✅
 
         PendingIntent pendingIntent = PendingIntent.getBroadcast(
                 context, id, intent,
@@ -167,9 +170,10 @@ public final class AdhanScheduler {
             long interval = prefs.getLong("reminder_" + id + "_interval", 3600000L);
             String title = prefs.getString("reminder_" + id + "_title", "تذكير");
             String body = prefs.getString("reminder_" + id + "_body", "");
+            boolean isSilent = prefs.getBoolean("reminder_" + id + "_is_silent", false); // ✅
 
             try {
-                scheduleReminderAlarm(context, id, interval, title, body);
+                scheduleReminderAlarm(context, id, interval, title, body, isSilent); // ✅
                 rescheduled++;
             } catch (Exception e) {
                 Log.e(TAG, "تعذر إعادة جدولة التذكير " + id, e);
@@ -180,13 +184,14 @@ public final class AdhanScheduler {
 
     /* ================== حفظ واسترجاع حالة التذكيرات ================== */
 
-    private static void saveReminderState(Context context, int id, long intervalMillis, String title, String body) {
+    private static void saveReminderState(Context context, int id, long intervalMillis, String title, String body, boolean isSilent) {
         try {
             context.getSharedPreferences(REMINDER_PREFS, Context.MODE_PRIVATE).edit()
                     .putBoolean("reminder_" + id + "_enabled", true)
                     .putLong("reminder_" + id + "_interval", intervalMillis)
                     .putString("reminder_" + id + "_title", title)
                     .putString("reminder_" + id + "_body", body)
+                    .putBoolean("reminder_" + id + "_is_silent", isSilent) // ✅
                     .apply();
         } catch (Exception e) {
             Log.e(TAG, "تعذر حفظ حالة التذكير " + id, e);
@@ -200,6 +205,7 @@ public final class AdhanScheduler {
                     .remove("reminder_" + id + "_interval")
                     .remove("reminder_" + id + "_title")
                     .remove("reminder_" + id + "_body")
+                    .remove("reminder_" + id + "_is_silent") // ✅
                     .apply();
         } catch (Exception e) {
             Log.e(TAG, "تعذر حذف حالة التذكير " + id, e);
@@ -240,10 +246,6 @@ public final class AdhanScheduler {
         return nextItem;
     }
 
-    /**
-     * تنبيه الأذان: يستخدم setAlarmClock لضمان التشغيل الدقيق.
-     * لو فشل، يرجع لـ setExact.
-     */
     private static boolean setAdhanAlarm(Context context, AlarmManager alarmManager,
                                          long triggerAtMillis, PendingIntent operation) {
         try {

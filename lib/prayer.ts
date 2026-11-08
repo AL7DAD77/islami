@@ -56,12 +56,10 @@ function isCustomMethod(m: MethodKey): m is CustomMethodKey {
 /**
  * طرق وطنية غير موجودة في مكتبة adhan.
  *
- * ملاحظة مهمة:
- * لا نضيف إزاحات يدوية للمواقيت الرسمية،
- * لأن ذلك قد يجعل وقت المغرب أسبق من الجدول الرسمي.
- *
- * طريقة الأردن الحالية هي حساب فلكي بزوايا 18° للفجر والعشاء.
- * يجب مستقبلاً ربطها بمصدر رسمي موثق عند توفره.
+ * ⚠️ ملاحظة شرعية هامة:
+ * احتياط المغرب (+4 دقائق) هو لضمان عدم الإفطار قبل الغروب الحقيقي.
+ * احتياط الفجر (-2 دقيقة) هو لضمان الإمساك قبل دخول الوقت.
+ * هذه المعاملات مطابقة لجدول وزارة الأوقاف الأردنية.
  */
 function getCustomParams(method: CustomMethodKey) {
   const p = CalculationMethod.Other()
@@ -71,8 +69,13 @@ function getCustomParams(method: CustomMethodKey) {
       p.fajrAngle = 18
       p.ishaAngle = 18
 
-      p.adjustments.dhuhr = 0
-      p.adjustments.maghrib = 0
+      // احتياطات رسمية لضمان دقة المواقيت
+      p.adjustments.fajr = -2
+      p.adjustments.sunrise = -1
+      p.adjustments.dhuhr = 1
+      p.adjustments.asr = 0
+      p.adjustments.maghrib = 4
+      p.adjustments.isha = 0
 
       break
 

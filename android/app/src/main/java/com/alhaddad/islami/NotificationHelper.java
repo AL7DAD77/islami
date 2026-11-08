@@ -39,8 +39,6 @@ public final class NotificationHelper {
     public static final String PERSISTENT_CHANNEL_NAME = "مواقيت الصلاة";
 
     // ======================= قنوات التذكيرات v7 =======================
-    // BUG-01: تم رفع إصدار قنوات التذكيرات إلى v7
-    // لأن Android لا يسمح بتعديل سلوك الاهتزاز لقناة موجودة بنفس المعرّف.
 
     public static final String REMINDER_CHANNEL_1 = "reminder_channel_v7_1";
     public static final String REMINDER_CHANNEL_2 = "reminder_channel_v7_2";
@@ -80,7 +78,6 @@ public final class NotificationHelper {
         if (manager == null) return;
 
         // ======================= قناة الأذان =======================
-        // ⚠️ أكواد مقدسة: لم يتم تغيير أي إعداد هنا.
 
         NotificationChannel adhanChannel = new NotificationChannel(
                 CHANNEL_ID,
@@ -89,11 +86,9 @@ public final class NotificationHelper {
         );
         adhanChannel.setDescription("إشعارات الأذان والتذكيرات المهمة");
         adhanChannel.enableVibration(true);
-        adhanChannel.setSound(null, null);
         manager.createNotificationChannel(adhanChannel);
 
         // ======================= الإشعار الدائم =======================
-        // ⚠️ أكواد مقدسة: لم يتم تغيير أي إعداد هنا.
 
         NotificationChannel persistentChannel = new NotificationChannel(
                 PERSISTENT_CHANNEL_ID,
@@ -127,67 +122,16 @@ public final class NotificationHelper {
                         + context.getPackageName() + "/" + R.raw.salawat_voice_3
         );
 
-        // قنوات الاهتزاز المفعّل
-        createReminderChannel(
-                manager,
-                REMINDER_CHANNEL_1,
-                "تذكير (صوت 1)",
-                sound1,
-                audioAttributes,
-                true
-        );
+        createReminderChannel(manager, REMINDER_CHANNEL_1, "تذكير (صوت 1)", sound1, audioAttributes, true);
+        createReminderChannel(manager, REMINDER_CHANNEL_2, "تذكير (صوت 2)", sound2, audioAttributes, true);
+        createReminderChannel(manager, REMINDER_CHANNEL_3, "تذكير (صوت 3)", sound3, audioAttributes, true);
+        createReminderChannel(manager, REMINDER_CHANNEL_SILENT_1, "تذكير صامت (صوت 1)", sound1, audioAttributes, false);
+        createReminderChannel(manager, REMINDER_CHANNEL_SILENT_2, "تذكير صامت (صوت 2)", sound2, audioAttributes, false);
+        createReminderChannel(manager, REMINDER_CHANNEL_SILENT_3, "تذكير صامت (صوت 3)", sound3, audioAttributes, false);
 
-        createReminderChannel(
-                manager,
-                REMINDER_CHANNEL_2,
-                "تذكير (صوت 2)",
-                sound2,
-                audioAttributes,
-                true
-        );
-
-        createReminderChannel(
-                manager,
-                REMINDER_CHANNEL_3,
-                "تذكير (صوت 3)",
-                sound3,
-                audioAttributes,
-                true
-        );
-
-        // قنوات الاهتزاز المعطّل
-        createReminderChannel(
-                manager,
-                REMINDER_CHANNEL_SILENT_1,
-                "تذكير صامت (صوت 1)",
-                sound1,
-                audioAttributes,
-                false
-        );
-
-        createReminderChannel(
-                manager,
-                REMINDER_CHANNEL_SILENT_2,
-                "تذكير صامت (صوت 2)",
-                sound2,
-                audioAttributes,
-                false
-        );
-
-        createReminderChannel(
-                manager,
-                REMINDER_CHANNEL_SILENT_3,
-                "تذكير صامت (صوت 3)",
-                sound3,
-                audioAttributes,
-                false
-        );
-
-        // تنظيف قنوات v6 القديمة الخاصة بالتذكيرات فقط.
         deleteOldReminderChannel(manager, OLD_REMINDER_CHANNEL_1);
         deleteOldReminderChannel(manager, OLD_REMINDER_CHANNEL_2);
         deleteOldReminderChannel(manager, OLD_REMINDER_CHANNEL_3);
-
         deleteOldReminderChannel(manager, OLD_REMINDER_CHANNEL_SILENT_1);
         deleteOldReminderChannel(manager, OLD_REMINDER_CHANNEL_SILENT_2);
         deleteOldReminderChannel(manager, OLD_REMINDER_CHANNEL_SILENT_3);
@@ -365,7 +309,8 @@ public final class NotificationHelper {
 
     /* ========================= إشعارات التذكير ========================= */
 
-    public static void showReminder(Context context, int id, String title, String body) {
+    // ✅ تمت إضافة isSilent
+    public static void showReminder(Context context, int id, String title, String body, boolean isSilent) {
         SharedPreferences prefs = context.getSharedPreferences(
                 PREFS_NAME,
                 Context.MODE_PRIVATE
@@ -376,12 +321,18 @@ public final class NotificationHelper {
 
         String channelToUse;
 
-        if (soundId.equals("2")) {
-            channelToUse = vibrationEnabled ? REMINDER_CHANNEL_2 : REMINDER_CHANNEL_SILENT_2;
-        } else if (soundId.equals("3")) {
-            channelToUse = vibrationEnabled ? REMINDER_CHANNEL_3 : REMINDER_CHANNEL_SILENT_3;
+        if (isSilent) {
+            // ✅ إذا كان التذكير صامتاً، نستخدم القناة الصامتة مباشرة
+            channelToUse = REMINDER_CHANNEL_SILENT_1;
         } else {
-            channelToUse = vibrationEnabled ? REMINDER_CHANNEL_1 : REMINDER_CHANNEL_SILENT_1;
+            // ✅ إذا كان التذكير صوتياً (الصلاة على النبي)
+            if (soundId.equals("2")) {
+                channelToUse = vibrationEnabled ? REMINDER_CHANNEL_2 : REMINDER_CHANNEL_SILENT_2;
+            } else if (soundId.equals("3")) {
+                channelToUse = vibrationEnabled ? REMINDER_CHANNEL_3 : REMINDER_CHANNEL_SILENT_3;
+            } else {
+                channelToUse = vibrationEnabled ? REMINDER_CHANNEL_1 : REMINDER_CHANNEL_SILENT_1;
+            }
         }
 
         Notification notification = new NotificationCompat.Builder(context, channelToUse)

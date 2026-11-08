@@ -4,7 +4,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import { useHorizontalSwipe } from '@/lib/use-swipe'
 
 // ⚠️ نفس ترتيب الأقسام في BottomNav
-const MAIN_PAGES = ['/prayer', '/quran', '/adhkar', '/kids', '/qibla', '/more']
+const MAIN_PAGES = ['/prayer', '/quran', '/adhkar', '/sahihayn', '/qibla', '/more']
 
 /**
  * التنقل بالسحب بين الأقسام الرئيسية فقط.

@@ -99,10 +99,16 @@ const DOUBLE_TAP_SCALE = 2
 const SWIPE_THRESHOLD = 45
 
 const REFERENCE_FONT_SIZE = 100
+// 🛡️ حاجز أمان بنسبة 2% لمنع التصاق النص بالحواف
 const FIT_PADDING = 0.98
 
-const TEXT_THIN_STROKE = 0.8
-const HEADER_THIN_STROKE = 0.6
+// ارتفاع كل سطر نصي = حجم الخط × هذه النسبة.
+// زد القيمة لتباعد الأسطر أكثر (يحمي التنوين من التداخل مع السطر الأعلى).
+// جرّب: 1.4 أو 1.5 أو 1.6
+const LINE_HEIGHT_RATIO = 1.45
+
+const TEXT_THIN_STROKE = 0.3
+const HEADER_THIN_STROKE = 0
 
 const META_URL = '/mushaf/meta.json'
 const PAGES_URL = '/mushaf-qcf4/pages'
@@ -530,10 +536,9 @@ export function MushafViewer({
       const heightScale =
         (availableHeight * FIT_PADDING) / contentHeight
 
-      const nextScale = Math.min(
-        widthScale,
-        heightScale,
-      )
+      // أصغر النسبتين: لا تُقص الحواف الجانبية أبداً،
+      // والتحجيم موحد لكل الصفحة فلا تتحرك الكلمات أو التنوين
+      const nextScale = Math.min(widthScale, heightScale)
 
       if (
         !Number.isFinite(nextScale) ||
@@ -1005,8 +1010,8 @@ export function MushafViewer({
     ? 'rgba(24, 24, 27, 0.88)'
     : 'rgba(255, 255, 255, 0.88)'
 
-  const bg = isNightMode ? '#101010' : '#fdfbf7'
-  const fg = isNightMode ? '#e4e4e7' : '#0a1f1a'
+ const bg = isNightMode ? '#101010' : '#fdfbf7'
+const fg = isNightMode ? '#f4f4f5' : '#06140f'
   const border = isNightMode
     ? 'rgba(63, 63, 70, 0.7)'
     : '#e8dccb'
@@ -1109,17 +1114,15 @@ export function MushafViewer({
             </button>
           </div>
         ) : pageData ? (
-          // المساحة المتاحة للصفحة
+          // المساحة المتاحة للصفحة (بدون هوامش جانبية، والهوامش العلوية والسفلية للأجهزة فقط)
           <div
             ref={pageWrapperRef}
             className="relative flex h-full w-full items-center justify-center overflow-hidden"
             style={{
-              paddingTop:
-                'calc(env(safe-area-inset-top, 0px) + 72px)',
-              paddingBottom:
-                'calc(env(safe-area-inset-bottom, 0px) + 72px)',
-              paddingLeft: '3%',
-              paddingRight: '3%',
+              paddingTop: 'env(safe-area-inset-top, 0px)',
+              paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+              paddingLeft: '0px',
+              paddingRight: '0px',
             }}
             onDoubleClick={handleDoubleClick}
           >
@@ -1178,7 +1181,9 @@ export function MushafViewer({
                       direction: 'rtl',
                       width: '100%',
                       height:
-                        REFERENCE_FONT_SIZE * 1.3,
+                        REFERENCE_FONT_SIZE *
+                        LINE_HEIGHT_RATIO,
+                      overflow: 'visible',
                     }}
                   >
                     {line.words.map(

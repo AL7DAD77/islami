@@ -16,6 +16,7 @@ public final class AdhanReceiver extends BroadcastReceiver {
     private static final String EXTRA_ID = "id";
     private static final String EXTRA_TITLE = "title";
     private static final String EXTRA_BODY = "body";
+    private static final String EXTRA_IS_SILENT = "isSilent"; // ✅
 
     @Override
     public void onReceive(Context context, Intent intent) {
@@ -43,15 +44,17 @@ public final class AdhanReceiver extends BroadcastReceiver {
                 String title = intent.getStringExtra(EXTRA_TITLE);
                 String body = intent.getStringExtra(EXTRA_BODY);
                 long intervalMillis = intent.getLongExtra("intervalMillis", 3600000L);
+                boolean isSilent = intent.getBooleanExtra(EXTRA_IS_SILENT, false); // ✅
 
                 NotificationHelper.showReminder(
                         context,
                         id,
                         title != null ? title : "تذكير",
-                        body != null ? body : ""
+                        body != null ? body : "",
+                        isSilent // ✅
                 );
 
-                AdhanScheduler.scheduleReminderAlarm(context, id, intervalMillis, title, body);
+                AdhanScheduler.scheduleReminderAlarm(context, id, intervalMillis, title, body, isSilent); // ✅
             } catch (Exception e) {
                 Log.e(TAG, "خطأ في معالجة التذكير، تم منع انهيار التطبيق", e);
             }
@@ -77,7 +80,8 @@ public final class AdhanReceiver extends BroadcastReceiver {
                         context,
                         intent.getIntExtra(EXTRA_ID, 0),
                         intent.getStringExtra(EXTRA_TITLE),
-                        intent.getStringExtra(EXTRA_BODY)
+                        intent.getStringExtra(EXTRA_BODY),
+                        intent.getBooleanExtra(EXTRA_IS_SILENT, false) // ✅
                 );
 
             } else if ("time".equals(kind) || "phase".equals(kind)) {
