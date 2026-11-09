@@ -125,9 +125,21 @@ public final class AdhanStore {
         item.file = json.optString(JSON_FILE, "");
         item.volume = (float) json.optDouble(JSON_VOLUME, DEFAULT_VOLUME);
 
+        // حماية من قيمة صوت صفرية أو غير منطقية
+        if (item.volume <= 0f || item.volume > 1f || Float.isNaN(item.volume)) {
+            item.volume = DEFAULT_VOLUME;
+        }
+
         if (!item.isValid()) {
+            Log.w(TAG, "تم تجاهل عنصر تنبيه غير صالح: id=" + item.id + ", at=" + item.at);
             return null;
         }
+
+        Log.i(TAG, "تنبيه محمّل: id=" + item.id
+                + ", prayer=" + item.prayer
+                + ", at=" + item.at
+                + ", file=" + item.file
+                + ", volume=" + item.volume);
 
         return item;
     }

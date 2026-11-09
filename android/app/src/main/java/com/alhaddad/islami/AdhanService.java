@@ -1,7 +1,6 @@
 package com.alhaddad.islami;
 
 import android.app.Notification;
-import android.app.Service;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -14,24 +13,35 @@ import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.os.Build;
 import android.os.IBinder;
+import android.os.PowerManager;
 import android.util.Log;
 
 import androidx.annotation.Nullable;
+import androidx.core.app.Service;
 import androidx.core.content.ContextCompat;
 
-public final class AdhanService extends Service {
+public final class AdhanService extends android.app.Service {
 
     private static final String TAG = "AdhanService";
     public static final String ACTION_STOP_ADHAN = "com.alhaddad.islami.STOP_ADHAN";
 
+    /**
+     * true: إيقاف الأذان عند إطفاء الشاشة بالزر (السلوك الذي طلبته أصلاً).
+     * false: يكتمل الأذان مهما حدث للشاشة.
+     */
     private static final boolean STOP_ON_SCREEN_OFF = true;
+
+    /** مدة قفل الاستيقاظ القصوى (احتياط ضد التعليق). */
+    private static final long WAKE_LOCK_TIMEOUT_MS = 10 * 60 * 1000L;
 
     private static final String EXTRA_FILE = "file";
     private static final String EXTRA_VOLUME = "volume";
     private static final String EXTRA_TITLE = "title";
     private static final String EXTRA_BODY = "body";
 
+    /** المسار داخل assets كما يُحفظ فعلياً في المشروع. */
     private static final String ASSET_DIR = "public/audio/adhans/";
+
     private static final String DEFAULT_TITLE = "حان وقت الأذان";
     private static final String DEFAULT_BODY = "حي على الصلاة، حي على الفلاح";
 
@@ -39,6 +49,7 @@ public final class AdhanService extends Service {
     private AudioManager audioManager;
     private AudioFocusRequest audioFocusRequest;
     private AssetFileDescriptor currentAfd;
+    private PowerManager.WakeLock wakeLock;
     private boolean screenReceiverRegistered = false;
     private boolean foregroundActive = false;
     private float playbackVolume = 1.0f;
@@ -89,24 +100,20 @@ public final class AdhanService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        // ✅ سطر التشخيص
-        if (intent != null) {
-            Log.i("AdhanService", "استلمت أمر التشغيل. الملف: " + intent.getStringExtra("file"));
-        }
-
         if (intent == null || ACTION_STOP_ADHAN.equals(intent.getAction())) {
             startForegroundSafely(NotificationHelper.buildPlaying(this, DEFAULT_TITLE, DEFAULT_BODY));
             stopPlayback(true);
             return START_NOT_STICKY;
         }
 
-        // ✅ قراءة اسم الملف ومستوى الصوت بشكل صحيح
         String fileName = intent.getStringExtra(EXTRA_FILE);
         float volume = clampVolume(intent.getFloatExtra(EXTRA_VOLUME, 1.0f));
         String title = nonEmptyOr(intent.getStringExtra(EXTRA_TITLE), DEFAULT_TITLE);
         String body = nonEmptyOr(intent.getStringExtra(EXTRA_BODY), DEFAULT_BODY);
 
+        // يجب استدعاء startForeground قبل أي عمل آخر
         startForegroundSafely(NotificationHelper.buildPlaying(this, title, body));
+        acquireWakeLock();
 
         if (fileName == null || fileName.trim().isEmpty()) {
             Log.e(TAG, "لم يتم توفير ملف صوتي للأذان");
@@ -124,11 +131,19 @@ public final class AdhanService extends Service {
         try {
             MediaPlayer player = ensureMediaPlayer();
             player.reset();
+
             closeCurrentAfd();
             requestAudioFocus();
 
+            // ✅ القراءة من assets عبر AssetFileDescriptor (الطريقة الصحيحة في الخدمات)
             currentAfd = getAssets().openFd(ASSET_DIR + fileName);
-            player.setDataSource(currentAfd.getFileDescriptor(), currentAfd.getStartOffset(), currentAfd.getLength());
+            Log.i(TAG, "محاولة تشغيل الملف: " + ASSET_DIR + fileName);
+
+            player.setDataSource(
+                    currentAfd.getFileDescriptor(),
+                    currentAfd.getStartOffset(),
+                    currentAfd.getLength()
+            );
             player.setVolume(volume, volume);
 
             player.setOnPreparedListener(preparedPlayer -> {
@@ -178,6 +193,7 @@ public final class AdhanService extends Service {
         } finally {
             abandonAudioFocus();
             closeCurrentAfd();
+            releaseWakeLock();
             stopForegroundCompat();
             stopSelf();
             NotificationHelper.updatePersistent(this);
@@ -190,17 +206,22 @@ public final class AdhanService extends Service {
     private void startForegroundSafely(Notification notification) {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                startForeground(NotificationHelper.ID_PLAYING, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
+                startForeground(
+                        NotificationHelper.ID_PLAYING,
+                        notification,
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+                );
             } else {
                 startForeground(NotificationHelper.ID_PLAYING, notification);
             }
             foregroundActive = true;
         } catch (Exception e) {
+            Log.e(TAG, "تعذر بدء الخدمة الأمامية بالنوع المحدد، جاري المحاولة بدونه", e);
             try {
                 startForeground(NotificationHelper.ID_PLAYING, notification);
                 foregroundActive = true;
             } catch (Exception ex) {
-                Log.e(TAG, "تعذر بدء الخدمة الأمامية", ex);
+                Log.e(TAG, "تعذر بدء الخدمة الأمامية نهائياً", ex);
             }
         }
     }
@@ -219,6 +240,32 @@ public final class AdhanService extends Service {
         }
     }
 
+    private void acquireWakeLock() {
+        try {
+            if (wakeLock == null) {
+                PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+                if (pm == null) return;
+                wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, TAG + ":adhan");
+                wakeLock.setReferenceCounted(false);
+            }
+            if (!wakeLock.isHeld()) {
+                wakeLock.acquire(WAKE_LOCK_TIMEOUT_MS);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "تعذر أخذ قفل الاستيقاظ", e);
+        }
+    }
+
+    private void releaseWakeLock() {
+        try {
+            if (wakeLock != null && wakeLock.isHeld()) {
+                wakeLock.release();
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "تعذر تحرير قفل الاستيقاظ", e);
+        }
+    }
+
     private void requestAudioFocus() {
         if (audioManager == null) {
             audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
@@ -227,7 +274,8 @@ public final class AdhanService extends Service {
 
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                audioFocusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+                audioFocusRequest = new AudioFocusRequest.Builder(
+                        AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
                         .setAudioAttributes(adhanAudioAttributes())
                         .setAcceptsDelayedFocusGain(false)
                         .setWillPauseWhenDucked(false)
@@ -235,7 +283,11 @@ public final class AdhanService extends Service {
                         .build();
                 audioManager.requestAudioFocus(audioFocusRequest);
             } else {
-                audioManager.requestAudioFocus(audioFocusListener, AudioManager.STREAM_ALARM, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK);
+                audioManager.requestAudioFocus(
+                        audioFocusListener,
+                        AudioManager.STREAM_ALARM,
+                        AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK
+                );
             }
         } catch (Exception e) {
             Log.e(TAG, "خطأ في طلب التركيز الصوتي", e);
@@ -260,7 +312,9 @@ public final class AdhanService extends Service {
         if (currentAfd == null) return;
         try {
             currentAfd.close();
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+            // لا شيء يُفعل هنا
+        }
         currentAfd = null;
     }
 
@@ -314,6 +368,7 @@ public final class AdhanService extends Service {
         }
         abandonAudioFocus();
         closeCurrentAfd();
+        releaseWakeLock();
         releaseMediaPlayer();
         stopForegroundCompat();
         super.onDestroy();
