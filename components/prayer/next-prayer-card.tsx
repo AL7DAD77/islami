@@ -68,6 +68,19 @@ export function NextPrayerCard() {
     formatCountdown(next.time.getTime() - now.getTime()),
   )
 
+  // ✅ إصلاح التاريخ الميلادي ليستخدم formatValue
+  const formattedGregorianDate = formatValue(
+    now.toLocaleDateString(
+      locale === 'ar' ? 'ar-EG' : 'en-US',
+      {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      },
+    ),
+  )
+
   return (
     <section
       aria-label={locale === 'ar' ? 'الصلاة القادمة' : 'Next Prayer'}
@@ -81,17 +94,8 @@ export function NextPrayerCard() {
       <div className="relative flex items-start justify-between gap-4">
         <div>
           <p className="text-sm opacity-80">{formatHijri(now, settings.hijriAdjust)}</p>
-          <p className="text-xs opacity-70">
-            {now.toLocaleDateString(
-              locale === 'ar' ? 'ar-EG' : 'en-US',
-              {
-                weekday: 'long',
-                day: 'numeric',
-                month: 'long',
-                year: 'numeric',
-              },
-            )}
-          </p>
+          {/* ✅ استخدام المتغير الجديد */}
+          <p className="text-xs opacity-70">{formattedGregorianDate}</p>
         </div>
 
         <button

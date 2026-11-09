@@ -9,6 +9,7 @@ import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.media.AudioAttributes;
@@ -32,7 +33,7 @@ public final class NotificationHelper {
 
     // ======================= قنوات الأذان =======================
 
-    public static final String CHANNEL_ID = "adhan_channel_id";
+    public static final String CHANNEL_ID = "adhan_channel_v2";
     public static final String CHANNEL_NAME = "أذان الصلاة";
 
     public static final String PERSISTENT_CHANNEL_ID = "persistent_channel_id";
@@ -42,20 +43,8 @@ public final class NotificationHelper {
 
     public static final String REMINDER_CHANNEL_1 = "reminder_channel_v7_1";
     public static final String REMINDER_CHANNEL_2 = "reminder_channel_v7_2";
-
     public static final String REMINDER_CHANNEL_SILENT_1 = "reminder_channel_v7_silent_1";
     public static final String REMINDER_CHANNEL_SILENT_2 = "reminder_channel_v7_silent_2";
-
-    // قنوات v6 القديمة: تُحذف بعد إنشاء قنوات v7.
-    private static final String OLD_REMINDER_CHANNEL_1 = "reminder_channel_v6_1";
-    private static final String OLD_REMINDER_CHANNEL_2 = "reminder_channel_v6_2";
-    private static final String OLD_REMINDER_CHANNEL_3 = "reminder_channel_v6_3";
-
-    private static final String OLD_REMINDER_CHANNEL_SILENT_1 = "reminder_channel_v6_silent_1";
-    private static final String OLD_REMINDER_CHANNEL_SILENT_2 = "reminder_channel_v6_silent_2";
-    private static final String OLD_REMINDER_CHANNEL_SILENT_3 = "reminder_channel_v6_silent_3";
-
-    public static final String REMINDER_CHANNEL_NAME = "تذكيرات الأذكار والصلاة على النبي";
 
     public static final int NOTIFICATION_ID = 1001;
     public static final int ID_PLAYING = 1002;
@@ -69,7 +58,6 @@ public final class NotificationHelper {
         createNotificationChannel(context);
     }
 
-    // ✅ إضافة SuppressLint لإخفاء خطأ NewApi
     @SuppressLint("NewApi")
     public static void createNotificationChannel(Context context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
@@ -85,6 +73,7 @@ public final class NotificationHelper {
                 NotificationManager.IMPORTANCE_HIGH
         );
         adhanChannel.setDescription("إشعارات الأذان والتذكيرات المهمة");
+        adhanChannel.setSound(null, null);
         adhanChannel.enableVibration(true);
         manager.createNotificationChannel(adhanChannel);
 
@@ -119,20 +108,10 @@ public final class NotificationHelper {
 
         createReminderChannel(manager, REMINDER_CHANNEL_1, "تذكير (صوت 1)", sound1, audioAttributes, true);
         createReminderChannel(manager, REMINDER_CHANNEL_2, "تذكير (صوت 2)", sound2, audioAttributes, true);
-
-        createReminderChannel(manager, REMINDER_CHANNEL_SILENT_1, "تذكير صامت (صوت 1)", sound1, audioAttributes, false);
-        createReminderChannel(manager, REMINDER_CHANNEL_SILENT_2, "تذكير صامت (صوت 2)", sound2, audioAttributes, false);
-
-        // تنظيف القنوات القديمة
-        deleteOldReminderChannel(manager, OLD_REMINDER_CHANNEL_1);
-        deleteOldReminderChannel(manager, OLD_REMINDER_CHANNEL_2);
-        deleteOldReminderChannel(manager, OLD_REMINDER_CHANNEL_3);
-        deleteOldReminderChannel(manager, OLD_REMINDER_CHANNEL_SILENT_1);
-        deleteOldReminderChannel(manager, OLD_REMINDER_CHANNEL_SILENT_2);
-        deleteOldReminderChannel(manager, OLD_REMINDER_CHANNEL_SILENT_3);
+        createReminderChannel(manager, REMINDER_CHANNEL_SILENT_1, "تذكير صامت (صوت 1)", null, audioAttributes, false);
+        createReminderChannel(manager, REMINDER_CHANNEL_SILENT_2, "تذكير صامت (صوت 2)", null, audioAttributes, false);
     }
 
-    // ✅ إضافة SuppressLint للدالة المساعدة أيضاً
     @SuppressLint("NewApi")
     private static void createReminderChannel(
             NotificationManager manager,
@@ -149,7 +128,11 @@ public final class NotificationHelper {
         );
 
         channel.setDescription("نغمة التذكير المختارة");
-        channel.setSound(sound, attributes);
+        if (sound != null) {
+            channel.setSound(sound, attributes);
+        } else {
+            channel.setSound(null, null);
+        }
 
         if (vibrate) {
             channel.enableVibration(true);
@@ -160,19 +143,6 @@ public final class NotificationHelper {
         }
 
         manager.createNotificationChannel(channel);
-    }
-
-    // ✅ إضافة SuppressLint لدالة الحذف
-    @SuppressLint("NewApi")
-    private static void deleteOldReminderChannel(NotificationManager manager, String channelId) {
-        try {
-            NotificationChannel oldChannel = manager.getNotificationChannel(channelId);
-            if (oldChannel != null) {
-                manager.deleteNotificationChannel(channelId);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "تعذر حذف قناة التذكير القديمة: " + channelId, e);
-        }
     }
 
     /* ======================= الإشعار الدائم ======================= */
@@ -207,24 +177,20 @@ public final class NotificationHelper {
                     R.layout.notif_persistent
             );
 
-            try {
-                expandedView.setImageViewBitmap(R.id.notif_logo, getAppIcon(context));
-                expandedView.setImageViewBitmap(R.id.notif_watermark, getAppIcon(context));
-            } catch (Exception e) {
-                Log.e(TAG, "خطأ في تحميل الشعارات داخل الإشعار الدائم", e);
+            Bitmap appIcon = getAppIcon(context);
+            if (appIcon != null) {
+                expandedView.setImageViewBitmap(R.id.notif_logo, appIcon);
+                expandedView.setImageViewBitmap(R.id.notif_watermark, appIcon);
             }
 
-            if (showNext) {
-                expandedView.setTextViewText(R.id.notif_prayer_name, next.name);
-                expandedView.setTextViewText(R.id.notif_prayer_time, formatTime(next.at));
-            } else {
-                expandedView.setTextViewText(R.id.notif_prayer_name, previous.name);
-                expandedView.setTextViewText(R.id.notif_prayer_time, formatTime(previous.at));
-            }
+            PrayerTime target = showNext ? next : previous;
+            expandedView.setTextViewText(R.id.notif_prayer_name, target.name);
+            expandedView.setTextViewText(R.id.notif_prayer_time, formatTime(target.at));
 
-            long targetTime = showNext ? next.at : previous.at;
-            long timeDiff = showNext ? (targetTime - now) : (now - targetTime);
-            long chronometerBase = showNext ? (elapsedRealtime + timeDiff) : (elapsedRealtime - timeDiff);
+            long timeDiff = showNext ? (target.at - now) : (now - target.at);
+            long chronometerBase = showNext
+                    ? (elapsedRealtime + timeDiff)
+                    : (elapsedRealtime - timeDiff);
 
             expandedView.setChronometerCountDown(R.id.notif_chronometer, showNext);
             expandedView.setChronometer(R.id.notif_chronometer, chronometerBase, null, true);
@@ -233,13 +199,15 @@ public final class NotificationHelper {
                 if (next != null && previous != null) {
                     long totalInterval = next.at - previous.at;
                     long elapsed = now - previous.at;
-                    int progress = (int) ((elapsed * 100) / totalInterval);
-                    expandedView.setProgressBar(
-                            R.id.notif_progress_bar,
-                            100,
-                            showNext ? (100 - progress) : progress,
-                            false
-                    );
+                    if (totalInterval > 0) {
+                        int progress = (int) ((elapsed * 100) / totalInterval);
+                        expandedView.setProgressBar(
+                                R.id.notif_progress_bar,
+                                100,
+                                showNext ? (100 - progress) : progress,
+                                false
+                        );
+                    }
                 }
             } catch (Exception e) {
                 Log.e(TAG, "خطأ في شريط التقدم، سيتم تجاهله", e);
@@ -249,7 +217,7 @@ public final class NotificationHelper {
                     .setSmallIcon(R.drawable.ic_stat_adhan)
                     .setContentTitle(title)
                     .setContentText(body)
-                    .setLargeIcon(getAppIcon(context))
+                    .setLargeIcon(appIcon)
                     .setColor(APP_COLOR)
                     .setOngoing(true)
                     .setOnlyAlertOnce(true)
@@ -275,7 +243,7 @@ public final class NotificationHelper {
                 new Intent(context, AdhanReceiver.class)
                         .setAction(AdhanReceiver.ACTION_STOP_ADHAN),
                 PendingIntent.FLAG_UPDATE_CURRENT
-                        | (Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0)
+                        | (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ? PendingIntent.FLAG_IMMUTABLE : 0)
         );
 
         Intent fullScreenIntent = new Intent(context, MainActivity.class);
@@ -296,6 +264,7 @@ public final class NotificationHelper {
                 .setSmallIcon(R.drawable.ic_stat_adhan)
                 .setLargeIcon(getAppIcon(context))
                 .setColor(APP_COLOR)
+                .setSound(null)
                 .setPriority(NotificationCompat.PRIORITY_MAX)
                 .setCategory(NotificationCompat.CATEGORY_ALARM)
                 .setOngoing(true)
@@ -309,10 +278,7 @@ public final class NotificationHelper {
     /* ========================= إشعارات التذكير ========================= */
 
     public static void showReminder(Context context, int id, String title, String body, boolean isSilent) {
-        SharedPreferences prefs = context.getSharedPreferences(
-                PREFS_NAME,
-                Context.MODE_PRIVATE
-        );
+        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
 
         boolean vibrationEnabled = prefs.getBoolean("vibration_enabled", true);
         String soundId = prefs.getString("salawat_sound_id", "1");
@@ -321,12 +287,10 @@ public final class NotificationHelper {
 
         if (isSilent) {
             channelToUse = REMINDER_CHANNEL_SILENT_1;
+        } else if ("2".equals(soundId)) {
+            channelToUse = vibrationEnabled ? REMINDER_CHANNEL_2 : REMINDER_CHANNEL_SILENT_2;
         } else {
-            if (soundId.equals("2")) {
-                channelToUse = vibrationEnabled ? REMINDER_CHANNEL_2 : REMINDER_CHANNEL_SILENT_2;
-            } else {
-                channelToUse = vibrationEnabled ? REMINDER_CHANNEL_1 : REMINDER_CHANNEL_SILENT_1;
-            }
+            channelToUse = vibrationEnabled ? REMINDER_CHANNEL_1 : REMINDER_CHANNEL_SILENT_1;
         }
 
         Notification notification = new NotificationCompat.Builder(context, channelToUse)
@@ -338,6 +302,7 @@ public final class NotificationHelper {
                 .setAutoCancel(true)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setContentIntent(openApp(context, id))
+                .setSound(null)
                 .build();
 
         notifySafely(context, id, notification);
@@ -444,7 +409,7 @@ public final class NotificationHelper {
         return months[month];
     }
 
-    private static android.graphics.Bitmap getAppIcon(Context context) {
+    private static Bitmap getAppIcon(Context context) {
         try {
             return BitmapFactory.decodeResource(
                     context.getResources(),
@@ -473,40 +438,14 @@ public final class NotificationHelper {
     }
 
     public static PendingIntent openApp(Context context, int requestCode) {
-        return createActivityPendingIntent(
-                context,
-                MainActivity.class,
-                requestCode,
-                false
-        );
-    }
-
-    private static PendingIntent createActivityPendingIntent(
-            Context context,
-            Class<?> activityClass,
-            int requestCode,
-            boolean clearTask
-    ) {
-        Intent intent = new Intent(context, activityClass);
-
-        if (clearTask) {
-            intent.setFlags(
-                    Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK
-            );
-        }
+        Intent intent = new Intent(context, MainActivity.class);
 
         int flags = PendingIntent.FLAG_UPDATE_CURRENT;
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             flags |= PendingIntent.FLAG_IMMUTABLE;
         }
 
-        return PendingIntent.getActivity(
-                context,
-                requestCode,
-                intent,
-                flags
-        );
+        return PendingIntent.getActivity(context, requestCode, intent, flags);
     }
 
     private static final class PrayerTime {

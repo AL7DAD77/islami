@@ -31,7 +31,7 @@ import {
 } from '@/lib/bookmarks'
 
 import { cn } from '@/lib/utils'
-import { toArabicNumber } from '@/lib/quran'
+import { useNumberFormat } from '@/lib/numbers'
 import { useQuranPlayer } from '@/lib/quran-player'
 import { useSettings } from '@/lib/settings'
 import { SURAH_INFO } from '@/lib/quran-info'
@@ -100,16 +100,10 @@ const MAX_SCALE = 4
 const DOUBLE_TAP_SCALE = 2
 const SWIPE_THRESHOLD = 45
 
-// حجم مرجعي للقياس فقط
 const REFERENCE_FONT_SIZE = 100
-// نسبة استغلال العرض
 const FIT_PADDING = 0.98
-// أقصى ارتفاع للسطر
-const MAX_ROW_RATIO = 1.6
-// حجم عنوان السورة
 const SURAH_HEADER_RATIO = 0.72
 
-// ألوان المصحف المطبوع
 const PRINT_GREEN = '#4f6b2e'
 const PRINT_GOLD = '#b8924a'
 const PRINT_CREAM = '#fbf6ea'
@@ -266,6 +260,7 @@ export function MushafViewer({
   const searchParams = useSearchParams()
 
   const [settings] = useSettings()
+  const { formatValue } = useNumberFormat()
   const vibrationEnabled = settings.vibrationEnabled
 
   const pageParam = Number(searchParams.get('page'))
@@ -591,12 +586,7 @@ export function MushafViewer({
         widestLine
 
       setFontPx(nextFont)
-      setRowPx(
-        Math.min(
-          availableHeight / pageData.lines.length,
-          nextFont * MAX_ROW_RATIO,
-        ),
-      )
+      setRowPx(availableHeight / pageData.lines.length)
     }
 
     measure()
@@ -1043,17 +1033,6 @@ export function MushafViewer({
     >
       <Qcf4Fonts />
 
-      {/* ✅ إطار زخرفي حول الشاشة - لا يؤثر على النص */}
-      <div
-        className="pointer-events-none absolute inset-0 z-40"
-        style={{
-          border: `2px solid ${printGold}`,
-          boxShadow: `inset 0 0 0 1px ${printGreen}`,
-          margin: '6px',
-          borderRadius: '4px',
-        }}
-      />
-
       {/* الشريط العلوي الثابت بتصميم المصحف المطبوع */}
       <div
         className="flex shrink-0 items-center justify-between px-3 pb-2 relative z-50"
@@ -1066,21 +1045,21 @@ export function MushafViewer({
         }}
       >
         <span className="text-[13px] font-bold">
-          {toArabicNumber(currentSurahIndex + 1)} {surahName}
+          {formatValue(currentSurahIndex + 1)} {surahName}
           {versesCount
-            ? ` (${toArabicNumber(versesCount)})`
+            ? ` (${formatValue(versesCount)})`
             : ''}
         </span>
 
         <span className="text-[13px] font-bold">
-          الجزء {toArabicNumber(currentJuzNumber)}
+          الجزء {formatValue(currentJuzNumber)}
           {currentQuarter
-            ? ` (${toArabicNumber(currentQuarter.quarter)}/${toArabicNumber(4)})`
+            ? ` (${formatValue(currentQuarter.quarter)}/${formatValue(4)})`
             : ''}
         </span>
 
         <span className="text-[13px] font-bold">
-          {toArabicNumber(currentPage)}
+          {formatValue(currentPage)}
         </span>
       </div>
 
@@ -1165,7 +1144,7 @@ export function MushafViewer({
               style={{
                 direction: 'rtl',
                 opacity: isPageMeasured && rowPx ? 1 : 0,
-                transition: 'opacity 200ms ease-out', // ✅ ظهور ناعم لمنع الوميض
+                transition: 'opacity 200ms ease-out',
               }}
             >
               {pageData.lines.map((line, lineIndex) => {
@@ -1211,61 +1190,42 @@ export function MushafViewer({
         ) : null}
       </div>
 
-      {/* الشريط العلوي للتحكم */}
+      {/* الشريط العائم */}
       <header
-        className={`absolute inset-x-0 top-0 z-50 flex items-start justify-between gap-3 p-3 transition-opacity duration-300 pointer-events-auto ${
-          showUi
-            ? 'opacity-100'
-            : 'opacity-0 pointer-events-none'
-        }`}
-        style={{
-          paddingTop:
-            'max(0.75rem, env(safe-area-inset-top))',
-        }}
+        className={cn(
+          'absolute inset-x-0 top-0 z-50 flex items-start justify-between gap-2 p-3 transition-all duration-300 pointer-events-auto',
+          showUi ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'
+        )}
+        style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
       >
-        <div
-          className="flex items-center gap-1 rounded-full border px-2 py-1 shadow-sm backdrop-blur-md"
-          style={{
-            backgroundColor: surface,
-            borderColor: border,
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation()
+            router.back()
           }}
+          className="flex size-10 items-center justify-center rounded-full border shadow-lg backdrop-blur-md transition-transform active:scale-90"
+          style={{ backgroundColor: surface, borderColor: border, color: fg }}
+          aria-label="رجوع"
         >
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation()
-              router.back()
-            }}
-            className="rounded-full p-1.5 transition-opacity active:opacity-60"
-            style={{ color: fg }}
-            aria-label="رجوع"
-          >
-            <ChevronRight className="size-5" />
-          </button>
-        </div>
+          <ChevronRight className="size-5" />
+        </button>
 
         <div
-          className="flex items-center gap-1 rounded-full border px-2 py-1 shadow-sm backdrop-blur-md"
-          style={{
-            backgroundColor: surface,
-            borderColor: border,
-          }}
+          className="flex items-center gap-1 rounded-full border px-2 py-1 shadow-lg backdrop-blur-md"
+          style={{ backgroundColor: surface, borderColor: border }}
         >
           <button
             type="button"
             onClick={handleNightModeToggle}
-            className="rounded-full p-1.5 transition-opacity active:opacity-60"
+            className="flex items-center gap-1.5 rounded-full px-3 py-1.5 transition-colors hover:bg-black/5 active:opacity-60"
             style={{ color: accent }}
-            aria-label={
-              isNightMode ? 'الوضع النهاري' : 'الوضع الليلي'
-            }
           >
-            {isNightMode ? (
-              <Sun className="size-5" />
-            ) : (
-              <Moon className="size-5" />
-            )}
+            {isNightMode ? <Sun className="size-4" /> : <Moon className="size-4" />}
+            <span className="text-xs font-bold">{isNightMode ? 'نهاري' : 'ليلي'}</span>
           </button>
+
+          <div className="h-4 w-px bg-border" />
 
           <button
             type="button"
@@ -1273,62 +1233,54 @@ export function MushafViewer({
               event.stopPropagation()
               router.push('/quran/reciters')
             }}
-            className="flex items-center gap-1 rounded-full px-2 py-1.5 text-[12px] font-bold transition-opacity active:opacity-60"
+            className="flex items-center gap-1.5 rounded-full px-3 py-1.5 transition-colors hover:bg-black/5 active:opacity-60"
             style={{ color: fg }}
           >
             <Headphones className="size-4" />
-            <span>القارئ</span>
+            <span className="text-xs font-bold">القارئ</span>
           </button>
+
+          <div className="h-4 w-px bg-border" />
 
           <button
             type="button"
             onClick={handlePlayToggle}
-            className="rounded-full p-2 shadow-sm transition-opacity active:opacity-70"
-            style={{
-              backgroundColor: primary,
-              color: primaryText,
-            }}
-            aria-label={
-              isCurrentSurahPlaying
-                ? 'إيقاف التلاوة'
-                : 'تشغيل التلاوة'
-            }
+            className="flex items-center gap-1.5 rounded-full px-3 py-1.5 transition-colors active:scale-95"
+            style={{ backgroundColor: primary, color: primaryText }}
           >
             {isCurrentSurahPlaying ? (
-              <Pause className="size-4" fill="currentColor" />
+              <>
+                <Pause className="size-4" fill="currentColor" />
+                <span className="text-xs font-bold">إيقاف</span>
+              </>
             ) : (
-              <Play className="size-4" fill="currentColor" />
+              <>
+                <Play className="size-4" fill="currentColor" />
+                <span className="text-xs font-bold">تشغيل</span>
+              </>
             )}
           </button>
+
+          <div className="h-4 w-px bg-border" />
 
           <button
             type="button"
             onClick={handleBookmark}
-            className="rounded-full p-1.5 transition-opacity active:opacity-60"
-            style={{
-              color: isBookmarkedPage ? accent : fg,
-            }}
-            aria-label="إضافة علامة مرجعية"
+            className="flex items-center justify-center rounded-full p-1.5 transition-colors hover:bg-black/5 active:opacity-60"
+            style={{ color: isBookmarkedPage ? accent : fg }}
           >
-            <Bookmark
-              className="size-5"
-              fill={isBookmarkedPage ? 'currentColor' : 'none'}
-            />
+            <Bookmark className="size-4" fill={isBookmarkedPage ? 'currentColor' : 'none'} />
           </button>
         </div>
       </header>
 
       {/* الشريط السفلي للتنقل */}
       <footer
-        className={`absolute inset-x-0 bottom-4 z-50 flex items-center justify-between px-6 transition-opacity duration-300 pointer-events-auto ${
-          showUi
-            ? 'opacity-100'
-            : 'opacity-0 pointer-events-none'
-        }`}
-        style={{
-          paddingBottom:
-            'max(0.5rem, env(safe-area-inset-bottom))',
-        }}
+        className={cn(
+          'absolute inset-x-0 bottom-4 z-50 flex items-center justify-between px-6 transition-opacity duration-300 pointer-events-auto',
+          showUi ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        )}
+        style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
       >
         <button
           type="button"
@@ -1338,24 +1290,16 @@ export function MushafViewer({
           }}
           disabled={currentPage === 1}
           className="flex size-11 items-center justify-center rounded-full border shadow-lg backdrop-blur-md transition-transform active:scale-90 disabled:opacity-30"
-          style={{
-            backgroundColor: surface,
-            color: fg,
-            borderColor: border,
-          }}
+          style={{ backgroundColor: surface, color: fg, borderColor: border }}
         >
           <ChevronRight className="size-6" />
         </button>
 
         <div
           className="rounded-full border px-5 py-1.5 text-sm font-bold shadow-sm backdrop-blur-md"
-          style={{
-            backgroundColor: surface,
-            borderColor: border,
-            color: fg,
-          }}
+          style={{ backgroundColor: surface, borderColor: border, color: fg }}
         >
-          صفحة {toArabicNumber(currentPage)}
+          صفحة {formatValue(currentPage)}
         </div>
 
         <button
@@ -1366,11 +1310,7 @@ export function MushafViewer({
           }}
           disabled={currentPage === TOTAL_PAGES}
           className="flex size-11 items-center justify-center rounded-full border shadow-lg backdrop-blur-md transition-transform active:scale-90 disabled:opacity-30"
-          style={{
-            backgroundColor: surface,
-            color: fg,
-            borderColor: border,
-          }}
+          style={{ backgroundColor: surface, color: fg, borderColor: border }}
         >
           <ChevronLeft className="size-6" />
         </button>
