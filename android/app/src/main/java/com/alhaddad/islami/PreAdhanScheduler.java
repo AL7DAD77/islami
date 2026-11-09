@@ -7,6 +7,7 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.media.AudioAttributes;
 import android.net.Uri;
 import android.os.Build;
 import android.util.Log;
@@ -28,15 +29,6 @@ import java.util.List;
  * PreAdhanScheduler
  *
  * جدولة تنبيه قبل الأذان بشكل مستقل تماماً.
- *
- * مهم جداً:
- * - لا يعدّل وقت الأذان.
- * - لا يلغي منبه الأذان.
- * - لا يتعامل مع adhan://.
- * - لا يشغّل AdhanService.
- * - لا يؤثر على عدّاد الوقت المتبقي.
- * - يستخدم قناة إشعار منفصلة.
- * - يستخدم URI مستقل: pre_adhan://
  */
 @CapacitorPlugin(name = "PreAdhanScheduler")
 public final class PreAdhanScheduler extends Plugin {
@@ -46,8 +38,9 @@ public final class PreAdhanScheduler extends Plugin {
     public static final String ACTION_PRE_ADHAN_ALARM =
             "com.alhaddad.islami.ACTION_PRE_ADHAN_ALARM";
 
+    // ✅ تم رفع إصدار القناة إلى v2 لتجاوز القناة الصامتة القديمة
     public static final String PRE_ADHAN_CHANNEL_ID =
-            "pre_adhan_channel";
+            "pre_adhan_channel_v2";
 
     private static final String URI_SCHEME = "pre_adhan";
     private static final String URI_HOST = "alarm";
@@ -500,6 +493,7 @@ public final class PreAdhanScheduler extends Plugin {
 
     /* ============================== قناة الإشعار ============================== */
 
+    // ✅ تم تعديل القناة لتشغيل الصوت
     public static void createNotificationChannel(Context context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
             return;
@@ -514,15 +508,28 @@ public final class PreAdhanScheduler extends Plugin {
 
         NotificationChannel channel = new NotificationChannel(
                 PRE_ADHAN_CHANNEL_ID,
-                "تنبيه قبل الأذان",
+                "تنبيه قبل الأذان (صوتي)",
                 NotificationManager.IMPORTANCE_HIGH
         );
 
         channel.setDescription(
-                "تنبيه قبل وقت الأذان دون تشغيل صوت الأذان"
+                "تنبيه صوتي قبل وقت الأذان"
         );
-        channel.setSound(null, null);
-        channel.enableVibration(false);
+
+        // ✅ ربط الصوت المخصص
+        AudioAttributes audioAttributes = new AudioAttributes.Builder()
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                .build();
+
+        Uri soundUri = Uri.parse(
+                android.content.ContentResolver.SCHEME_ANDROID_RESOURCE
+                        + "://" + context.getPackageName()
+                        + "/" + R.raw.prayer_approaching
+        );
+
+        channel.setSound(soundUri, audioAttributes);
+        channel.enableVibration(true);
 
         manager.createNotificationChannel(channel);
     }

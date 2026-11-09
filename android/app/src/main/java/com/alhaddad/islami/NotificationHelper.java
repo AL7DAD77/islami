@@ -1,5 +1,6 @@
 package com.alhaddad.islami;
 
+import android.annotation.SuppressLint;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -30,7 +31,6 @@ public final class NotificationHelper {
     private static final String PREFS_NAME = "IslamiSettings";
 
     // ======================= قنوات الأذان =======================
-    // ⚠️ أكواد مقدسة: لا تغيير في قنوات الأذان أو الإشعار الدائم.
 
     public static final String CHANNEL_ID = "adhan_channel_id";
     public static final String CHANNEL_NAME = "أذان الصلاة";
@@ -42,11 +42,9 @@ public final class NotificationHelper {
 
     public static final String REMINDER_CHANNEL_1 = "reminder_channel_v7_1";
     public static final String REMINDER_CHANNEL_2 = "reminder_channel_v7_2";
-    public static final String REMINDER_CHANNEL_3 = "reminder_channel_v7_3";
 
     public static final String REMINDER_CHANNEL_SILENT_1 = "reminder_channel_v7_silent_1";
     public static final String REMINDER_CHANNEL_SILENT_2 = "reminder_channel_v7_silent_2";
-    public static final String REMINDER_CHANNEL_SILENT_3 = "reminder_channel_v7_silent_3";
 
     // قنوات v6 القديمة: تُحذف بعد إنشاء قنوات v7.
     private static final String OLD_REMINDER_CHANNEL_1 = "reminder_channel_v6_1";
@@ -71,6 +69,8 @@ public final class NotificationHelper {
         createNotificationChannel(context);
     }
 
+    // ✅ إضافة SuppressLint لإخفاء خطأ NewApi
+    @SuppressLint("NewApi")
     public static void createNotificationChannel(Context context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
 
@@ -117,18 +117,13 @@ public final class NotificationHelper {
                         + context.getPackageName() + "/" + R.raw.salawat_voice_2
         );
 
-        Uri sound3 = Uri.parse(
-                ContentResolver.SCHEME_ANDROID_RESOURCE + "://"
-                        + context.getPackageName() + "/" + R.raw.salawat_voice_3
-        );
-
         createReminderChannel(manager, REMINDER_CHANNEL_1, "تذكير (صوت 1)", sound1, audioAttributes, true);
         createReminderChannel(manager, REMINDER_CHANNEL_2, "تذكير (صوت 2)", sound2, audioAttributes, true);
-        createReminderChannel(manager, REMINDER_CHANNEL_3, "تذكير (صوت 3)", sound3, audioAttributes, true);
+
         createReminderChannel(manager, REMINDER_CHANNEL_SILENT_1, "تذكير صامت (صوت 1)", sound1, audioAttributes, false);
         createReminderChannel(manager, REMINDER_CHANNEL_SILENT_2, "تذكير صامت (صوت 2)", sound2, audioAttributes, false);
-        createReminderChannel(manager, REMINDER_CHANNEL_SILENT_3, "تذكير صامت (صوت 3)", sound3, audioAttributes, false);
 
+        // تنظيف القنوات القديمة
         deleteOldReminderChannel(manager, OLD_REMINDER_CHANNEL_1);
         deleteOldReminderChannel(manager, OLD_REMINDER_CHANNEL_2);
         deleteOldReminderChannel(manager, OLD_REMINDER_CHANNEL_3);
@@ -137,6 +132,8 @@ public final class NotificationHelper {
         deleteOldReminderChannel(manager, OLD_REMINDER_CHANNEL_SILENT_3);
     }
 
+    // ✅ إضافة SuppressLint للدالة المساعدة أيضاً
+    @SuppressLint("NewApi")
     private static void createReminderChannel(
             NotificationManager manager,
             String id,
@@ -165,6 +162,8 @@ public final class NotificationHelper {
         manager.createNotificationChannel(channel);
     }
 
+    // ✅ إضافة SuppressLint لدالة الحذف
+    @SuppressLint("NewApi")
     private static void deleteOldReminderChannel(NotificationManager manager, String channelId) {
         try {
             NotificationChannel oldChannel = manager.getNotificationChannel(channelId);
@@ -309,7 +308,6 @@ public final class NotificationHelper {
 
     /* ========================= إشعارات التذكير ========================= */
 
-    // ✅ تمت إضافة isSilent
     public static void showReminder(Context context, int id, String title, String body, boolean isSilent) {
         SharedPreferences prefs = context.getSharedPreferences(
                 PREFS_NAME,
@@ -322,14 +320,10 @@ public final class NotificationHelper {
         String channelToUse;
 
         if (isSilent) {
-            // ✅ إذا كان التذكير صامتاً، نستخدم القناة الصامتة مباشرة
             channelToUse = REMINDER_CHANNEL_SILENT_1;
         } else {
-            // ✅ إذا كان التذكير صوتياً (الصلاة على النبي)
             if (soundId.equals("2")) {
                 channelToUse = vibrationEnabled ? REMINDER_CHANNEL_2 : REMINDER_CHANNEL_SILENT_2;
-            } else if (soundId.equals("3")) {
-                channelToUse = vibrationEnabled ? REMINDER_CHANNEL_3 : REMINDER_CHANNEL_SILENT_3;
             } else {
                 channelToUse = vibrationEnabled ? REMINDER_CHANNEL_1 : REMINDER_CHANNEL_SILENT_1;
             }

@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -29,6 +30,7 @@ import {
   useBookmarkState,
 } from '@/lib/bookmarks'
 
+import { cn } from '@/lib/utils'
 import { toArabicNumber } from '@/lib/quran'
 import { useQuranPlayer } from '@/lib/quran-player'
 import { useSettings } from '@/lib/settings'
@@ -98,17 +100,19 @@ const MAX_SCALE = 4
 const DOUBLE_TAP_SCALE = 2
 const SWIPE_THRESHOLD = 45
 
+// حجم مرجعي للقياس فقط
 const REFERENCE_FONT_SIZE = 100
-// 🛡️ حاجز أمان بنسبة 2% لمنع التصاق النص بالحواف
+// نسبة استغلال العرض
 const FIT_PADDING = 0.98
+// أقصى ارتفاع للسطر
+const MAX_ROW_RATIO = 1.6
+// حجم عنوان السورة
+const SURAH_HEADER_RATIO = 0.72
 
-// ارتفاع كل سطر نصي = حجم الخط × هذه النسبة.
-// زد القيمة لتباعد الأسطر أكثر (يحمي التنوين من التداخل مع السطر الأعلى).
-// جرّب: 1.4 أو 1.5 أو 1.6
-const LINE_HEIGHT_RATIO = 1.45
-
-const TEXT_THIN_STROKE = 0.3
-const HEADER_THIN_STROKE = 0
+// ألوان المصحف المطبوع
+const PRINT_GREEN = '#4f6b2e'
+const PRINT_GOLD = '#b8924a'
+const PRINT_CREAM = '#fbf6ea'
 
 const META_URL = '/mushaf/meta.json'
 const PAGES_URL = '/mushaf-qcf4/pages'
@@ -158,6 +162,53 @@ function glyphOf(word: Word): string {
   }
 
   return String.fromCodePoint(word.code)
+}
+
+function renderLineContent(
+  line: Line,
+  size: number,
+  color: string,
+) {
+  const isSingleGlyphLine =
+    isHeaderLine(line) || isBismillahLine(line)
+
+  const baseStyle = {
+    fontSize: `${size}px`,
+    lineHeight: 1,
+    whiteSpace: 'nowrap' as const,
+    color,
+    fontSynthesis: 'none' as const,
+  }
+
+  if (isSingleGlyphLine) {
+    const glyphSize = isHeaderLine(line)
+      ? size * SURAH_HEADER_RATIO
+      : size
+
+    return (
+      <span
+        style={{
+          ...baseStyle,
+          fontSize: `${glyphSize}px`,
+          fontFamily: 'QCF4_QBSML',
+        }}
+      >
+        {glyphOf(line.words[0])}
+      </span>
+    )
+  }
+
+  return line.words.map((word, wordIndex) =>
+    word.type === 'quarter' ? null : (
+      <span
+        key={wordIndex}
+        title={word.text}
+        style={{ ...baseStyle, fontFamily: fontOf(word) }}
+      >
+        {glyphOf(word)}
+      </span>
+    ),
+  )
 }
 
 function Qcf4Fonts() {
@@ -240,23 +291,22 @@ export function MushafViewer({
   const [hasError, setHasError] = useState(false)
   const [isNightMode, setIsNightMode] = useState(false)
 
-  const [pageScale, setPageScale] = useState(1)
+  const [fontPx, setFontPx] = useState(REFERENCE_FONT_SIZE)
+  const [rowPx, setRowPx] = useState<number | undefined>(
+    undefined,
+  )
   const [isPageMeasured, setIsPageMeasured] = useState(false)
 
   const [showUi, setShowUi] = useState(true)
-  const [pageInfoToast, setPageInfoToast] = useState<
-    string | null
-  >(null)
 
   const uiTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const pageInfoTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const [userScale, setUserScale] = useState(MIN_SCALE)
   const [pan, setPan] = useState<Point>({ x: 0, y: 0 })
 
   const containerRef = useRef<HTMLDivElement | null>(null)
-  const pageWrapperRef = useRef<HTMLDivElement | null>(null)
-  const pageContentRef = useRef<HTMLDivElement | null>(null)
+  const pageBoxRef = useRef<HTMLDivElement | null>(null)
+  const measureRef = useRef<HTMLDivElement | null>(null)
 
   const pointerStartRef = useRef<Point | null>(null)
   const pinchStartRef = useRef<PinchState | null>(null)
@@ -431,7 +481,7 @@ export function MushafViewer({
     setIsPageLoading(true)
     setHasError(false)
     setIsPageMeasured(false)
-    setPageScale(1)
+    setRowPx(undefined)
 
     const paddedPage = String(currentPage).padStart(3, '0')
 
@@ -505,80 +555,61 @@ export function MushafViewer({
     }
   }, [pageData])
 
-  // قياس الصفحة الفعلي ثم تحجيمها لملء الشاشة
-  useEffect(() => {
-    if (!isPageMeasured) return
-    if (!pageWrapperRef.current) return
-    if (!pageContentRef.current) return
+  // قياس بدون transform
+  useLayoutEffect(() => {
+    if (!isPageMeasured || !pageData) return
 
-    const wrapper = pageWrapperRef.current
-    const content = pageContentRef.current
+    const measure = () => {
+      const box = pageBoxRef.current
+      const ruler = measureRef.current
 
-    const measurePage = () => {
-      const availableWidth = wrapper.clientWidth
-      const availableHeight = wrapper.clientHeight
+      if (!box || !ruler) return
 
-      const contentWidth = content.offsetWidth
-      const contentHeight = content.offsetHeight
+      const availableWidth = box.clientWidth
+      const availableHeight = box.clientHeight
+
+      let widestLine = 0
+
+      ruler
+        .querySelectorAll<HTMLElement>('[data-row]')
+        .forEach((row) => {
+          widestLine = Math.max(widestLine, row.offsetWidth)
+        })
 
       if (
         availableWidth <= 0 ||
         availableHeight <= 0 ||
-        contentWidth <= 0 ||
-        contentHeight <= 0
+        widestLine <= 0
       ) {
         return
       }
 
-      const widthScale =
-        (availableWidth * FIT_PADDING) / contentWidth
+      const nextFont =
+        (REFERENCE_FONT_SIZE *
+          availableWidth *
+          FIT_PADDING) /
+        widestLine
 
-      const heightScale =
-        (availableHeight * FIT_PADDING) / contentHeight
-
-      // أصغر النسبتين: لا تُقص الحواف الجانبية أبداً،
-      // والتحجيم موحد لكل الصفحة فلا تتحرك الكلمات أو التنوين
-      const nextScale = Math.min(widthScale, heightScale)
-
-      if (
-        !Number.isFinite(nextScale) ||
-        nextScale <= 0
-      ) {
-        return
-      }
-
-      setPageScale(nextScale)
+      setFontPx(nextFont)
+      setRowPx(
+        Math.min(
+          availableHeight / pageData.lines.length,
+          nextFont * MAX_ROW_RATIO,
+        ),
+      )
     }
 
-    const firstFrame = requestAnimationFrame(() => {
-      measurePage()
+    measure()
 
-      const secondFrame = requestAnimationFrame(() => {
-        measurePage()
-      })
+    const observer = new ResizeObserver(measure)
 
-      return () =>
-        cancelAnimationFrame(secondFrame)
-    })
-
-    const observer = new ResizeObserver(() => {
-      measurePage()
-    })
-
-    observer.observe(wrapper)
-    observer.observe(content)
-
-    return () => {
-      cancelAnimationFrame(firstFrame)
-      observer.disconnect()
+    if (pageBoxRef.current) {
+      observer.observe(pageBoxRef.current)
     }
-  }, [
-    isPageMeasured,
-    currentPage,
-    pageData,
-  ])
 
-  // إخفاء واجهة التحكم تلقائياً
+    return () => observer.disconnect()
+  }, [isPageMeasured, pageData])
+
   const resetUiTimeout = useCallback(() => {
     if (uiTimeoutRef.current) {
       clearTimeout(uiTimeoutRef.current)
@@ -620,7 +651,6 @@ export function MushafViewer({
     [resetUiTimeout],
   )
 
-  // الوضع الليلي
   useEffect(() => {
     const savedMode = localStorage.getItem(NIGHT_MODE_KEY)
 
@@ -637,7 +667,6 @@ export function MushafViewer({
     }
   }, [])
 
-  // إعادة ضبط التكبير عند تغيير الصفحة
   useEffect(() => {
     setUserScale(MIN_SCALE)
     setPan({ x: 0, y: 0 })
@@ -645,7 +674,6 @@ export function MushafViewer({
     resetUiTimeout()
   }, [currentPage, resetUiTimeout])
 
-  // حفظ موضع القراءة
   useEffect(() => {
     if (!currentPage || !metaData) return
 
@@ -655,40 +683,6 @@ export function MushafViewer({
       currentPage,
     )
   }, [currentPage, initialSurah, metaData, surahName])
-
-  // إظهار معلومات الجزء والربع عند تغيير الصفحة
-  useEffect(() => {
-    if (!metaData) return
-
-    const parts: string[] = []
-
-    parts.push(`الجزء ${currentJuzNumber}`)
-
-    if (currentQuarter) {
-      parts.push(`ربع الحزب ${currentQuarter.quarter}`)
-    }
-
-    setPageInfoToast(parts.join(' • '))
-
-    if (pageInfoTimeoutRef.current) {
-      clearTimeout(pageInfoTimeoutRef.current)
-    }
-
-    pageInfoTimeoutRef.current = setTimeout(() => {
-      setPageInfoToast(null)
-    }, 1800)
-
-    return () => {
-      if (pageInfoTimeoutRef.current) {
-        clearTimeout(pageInfoTimeoutRef.current)
-      }
-    }
-  }, [
-    currentPage,
-    metaData,
-    currentJuzNumber,
-    currentQuarter,
-  ])
 
   const handlePreviousPage = useCallback(() => {
     setCurrentPage((previous) => {
@@ -723,16 +717,11 @@ export function MushafViewer({
       const rect = container.getBoundingClientRect()
 
       const overflowX =
-        Math.max(
-          0,
-          rect.width * nextScale - rect.width,
-        ) / 2
+        Math.max(0, rect.width * nextScale - rect.width) / 2
 
       const overflowY =
-        Math.max(
-          0,
-          rect.height * nextScale - rect.height,
-        ) / 2
+        Math.max(0, rect.height * nextScale - rect.height) /
+        2
 
       return {
         x: Math.min(
@@ -794,8 +783,7 @@ export function MushafViewer({
 
         const nextScale = Math.min(
           Math.max(
-            pinchStartRef.current.scale *
-              distanceRatio,
+            pinchStartRef.current.scale * distanceRatio,
             MIN_SCALE,
           ),
           MAX_SCALE,
@@ -851,15 +839,11 @@ export function MushafViewer({
         pointerStartRef.current
       ) {
         const startX = pointerStartRef.current.x
-        const endX =
-          event.changedTouches[0].clientX
+        const endX = event.changedTouches[0].clientX
 
         const swipeDistance = startX - endX
 
-        if (
-          Math.abs(swipeDistance) >
-          SWIPE_THRESHOLD
-        ) {
+        if (Math.abs(swipeDistance) > SWIPE_THRESHOLD) {
           if (swipeDistance > 0) {
             handlePreviousPage()
           } else {
@@ -871,11 +855,7 @@ export function MushafViewer({
       pointerStartRef.current = null
       pinchStartRef.current = null
     },
-    [
-      handleNextPage,
-      handlePreviousPage,
-      userScale,
-    ],
+    [handleNextPage, handlePreviousPage, userScale],
   )
 
   const handleDoubleClick = useCallback(() => {
@@ -913,8 +893,7 @@ export function MushafViewer({
 
       try {
         server =
-          localStorage.getItem(RECITER_SERVER_KEY) ||
-          server
+          localStorage.getItem(RECITER_SERVER_KEY) || server
 
         reciterName =
           localStorage.getItem(RECITER_NAME_KEY) ||
@@ -985,10 +964,7 @@ export function MushafViewer({
       setIsNightMode((previous) => {
         const next = !previous
 
-        localStorage.setItem(
-          NIGHT_MODE_KEY,
-          String(next),
-        )
+        localStorage.setItem(NIGHT_MODE_KEY, String(next))
 
         return next
       })
@@ -1003,28 +979,29 @@ export function MushafViewer({
   )
 
   const isCurrentSurahPlaying =
-    player.playing &&
-    player.surah === initialSurah
+    player.playing && player.surah === initialSurah
 
   const surface = isNightMode
     ? 'rgba(24, 24, 27, 0.88)'
     : 'rgba(255, 255, 255, 0.88)'
 
- const bg = isNightMode ? '#101010' : '#fdfbf7'
-const fg = isNightMode ? '#f4f4f5' : '#06140f'
+  const bg = isNightMode ? '#101010' : '#fdfbf7'
+  const fg = isNightMode ? '#f4f4f5' : '#06140f'
   const border = isNightMode
     ? 'rgba(63, 63, 70, 0.7)'
     : '#e8dccb'
 
   const accent = '#d4af37'
 
-  const primary = isNightMode
-    ? '#d4af37'
-    : '#0a1f1a'
+  const primary = isNightMode ? '#d4af37' : '#0a1f1a'
 
-  const primaryText = isNightMode
-    ? '#101010'
-    : '#fdfbf7'
+  const primaryText = isNightMode ? '#101010' : '#fdfbf7'
+
+  const printGreen = isNightMode ? '#d4af37' : PRINT_GREEN
+  const printGold = isNightMode ? '#8a7030' : PRINT_GOLD
+  const headerFrameBg = isNightMode ? '#16161a' : PRINT_CREAM
+
+  const versesCount = currentSurahInfo?.verses
 
   if (isLoading || !metaData) {
     return (
@@ -1053,7 +1030,7 @@ const fg = isNightMode ? '#f4f4f5' : '#06140f'
   return (
     <div
       dir="rtl"
-      className="mushaf-root relative h-dvh w-full select-none overflow-hidden"
+      className="mushaf-root relative flex h-dvh w-full select-none flex-col overflow-hidden"
       style={{
         backgroundColor: bg,
         color: fg,
@@ -1066,10 +1043,51 @@ const fg = isNightMode ? '#f4f4f5' : '#06140f'
     >
       <Qcf4Fonts />
 
-      {/* حاوية التكبير بالإصبع */}
+      {/* ✅ إطار زخرفي حول الشاشة - لا يؤثر على النص */}
+      <div
+        className="pointer-events-none absolute inset-0 z-40"
+        style={{
+          border: `2px solid ${printGold}`,
+          boxShadow: `inset 0 0 0 1px ${printGreen}`,
+          margin: '6px',
+          borderRadius: '4px',
+        }}
+      />
+
+      {/* الشريط العلوي الثابت بتصميم المصحف المطبوع */}
+      <div
+        className="flex shrink-0 items-center justify-between px-3 pb-2 relative z-50"
+        style={{
+          paddingTop:
+            'calc(env(safe-area-inset-top, 0px) + 8px)',
+          color: printGreen,
+          borderBottom: `1px solid ${printGold}`,
+          backgroundColor: bg,
+        }}
+      >
+        <span className="text-[13px] font-bold">
+          {toArabicNumber(currentSurahIndex + 1)} {surahName}
+          {versesCount
+            ? ` (${toArabicNumber(versesCount)})`
+            : ''}
+        </span>
+
+        <span className="text-[13px] font-bold">
+          الجزء {toArabicNumber(currentJuzNumber)}
+          {currentQuarter
+            ? ` (${toArabicNumber(currentQuarter.quarter)}/${toArabicNumber(4)})`
+            : ''}
+        </span>
+
+        <span className="text-[13px] font-bold">
+          {toArabicNumber(currentPage)}
+        </span>
+      </div>
+
+      {/* منطقة الصفحة */}
       <div
         ref={containerRef}
-        className="absolute inset-0 flex items-center justify-center"
+        className="relative min-h-0 flex-1"
         style={{
           transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${userScale})`,
           transformOrigin: 'center center',
@@ -1079,18 +1097,17 @@ const fg = isNightMode ? '#f4f4f5' : '#06140f'
               : 'transform 60ms linear',
         }}
       >
-        {(isPageLoading || !isPageMeasured) &&
-          !hasError && (
-            <div className="absolute inset-0 z-10 flex items-center justify-center">
-              <Loader2
-                className="size-7 animate-spin"
-                style={{ color: fg }}
-              />
-            </div>
-          )}
+        {(isPageLoading || !isPageMeasured) && !hasError && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center">
+            <Loader2
+              className="size-7 animate-spin"
+              style={{ color: fg }}
+            />
+          </div>
+        )}
 
         {hasError ? (
-          <div className="flex flex-col items-center gap-4 px-8 text-center">
+          <div className="flex h-full flex-col items-center justify-center gap-4 px-8 text-center">
             <p
               className="text-lg font-semibold"
               style={{ color: fg }}
@@ -1114,105 +1131,77 @@ const fg = isNightMode ? '#f4f4f5' : '#06140f'
             </button>
           </div>
         ) : pageData ? (
-          // المساحة المتاحة للصفحة (بدون هوامش جانبية، والهوامش العلوية والسفلية للأجهزة فقط)
           <div
-            ref={pageWrapperRef}
-            className="relative flex h-full w-full items-center justify-center overflow-hidden"
-            style={{
-              paddingTop: 'env(safe-area-inset-top, 0px)',
-              paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-              paddingLeft: '0px',
-              paddingRight: '0px',
-            }}
+            ref={pageBoxRef}
+            className="relative h-full w-full overflow-hidden px-1"
             onDoubleClick={handleDoubleClick}
           >
-            {/* الصفحة بحجمها الطبيعي قبل التحجيم */}
+            {/* قياس مخفي */}
             <div
-              ref={pageContentRef}
-              className="flex flex-col"
+              ref={measureRef}
+              aria-hidden
+              className="pointer-events-none invisible absolute left-0 top-0"
+              style={{ direction: 'rtl' }}
+            >
+              {pageData.lines.map((line, lineIndex) => (
+                <div
+                  key={lineIndex}
+                  data-row
+                  className="flex"
+                  style={{ width: 'max-content' }}
+                >
+                  {renderLineContent(
+                    line,
+                    REFERENCE_FONT_SIZE,
+                    fg,
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* الصفحة الفعلية */}
+            <div
+              className="flex h-full w-full flex-col justify-center"
               style={{
                 direction: 'rtl',
-                width: 'max-content',
-                transform: `scale(${pageScale})`,
-                transformOrigin: 'center center',
-                opacity: isPageMeasured ? 1 : 0,
-                transition: 'opacity 120ms ease-out',
+                opacity: isPageMeasured && rowPx ? 1 : 0,
+                transition: 'opacity 200ms ease-out', // ✅ ظهور ناعم لمنع الوميض
               }}
             >
               {pageData.lines.map((line, lineIndex) => {
                 const isHeader = isHeaderLine(line)
-                const isBismillah =
-                  isBismillahLine(line)
-
-                if (isHeader || isBismillah) {
-                  return (
-                    <div
-                      key={lineIndex}
-                      className="flex items-center justify-center"
-                      style={{
-                        width: '100%',
-                        height:
-                          REFERENCE_FONT_SIZE *
-                          (isHeader ? 1.15 : 0.8),
-                      }}
-                    >
-                      <span
-                        style={{
-                          fontFamily: 'QCF4_QBSML',
-                          fontSize: `${REFERENCE_FONT_SIZE}px`,
-                          lineHeight: 1,
-                          whiteSpace: 'nowrap',
-                          color: fg,
-                          fontSynthesis: 'none',
-                          WebkitTextStroke: `${HEADER_THIN_STROKE}px ${bg}`,
-                        }}
-                      >
-                        {glyphOf(line.words[0])}
-                      </span>
-                    </div>
-                  )
-                }
+                const centered =
+                  isHeader || isBismillahLine(line)
 
                 return (
                   <div
                     key={lineIndex}
-                    className="flex items-center justify-between"
+                    className={cn(
+                      'flex items-center',
+                      centered
+                        ? 'justify-center'
+                        : 'justify-between',
+                    )}
                     style={{
                       direction: 'rtl',
                       width: '100%',
-                      height:
-                        REFERENCE_FONT_SIZE *
-                        LINE_HEIGHT_RATIO,
-                      overflow: 'visible',
+                      height: rowPx,
                     }}
                   >
-                    {line.words.map(
-                      (word, wordIndex) => {
-                        // إخفاء علامة ربع الحزب من النص
-                        if (
-                          word.type === 'quarter'
-                        ) {
-                          return null
-                        }
-
-                        return (
-                          <span
-                            key={wordIndex}
-                            style={{
-                              fontFamily: fontOf(word),
-                              fontSize: `${REFERENCE_FONT_SIZE}px`,
-                              lineHeight: 1,
-                              whiteSpace: 'nowrap',
-                              color: fg,
-                              fontSynthesis: 'none',
-                              WebkitTextStroke: `${TEXT_THIN_STROKE}px ${bg}`,
-                            }}
-                            title={word.text}
-                          >
-                            {glyphOf(word)}
-                          </span>
-                        )
-                      },
+                    {isHeader ? (
+                      <div
+                        className="flex h-full w-[96%] items-center justify-center rounded-md"
+                        style={{
+                          border: `3px double ${printGold}`,
+                          boxShadow: `inset 0 0 0 1px ${printGreen}`,
+                          backgroundColor: headerFrameBg,
+                          padding: '0 8px',
+                        }}
+                      >
+                        {renderLineContent(line, fontPx, printGreen)}
+                      </div>
+                    ) : (
+                      renderLineContent(line, fontPx, fg)
                     )}
                   </div>
                 )
@@ -1222,21 +1211,7 @@ const fg = isNightMode ? '#f4f4f5' : '#06140f'
         ) : null}
       </div>
 
-      {/* Toast معلومات الصفحة */}
-      {pageInfoToast && (
-        <div
-          className="pointer-events-none absolute left-1/2 top-20 z-50 -translate-x-1/2 rounded-full border px-4 py-1.5 text-xs font-bold shadow-lg backdrop-blur-md transition-opacity duration-300"
-          style={{
-            backgroundColor: surface,
-            borderColor: border,
-            color: fg,
-          }}
-        >
-          {pageInfoToast}
-        </div>
-      )}
-
-      {/* الشريط العلوي */}
+      {/* الشريط العلوي للتحكم */}
       <header
         className={`absolute inset-x-0 top-0 z-50 flex items-start justify-between gap-3 p-3 transition-opacity duration-300 pointer-events-auto ${
           showUi
@@ -1267,25 +1242,6 @@ const fg = isNightMode ? '#f4f4f5' : '#06140f'
           >
             <ChevronRight className="size-5" />
           </button>
-
-          <div className="flex flex-col leading-tight">
-            <span
-              className="pl-1 pr-2 text-sm font-bold"
-              style={{ color: fg }}
-            >
-              {surahName}
-            </span>
-
-            {currentSurahInfo && (
-              <span
-                className="pl-1 pr-2 text-[10px] opacity-70"
-                style={{ color: fg }}
-              >
-                {currentSurahInfo.place} •{' '}
-                {currentSurahInfo.verses} آية
-              </span>
-            )}
-          </div>
         </div>
 
         <div
@@ -1301,9 +1257,7 @@ const fg = isNightMode ? '#f4f4f5' : '#06140f'
             className="rounded-full p-1.5 transition-opacity active:opacity-60"
             style={{ color: accent }}
             aria-label={
-              isNightMode
-                ? 'الوضع النهاري'
-                : 'الوضع الليلي'
+              isNightMode ? 'الوضع النهاري' : 'الوضع الليلي'
             }
           >
             {isNightMode ? (
@@ -1341,15 +1295,9 @@ const fg = isNightMode ? '#f4f4f5' : '#06140f'
             }
           >
             {isCurrentSurahPlaying ? (
-              <Pause
-                className="size-4"
-                fill="currentColor"
-              />
+              <Pause className="size-4" fill="currentColor" />
             ) : (
-              <Play
-                className="size-4"
-                fill="currentColor"
-              />
+              <Play className="size-4" fill="currentColor" />
             )}
           </button>
 
@@ -1358,25 +1306,19 @@ const fg = isNightMode ? '#f4f4f5' : '#06140f'
             onClick={handleBookmark}
             className="rounded-full p-1.5 transition-opacity active:opacity-60"
             style={{
-              color: isBookmarkedPage
-                ? accent
-                : fg,
+              color: isBookmarkedPage ? accent : fg,
             }}
             aria-label="إضافة علامة مرجعية"
           >
             <Bookmark
               className="size-5"
-              fill={
-                isBookmarkedPage
-                  ? 'currentColor'
-                  : 'none'
-              }
+              fill={isBookmarkedPage ? 'currentColor' : 'none'}
             />
           </button>
         </div>
       </header>
 
-      {/* الشريط السفلي */}
+      {/* الشريط السفلي للتنقل */}
       <footer
         className={`absolute inset-x-0 bottom-4 z-50 flex items-center justify-between px-6 transition-opacity duration-300 pointer-events-auto ${
           showUi

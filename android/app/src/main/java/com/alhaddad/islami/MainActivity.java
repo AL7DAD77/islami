@@ -10,22 +10,28 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import com.getcapacitor.BridgeActivity;
+import com.getcapacitor.JSObject;
+import com.getcapacitor.Plugin;
+import com.getcapacitor.PluginCall;
+import com.getcapacitor.PluginMethod;
+import com.getcapacitor.annotation.CapacitorPlugin;
 
 public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
 
-        // 1. تسجيل الإضافات قبل super.onCreate - ضروري جداً
+        // 1. تسجيل الإضافات قبل super.onCreate
         registerPlugin(AdhanSchedulerPlugin.class);
         registerPlugin(QuranPlayerPlugin.class);
         registerPlugin(SystemSettingsPlugin.class);
         registerPlugin(PreAdhanScheduler.class);
+        registerPlugin(AppExitPlugin.class); // ✅ تسجيل إضافة الخروج
 
         // 2. تشغيل Capacitor
         super.onCreate(savedInstanceState);
 
-        // ✅ 3. توجيه أزرار الصوت الجانبية للتحكم في صوت الأذان (Alarm)
+        // 3. توجيه أزرار الصوت الجانبية للتحكم في صوت الأذان (Alarm)
         setVolumeControlStream(AudioManager.STREAM_ALARM);
 
         // 4. إنشاء قنوات الإشعارات
@@ -58,12 +64,22 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onBackPressed() {
         if (getBridge() != null) {
-            // نرسل حدث "backButton" إلى JavaScript
-            // React سيقرر: هل يرجع صفحة داخلية؟ أم يغلق التطبيق؟
+            // نرسل الحدث إلى React، ليقرر هو ماذا يفعل
             getBridge().triggerJSEvent("backButton", "window");
         } else {
-            // إذا لم يكن هناك جسر، اخرج من التطبيق
-            super.onBackPressed();
+            // احتياطي: نقل التطبيق للخلفية بدلاً من إغلاقه
+            moveTaskToBack(true);
+        }
+    }
+
+    // ✅ 8. إضافة برمجية صغيرة للسماح لـ React بنقل التطبيق للخلفية
+    @CapacitorPlugin(name = "AppExit")
+    public static class AppExitPlugin extends Plugin {
+        @PluginMethod
+        public void exit(PluginCall call) {
+            // moveTaskToBack(true) ينقل التطبيق للخلفية دون قتله
+            getActivity().moveTaskToBack(true);
+            call.resolve(new JSObject());
         }
     }
 }

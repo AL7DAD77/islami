@@ -60,16 +60,18 @@
 
         </activity>
 
-        <!-- خدمة الأذان -->
+        <!-- ✅ خدمة الأذان (تمت إضافة stopWithTask="false" لكي لا تتوقف عند سحب التطبيق) -->
         <service
             android:name=".AdhanService"
             android:exported="false"
+            android:stopWithTask="false"
             android:foregroundServiceType="mediaPlayback" />
 
-        <!-- خدمة تشغيل القرآن -->
+        <!-- ✅ خدمة تشغيل القرآن (تمت إضافة stopWithTask="false" لكي لا يتوقف الصوت) -->
         <service
             android:name=".QuranPlaybackService"
             android:exported="false"
+            android:stopWithTask="false"
             android:foregroundServiceType="mediaPlayback">
             <intent-filter>
                 <action android:name="androidx.media3.session.MediaSessionService" />

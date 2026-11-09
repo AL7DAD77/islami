@@ -2,6 +2,7 @@ package com.alhaddad.islami;
 
 import android.app.Notification;
 import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -23,18 +24,31 @@ public class PreAdhanReceiver extends BroadcastReceiver {
         if (title == null) title = "تنبيه قبل الأذان";
         if (body == null) body = "";
 
+        // ✅ التأكد من إنشاء القناة الجديدة (الصوتية)
         PreAdhanScheduler.createNotificationChannel(context);
+
+        // ✅ إضافة Intent لفتح التطبيق عند الضغط على الإشعار
+        Intent openIntent = new Intent(context, MainActivity.class);
+        openIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        PendingIntent contentIntent = PendingIntent.getActivity(
+                context,
+                id,
+                openIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+        );
 
         Notification notification = new NotificationCompat.Builder(
                 context,
                 PreAdhanScheduler.PRE_ADHAN_CHANNEL_ID
         )
-                .setSmallIcon(android.R.drawable.ic_popup_reminder)
+                // ✅ استخدام أيقونة التطبيق بدلاً من أيقونة النظام
+                .setSmallIcon(R.drawable.ic_stat_adhan)
                 .setContentTitle(title)
                 .setContentText(body)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setAutoCancel(true)
-                .setSound(null)
+                .setContentIntent(contentIntent) // ✅ فتح التطبيق عند الضغط
+                // ✅ إزالة setSound(null) للسماح للقناة بالصوت
                 .build();
 
         NotificationManager manager =

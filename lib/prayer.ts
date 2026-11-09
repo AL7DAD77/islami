@@ -171,11 +171,13 @@ export function getQiblaDirection(lat: number, lng: number) {
   return Qibla(new Coordinates(lat, lng))
 }
 
+// ✅ تعديل دالة الوقت لتعيد الأرقام الإنجليزية دائماً (ليتم تحويلها لاحقاً)
 export function formatTime(d: Date) {
-  return d.toLocaleTimeString('ar-EG', {
+  return d.toLocaleTimeString('en-US', {
     hour: 'numeric',
     minute: '2-digit',
-  })
+    hour12: true,
+  }).replace('AM', 'ص').replace('PM', 'م')
 }
 
 export function formatCountdown(ms: number) {

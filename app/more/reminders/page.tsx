@@ -13,6 +13,8 @@ import {
   AlertTriangle,
   Bell,
   BellOff,
+  Settings2, // ✅ أيقونة التخصيص
+  ArrowRight, // ✅ أيقونة الرجوع
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Capacitor, registerPlugin } from '@capacitor/core'
@@ -62,11 +64,21 @@ export default function RemindersPage() {
 
   const [exactAlarmAllowed, setExactAlarmAllowed] = useState(true)
 
+  // حالات التذكيرات الأساسية
   const [salawatEnabled, setSalawatEnabled] = useState(false)
   const [salawatInterval, setSalawatInterval] = useState(60)
 
   const [adhkarEnabled, setAdhkarEnabled] = useState(false)
   const [adhkarInterval, setAdhkarInterval] = useState(180)
+
+  // ✅ حالات التخصيص (المفقودة)
+  const [showCustomSalawat, setShowCustomSalawat] = useState(false)
+  const [customSalawatValue, setCustomSalawatValue] = useState('')
+  const [customSalawatUnit, setCustomSalawatUnit] = useState<'min' | 'hr'>('min')
+
+  const [showCustomAdhkar, setShowCustomAdhkar] = useState(false)
+  const [customAdhkarValue, setCustomAdhkarValue] = useState('')
+  const [customAdhkarUnit, setCustomAdhkarUnit] = useState<'min' | 'hr'>('min')
 
   useEffect(() => {
     if (!hydrated) return
@@ -110,6 +122,7 @@ export default function RemindersPage() {
 
   // 💾 حفظ تذكير الصلاة على النبي (صوتي)
   const saveSalawatReminder = async (intervalMinutes: number) => {
+    if (intervalMinutes <= 0) return
     setIsSaving('salawat')
 
     try {
@@ -118,10 +131,7 @@ export default function RemindersPage() {
       setSalawatEnabled(true)
       setSalawatInterval(intervalMinutes)
 
-      if (
-        Capacitor.getPlatform() === 'android' &&
-        AdhanScheduler
-      ) {
+      if (Capacitor.getPlatform() === 'android' && AdhanScheduler) {
         const intervalMillis = intervalMinutes * 60 * 1000
         await AdhanScheduler.scheduleReminder({
           id: REMINDER_ID_SALAWAT,
@@ -135,11 +145,13 @@ export default function RemindersPage() {
       console.log('Schedule salawat error', e)
     } finally {
       setIsSaving(null)
+      setShowCustomSalawat(false)
     }
   }
 
   // 💾 حفظ تذكير الأذكار (صامت)
   const saveAdhkarReminder = async (intervalMinutes: number) => {
+    if (intervalMinutes <= 0) return
     setIsSaving('adhkar')
 
     try {
@@ -148,10 +160,7 @@ export default function RemindersPage() {
       setAdhkarEnabled(true)
       setAdhkarInterval(intervalMinutes)
 
-      if (
-        Capacitor.getPlatform() === 'android' &&
-        AdhanScheduler
-      ) {
+      if (Capacitor.getPlatform() === 'android' && AdhanScheduler) {
         const intervalMillis = intervalMinutes * 60 * 1000
         await AdhanScheduler.scheduleReminder({
           id: REMINDER_ID_ADHKAR,
@@ -165,7 +174,30 @@ export default function RemindersPage() {
       console.log('Schedule adhkar error', e)
     } finally {
       setIsSaving(null)
+      setShowCustomAdhkar(false)
     }
+  }
+
+  // 💾 حفظ التخصيص (الصلاة على النبي)
+  const handleSaveCustomSalawat = () => {
+    const value = parseInt(customSalawatValue, 10)
+    if (isNaN(value) || value <= 0) {
+      alert(dict.remindersPage.errors.invalidNumber)
+      return
+    }
+    const minutes = customSalawatUnit === 'hr' ? value * 60 : value
+    saveSalawatReminder(minutes)
+  }
+
+  // 💾 حفظ التخصيص (الأذكار)
+  const handleSaveCustomAdhkar = () => {
+    const value = parseInt(customAdhkarValue, 10)
+    if (isNaN(value) || value <= 0) {
+      alert(dict.remindersPage.errors.invalidNumber)
+      return
+    }
+    const minutes = customAdhkarUnit === 'hr' ? value * 60 : value
+    saveAdhkarReminder(minutes)
   }
 
   // 🛑 إيقاف التذكيرات
@@ -293,7 +325,7 @@ export default function RemindersPage() {
           </div>
         )}
 
-        {/* قسم الصلاة على النبي */}
+        {/* ==================== قسم الصلاة على النبي ==================== */}
         <section className="rounded-3xl bg-white p-5 shadow-sm border border-[#e8dccb]">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
@@ -310,6 +342,83 @@ export default function RemindersPage() {
               </div>
             </div>
 
+            {/* زر التخصيص */}
+            <button
+              type="button"
+              onClick={() => setShowCustomSalawat(!showCustomSalawat)}
+              className="text-xs font-bold text-emerald-700 flex items-center gap-1 hover:underline"
+            >
+              {showCustomSalawat ? (
+                <>
+                  <ArrowRight className="size-3" /> {dict.remindersPage.back}
+                </>
+              ) : (
+                <>
+                  <Settings2 className="size-3" /> {dict.remindersPage.customize}
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* حقول التخصيص */}
+          {showCustomSalawat ? (
+            <div className="flex items-center gap-2 bg-[#f4ece1] p-2 rounded-xl relative z-10">
+              <input
+                type="number"
+                min="1"
+                value={customSalawatValue}
+                onChange={(e) => setCustomSalawatValue(e.target.value)}
+                placeholder={dict.remindersPage.intervals.count}
+                className="w-16 rounded-lg border border-[#e8dccb] px-2 py-1.5 text-center text-sm bg-white"
+              />
+              <select
+                value={customSalawatUnit}
+                onChange={(e) => setCustomSalawatUnit(e.target.value as 'min' | 'hr')}
+                className="rounded-lg border border-[#e8dccb] px-1 py-1.5 text-sm bg-white flex-1"
+              >
+                <option value="min">{dict.remindersPage.intervals.min}</option>
+                <option value="hr">{dict.remindersPage.intervals.hr}</option>
+              </select>
+              <button
+                type="button"
+                onClick={handleSaveCustomSalawat}
+                disabled={isSaving === 'salawat'}
+                className="flex-1 rounded-lg bg-[#0a1f1a] py-2 text-sm text-white font-bold transition-all active:scale-95 disabled:opacity-70 shadow-md"
+              >
+                {isSaving === 'salawat' ? dict.remindersPage.saving : dict.remindersPage.save}
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                  <Clock className="size-3.5" /> {dict.remindersPage.reminderEvery}
+                </p>
+              </div>
+
+              <div className="flex gap-2">
+                {INTERVAL_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => saveSalawatReminder(opt.value)}
+                    className={cn(
+                      'flex-1 rounded-xl py-2 text-xs font-medium transition active:scale-95',
+                      salawatInterval === opt.value && salawatEnabled
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-[#f4ece1] text-[#5a3e1b]',
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {/* زر التشغيل / الإيقاف */}
+          <div className="mt-4 flex items-center justify-between border-t border-[#e8dccb] pt-4">
+            <p className="text-sm font-bold text-[#0a1f1a]">تشغيل التذكير</p>
             <button
               type="button"
               onClick={() => {
@@ -334,35 +443,11 @@ export default function RemindersPage() {
             </button>
           </div>
 
-          <div className="mt-2">
-            <p className="mb-2 text-xs font-medium text-muted-foreground flex items-center gap-1">
-              <Clock className="size-3.5" /> كل
-            </p>
-
-            <div className="flex gap-2">
-              {INTERVAL_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => saveSalawatReminder(opt.value)}
-                  className={cn(
-                    'flex-1 rounded-xl py-2 text-xs font-medium transition active:scale-95',
-                    salawatInterval === opt.value && salawatEnabled
-                      ? 'bg-emerald-600 text-white'
-                      : 'bg-[#f4ece1] text-[#5a3e1b]',
-                  )}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
+          {/* نغمة التذكير */}
           <div className="mt-4">
             <p className="mb-2 text-xs font-medium text-muted-foreground flex items-center gap-1">
               <Music className="size-3.5" /> {dict.remindersPage.tone}
             </p>
-
             <div className="flex items-center gap-2">
               <select
                 value={salawatSound}
@@ -372,7 +457,6 @@ export default function RemindersPage() {
                 <option value="1">{dict.remindersPage.sounds['1']}</option>
                 <option value="2">{dict.remindersPage.sounds['2']}</option>
               </select>
-
               <button
                 type="button"
                 onClick={() => togglePreview(salawatSound)}
@@ -393,7 +477,7 @@ export default function RemindersPage() {
           </div>
         </section>
 
-        {/* قسم تذكير الأذكار */}
+        {/* ==================== قسم تذكير الأذكار ==================== */}
         <section className="rounded-3xl bg-white p-5 shadow-sm border border-[#e8dccb]">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
@@ -410,6 +494,83 @@ export default function RemindersPage() {
               </div>
             </div>
 
+            {/* زر التخصيص */}
+            <button
+              type="button"
+              onClick={() => setShowCustomAdhkar(!showCustomAdhkar)}
+              className="text-xs font-bold text-blue-700 flex items-center gap-1 hover:underline"
+            >
+              {showCustomAdhkar ? (
+                <>
+                  <ArrowRight className="size-3" /> {dict.remindersPage.back}
+                </>
+              ) : (
+                <>
+                  <Settings2 className="size-3" /> {dict.remindersPage.customize}
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* حقول التخصيص */}
+          {showCustomAdhkar ? (
+            <div className="flex items-center gap-2 bg-[#f4ece1] p-2 rounded-xl relative z-10">
+              <input
+                type="number"
+                min="1"
+                value={customAdhkarValue}
+                onChange={(e) => setCustomAdhkarValue(e.target.value)}
+                placeholder={dict.remindersPage.intervals.count}
+                className="w-16 rounded-lg border border-[#e8dccb] px-2 py-1.5 text-center text-sm bg-white"
+              />
+              <select
+                value={customAdhkarUnit}
+                onChange={(e) => setCustomAdhkarUnit(e.target.value as 'min' | 'hr')}
+                className="rounded-lg border border-[#e8dccb] px-1 py-1.5 text-sm bg-white flex-1"
+              >
+                <option value="min">{dict.remindersPage.intervals.min}</option>
+                <option value="hr">{dict.remindersPage.intervals.hr}</option>
+              </select>
+              <button
+                type="button"
+                onClick={handleSaveCustomAdhkar}
+                disabled={isSaving === 'adhkar'}
+                className="flex-1 rounded-lg bg-[#0a1f1a] py-2 text-sm text-white font-bold transition-all active:scale-95 disabled:opacity-70 shadow-md"
+              >
+                {isSaving === 'adhkar' ? dict.remindersPage.saving : dict.remindersPage.save}
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                  <Clock className="size-3.5" /> {dict.remindersPage.reminderEvery}
+                </p>
+              </div>
+
+              <div className="flex gap-2">
+                {INTERVAL_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => saveAdhkarReminder(opt.value)}
+                    className={cn(
+                      'flex-1 rounded-xl py-2 text-xs font-medium transition active:scale-95',
+                      adhkarInterval === opt.value && adhkarEnabled
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-[#f4ece1] text-[#5a3e1b]',
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {/* زر التشغيل / الإيقاف */}
+          <div className="mt-4 flex items-center justify-between border-t border-[#e8dccb] pt-4">
+            <p className="text-sm font-bold text-[#0a1f1a]">تشغيل التذكير</p>
             <button
               type="button"
               onClick={() => {
@@ -422,7 +583,7 @@ export default function RemindersPage() {
               className={cn(
                 'flex size-10 items-center justify-center rounded-xl transition active:scale-90',
                 adhkarEnabled
-                  ? 'bg-emerald-600 text-white'
+                  ? 'bg-blue-600 text-white'
                   : 'bg-gray-200 text-gray-600',
               )}
             >
@@ -432,30 +593,6 @@ export default function RemindersPage() {
                 <BellOff className="size-5" />
               )}
             </button>
-          </div>
-
-          <div className="mt-2">
-            <p className="mb-2 text-xs font-medium text-muted-foreground flex items-center gap-1">
-              <Clock className="size-3.5" /> كل
-            </p>
-
-            <div className="flex gap-2">
-              {INTERVAL_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => saveAdhkarReminder(opt.value)}
-                  className={cn(
-                    'flex-1 rounded-xl py-2 text-xs font-medium transition active:scale-95',
-                    adhkarInterval === opt.value && adhkarEnabled
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-[#f4ece1] text-[#5a3e1b]',
-                  )}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
           </div>
         </section>
       </div>
