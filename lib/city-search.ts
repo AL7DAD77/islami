@@ -55,7 +55,7 @@ function distanceKm(
 export function nearestCity(
   lat: number,
   lng: number,
-  maxKm = 40,
+  maxKm = 500, // ✅ تم رفع النطاق إلى 500 كم لضمان التعرف على الدولة وطريقتها الرسمية حتى في المناطق البعيدة
   list: City[] = CITIES,
 ): City | null {
   let best: City | null = null

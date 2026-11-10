@@ -1,4 +1,4 @@
-import { CalculationMethod, Coordinates, Madhab, PrayerTimes, Qibla } from 'adhan'
+import { CalculationMethod, Coordinates, HighLatitudeRule, Madhab, PrayerTimes, Qibla } from 'adhan'
 import type { AppSettings, MethodKey, PrayerKey } from './settings'
 
 export const PRAYER_NAMES: Record<PrayerKey | 'sunrise', string> = {
@@ -54,12 +54,7 @@ function isCustomMethod(m: MethodKey): m is CustomMethodKey {
 }
 
 /**
- * طرق وطنية غير موجودة في مكتبة adhan.
- *
- * ⚠️ ملاحظة شرعية هامة:
- * احتياط المغرب (+4 دقائق) هو لضمان عدم الإفطار قبل الغروب الحقيقي.
- * احتياط الفجر (-2 دقيقة) هو لضمان الإمساك قبل دخول الوقت.
- * هذه المعاملات مطابقة لجدول وزارة الأوقاف الأردنية.
+ * إعدادات طرق الحساب الوطنية مع الاحتياطات الرسمية المدمجة آلياً
  */
 function getCustomParams(method: CustomMethodKey) {
   const p = CalculationMethod.Other()
@@ -68,15 +63,12 @@ function getCustomParams(method: CustomMethodKey) {
     case 'JordanAwqaf':
       p.fajrAngle = 18
       p.ishaAngle = 18
-
-      // احتياطات رسمية لضمان دقة المواقيت
       p.adjustments.fajr = -2
       p.adjustments.sunrise = -1
       p.adjustments.dhuhr = 1
       p.adjustments.asr = 0
       p.adjustments.maghrib = 4
       p.adjustments.isha = 0
-
       break
 
     case 'AlgeriaMinistry':
@@ -102,11 +94,14 @@ function getCustomParams(method: CustomMethodKey) {
 }
 
 function getParams(method: MethodKey) {
-  if (isCustomMethod(method)) {
-    return getCustomParams(method)
-  }
+  const params = isCustomMethod(method)
+    ? getCustomParams(method)
+    : (CalculationMethod[method] ?? CalculationMethod.UmmAlQura)()
 
-  return (CalculationMethod[method] ?? CalculationMethod.UmmAlQura)()
+  // ضبط قاعدة خطوط العرض العليا تلقائياً لمنع أي خلل فلكي في المناطق الشمالية
+  params.highLatitudeRule = HighLatitudeRule.TwilightAngle
+
+  return params
 }
 
 export function getPrayerTimes(
@@ -171,7 +166,6 @@ export function getQiblaDirection(lat: number, lng: number) {
   return Qibla(new Coordinates(lat, lng))
 }
 
-// ✅ تعديل دالة الوقت لتعيد الأرقام الإنجليزية دائماً (ليتم تحويلها لاحقاً)
 export function formatTime(d: Date) {
   return d.toLocaleTimeString('en-US', {
     hour: 'numeric',

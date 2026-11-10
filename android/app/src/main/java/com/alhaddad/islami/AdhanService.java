@@ -1,6 +1,5 @@
-package com.alhaddad.islami;
+Package com.alhaddad.islami;
 
-import android.app.Notification;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -17,7 +16,6 @@ import android.os.PowerManager;
 import android.util.Log;
 
 import androidx.annotation.Nullable;
-import androidx.core.app.Service;
 import androidx.core.content.ContextCompat;
 
 public final class AdhanService extends android.app.Service {
@@ -25,13 +23,9 @@ public final class AdhanService extends android.app.Service {
     private static final String TAG = "AdhanService";
     public static final String ACTION_STOP_ADHAN = "com.alhaddad.islami.STOP_ADHAN";
 
-    /**
-     * true: إيقاف الأذان عند إطفاء الشاشة بالزر (السلوك الذي طلبته أصلاً).
-     * false: يكتمل الأذان مهما حدث للشاشة.
-     */
-    private static final boolean STOP_ON_SCREEN_OFF = true;
+    // ✅ التعديل الحاسم: جعلها false لكي لا يتوقف الأذان عند قفل الشاشة
+    private static final boolean STOP_ON_SCREEN_OFF = false;
 
-    /** مدة قفل الاستيقاظ القصوى (احتياط ضد التعليق). */
     private static final long WAKE_LOCK_TIMEOUT_MS = 10 * 60 * 1000L;
 
     private static final String EXTRA_FILE = "file";
@@ -39,7 +33,6 @@ public final class AdhanService extends android.app.Service {
     private static final String EXTRA_TITLE = "title";
     private static final String EXTRA_BODY = "body";
 
-    /** المسار داخل assets كما يُحفظ فعلياً في المشروع. */
     private static final String ASSET_DIR = "public/audio/adhans/";
 
     private static final String DEFAULT_TITLE = "حان وقت الأذان";
@@ -75,8 +68,10 @@ public final class AdhanService extends android.app.Service {
         @Override
         public void onReceive(Context context, Intent intent) {
             if (intent != null && Intent.ACTION_SCREEN_OFF.equals(intent.getAction())) {
-                Log.i(TAG, "تم إطفاء الشاشة، إيقاف الأذان");
-                stopPlayback(false);
+                if (STOP_ON_SCREEN_OFF) {
+                    Log.i(TAG, "تم إطفاء الشاشة، إيقاف الأذان");
+                    stopPlayback(false);
+                }
             }
         }
     };
@@ -111,7 +106,6 @@ public final class AdhanService extends android.app.Service {
         String title = nonEmptyOr(intent.getStringExtra(EXTRA_TITLE), DEFAULT_TITLE);
         String body = nonEmptyOr(intent.getStringExtra(EXTRA_BODY), DEFAULT_BODY);
 
-        // يجب استدعاء startForeground قبل أي عمل آخر
         startForegroundSafely(NotificationHelper.buildPlaying(this, title, body));
         acquireWakeLock();
 
@@ -135,7 +129,6 @@ public final class AdhanService extends android.app.Service {
             closeCurrentAfd();
             requestAudioFocus();
 
-            // ✅ القراءة من assets عبر AssetFileDescriptor (الطريقة الصحيحة في الخدمات)
             currentAfd = getAssets().openFd(ASSET_DIR + fileName);
             Log.i(TAG, "محاولة تشغيل الملف: " + ASSET_DIR + fileName);
 
@@ -149,7 +142,7 @@ public final class AdhanService extends android.app.Service {
             player.setOnPreparedListener(preparedPlayer -> {
                 try {
                     preparedPlayer.start();
-                    Log.i(TAG, "بدأ تشغيل الأذان");
+                    Log.i(TAG, "بدأ تشغيل الأذان بنجاح");
                 } catch (Exception e) {
                     Log.e(TAG, "تعذر بدء تشغيل الأذان", e);
                     stopPlayback(true);
@@ -216,7 +209,7 @@ public final class AdhanService extends android.app.Service {
             }
             foregroundActive = true;
         } catch (Exception e) {
-            Log.e(TAG, "تعذر بدء الخدمة الأمامية بالنوع المحدد، جاري المحاولة بدونه", e);
+            Log.e(TAG, "تعذر بدء الخدمة الأمامية بالنوع المحدد", e);
             try {
                 startForeground(NotificationHelper.ID_PLAYING, notification);
                 foregroundActive = true;
@@ -312,9 +305,7 @@ public final class AdhanService extends android.app.Service {
         if (currentAfd == null) return;
         try {
             currentAfd.close();
-        } catch (Exception ignored) {
-            // لا شيء يُفعل هنا
-        }
+        } catch (Exception ignored) {}
         currentAfd = null;
     }
 

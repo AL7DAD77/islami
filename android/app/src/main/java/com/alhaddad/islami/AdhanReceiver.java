@@ -17,7 +17,6 @@ public final class AdhanReceiver extends BroadcastReceiver {
     private static final String EXTRA_TITLE = "title";
     private static final String EXTRA_BODY = "body";
     private static final String EXTRA_IS_SILENT = "isSilent";
-    // ✅ إعادة تعريف المتغيرات المفقودة
     private static final String EXTRA_FILE = "file";
     private static final String EXTRA_VOLUME = "volume";
 
@@ -40,12 +39,12 @@ public final class AdhanReceiver extends BroadcastReceiver {
             return;
         }
 
-        // 2. استقبال الأذان
+        // 2. استقبال الأذان الأساسي
         if (AdhanScheduler.ACTION_ALARM.equals(action)) {
             try {
                 Log.i(TAG, "تم استقبال منبه الأذان، جاري تشغيل الخدمة...");
                 Intent serviceIntent = new Intent(context, AdhanService.class);
-                serviceIntent.putExtras(intent); // ✅ تمرير كل البيانات
+                serviceIntent.putExtras(intent); // تمرير كل البيانات (الملف والصوت)
                 ContextCompat.startForegroundService(context, serviceIntent);
                 
                 NotificationHelper.updatePersistent(context);
@@ -56,7 +55,7 @@ public final class AdhanReceiver extends BroadcastReceiver {
             return;
         }
 
-        // 3. استقبال التذكيرات
+        // 3. استقبال التذكيرات (الصلاة على النبي والأذكار)
         if (AdhanScheduler.ACTION_REMINDER.equals(action)) {
             try {
                 int id = intent.getIntExtra(EXTRA_ID, 777);
@@ -73,7 +72,7 @@ public final class AdhanReceiver extends BroadcastReceiver {
             return;
         }
 
-        // 4. استقبال الأحداث الأخرى
+        // 4. استقبال الأحداث الأخرى (kind)
         final String kind = intent.getStringExtra(EXTRA_KIND);
         if (kind != null) {
             try {

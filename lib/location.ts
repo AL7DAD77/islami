@@ -8,19 +8,23 @@ import { getSettings, updateSettings, type AppSettings } from '@/lib/settings'
 
 const PLACEHOLDER = 'موقعي الحالي'
 
-/** اسم المدينة: من الإنترنت، وإن فشل فأقرب مدينة معروفة، وإلا «موقعي الحالي». */
+/** 
+ * اسم المدينة: يتم البحث بدقة عن أقرب مدينة حقيقية للإحداثيات الفعلية،
+ * مع منع الاعتماد نهائياً على أي قيمة افتراضية مثل مكة المكرمة.
+ */
 export async function resolvePlace(lat: number, lng: number) {
   try {
     const place = await reverseGeocode(lat, lng)
 
-    if (place.city) {
+    if (place.city && place.city !== 'مكة المكرمة') {
       return place
     }
   } catch {
-    // لا يوجد إنترنت أو فشل خدمة تحديد المدينة
+    // لا يوجد إنترنت أو فشل خدمة تحديد المدينة عبر الإنترنت
   }
 
-  const near = nearestCity(lat, lng, 40, CITIES)
+  // البحث في أقرب مدينة مسجلة بغض النظر عن النطاق الضيق لضمان الدقة وعدم الوقوع في الخطأ
+  const near = nearestCity(lat, lng, 500, CITIES)
 
   if (near) {
     return {
@@ -40,9 +44,7 @@ export async function resolvePlace(lat: number, lng: number) {
 export type AutoLocationResult = 'ok' | 'denied' | 'error' | 'skipped'
 
 /**
- * يحدّث الموقع ويحفظ الإحداثيات الخام دائماً.
- * - الطريقة تُختار من الدولة المكتشفة من الإحداثيات نفسها، لا من الاختيار السابق.
- * - اسم المدينة يُعاد تحديده فقط عند الحاجة (تحرك أكثر من 5 كم أو اسم غير معروف).
+ * يحدّث الموقع ويحفظ الإحداثيات الخام بدقة تامة.
  */
 export async function updateAutoLocation(
   opts: LocationOptions & { force?: boolean } = {},
@@ -55,7 +57,7 @@ export async function updateAutoLocation(
 
   const locationResult = await getNativeLocation({
     askPermission: opts.askPermission,
-    highAccuracy: opts.highAccuracy ?? false,
+    highAccuracy: opts.highAccuracy ?? true, // رفع دقة GPS لضمان التطابق الفعلي
   })
 
   if (locationResult.status === 'denied') {
@@ -90,14 +92,16 @@ export async function updateAutoLocation(
     lng,
   )
 
+  // إذا كانت المدينة القديمة خاطئة أو افتراضية (مثل مكة خطأً)، نجبر التحديث فورا
+  const isDefaultOrWrong = 
+    savedLocation.city === 'مكة المكرمة' || 
+    savedLocation.city === PLACEHOLDER ||
+    !savedLocation.countryCode
+
   const needsPlaceName =
     movedKm >= 5 ||
-    !savedLocation.countryCode ||
-    savedLocation.city === PLACEHOLDER ||
-    (savedLocation.city === 'مكة المكرمة' && movedKm >= 1)
-
-  // ✅ تشخيص مؤقت: احذف هذا السطر بعد التحقق
-  console.log('[LOCATION-DEBUG] raw', { lat, lng, movedKm, needsPlaceName, savedCountry: savedLocation.countryCode, savedMethod: settings.method })
+    isDefaultOrWrong ||
+    opts.force
 
   let place: { city: string; country: string; countryCode: string } = {
     city: savedLocation.city,
@@ -112,7 +116,7 @@ export async function updateAutoLocation(
   updateSettings((latest: AppSettings) => {
     const detectedCountry = place.countryCode || latest.location.countryCode || ''
 
-    // الطريقة تتبع الدولة المكتشفة دائماً عند معرفتها
+    // ضبط طريقة الحساب تلقائياً بناءً على الدولة المكتشفة إحداثياً
     const nextMethod = place.countryCode
       ? methodForCountry(place.countryCode, latest.method)
       : latest.method
@@ -123,19 +127,14 @@ export async function updateAutoLocation(
         ...latest.location,
         lat,
         lng,
-        city: needsPlaceName ? place.city : latest.location.city,
-        country: needsPlaceName
-          ? place.country || latest.location.country
-          : latest.location.country,
+        city: (needsPlaceName && place.city !== PLACEHOLDER) ? place.city : latest.location.city,
+        country: needsPlaceName ? place.country || latest.location.country : latest.location.country,
         countryCode: detectedCountry,
         auto: true,
       },
       method: nextMethod,
     }
   })
-
-  // ✅ تشخيص مؤقت: احذف هذا السطر بعد التحقق
-  console.log('[LOCATION-DEBUG] saved', getSettings().location, getSettings().method)
 
   return 'ok'
 }
