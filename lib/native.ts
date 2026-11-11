@@ -795,12 +795,58 @@ export async function exitNativeApp(): Promise<void> {
   }
 
   try {
+    // إيقاف الخدمات أولاً
     await stopNativeAdhan()
     await stopNativePreAdhans()
 
     const { App } = await import('@capacitor/app')
-    await App.exitApp()
+    
+    // محاولة الخروج
+    try {
+      await App.exitApp()
+    } catch (e) {
+      console.warn('فشل الخروج من التطبيق:', e)
+    }
   } catch (error) {
     console.warn('تعذر إنهاء التطبيق:', error)
+  }
+}
+
+/* ============================ زر الرجوع ============================ */
+
+export function registerBackButtonHandler(
+  onBack: () => boolean,
+): () => void {
+  if (typeof window === 'undefined') {
+    return () => {}
+  }
+
+  let removeListener: (() => void) | null = null
+
+  if (isNativePlatform()) {
+    import('@capacitor/app').then(({ App }) => {
+      App.addListener('backButton', ({ canGoBack }) => {
+        // onBack ترجع true إذا تم التعامل مع الحدث، false إذا نترك السلوك الافتراضي
+        const handled = onBack()
+        if (!handled) {
+          if (canGoBack) {
+            window.history.back()
+          } else {
+            App.exitApp()
+          }
+        }
+      }).then(listener => {
+        removeListener = () => listener.remove()
+      }).catch(error => {
+        console.warn('تعذر تسجيل مستمع زر الرجوع:', error)
+      })
+    }).catch(error => {
+      console.warn('تعذر تحميل @capacitor/app:', error)
+    })
+  }
+
+  return () => {
+    removeListener?.()
+    removeListener = null
   }
 }

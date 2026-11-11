@@ -1,5 +1,7 @@
-Package com.alhaddad.islami;
+package com.alhaddad.islami;
 
+import android.annotation.SuppressLint;
+import android.app.Notification;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -7,8 +9,6 @@ import android.content.IntentFilter;
 import android.content.pm.ServiceInfo;
 import android.content.res.AssetFileDescriptor;
 import android.media.AudioAttributes;
-import android.media.AudioFocusRequest;
-import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.os.Build;
 import android.os.IBinder;
@@ -23,9 +23,8 @@ public final class AdhanService extends android.app.Service {
     private static final String TAG = "AdhanService";
     public static final String ACTION_STOP_ADHAN = "com.alhaddad.islami.STOP_ADHAN";
 
-    // ✅ التعديل الحاسم: جعلها false لكي لا يتوقف الأذان عند قفل الشاشة
+    // ⚠️ ميزة الإيقاف عند إطفاء الشاشة: معطلة (false) لأنها كانت تسبب مشاكل
     private static final boolean STOP_ON_SCREEN_OFF = false;
-
     private static final long WAKE_LOCK_TIMEOUT_MS = 10 * 60 * 1000L;
 
     private static final String EXTRA_FILE = "file";
@@ -34,36 +33,17 @@ public final class AdhanService extends android.app.Service {
     private static final String EXTRA_BODY = "body";
 
     private static final String ASSET_DIR = "public/audio/adhans/";
-
     private static final String DEFAULT_TITLE = "حان وقت الأذان";
     private static final String DEFAULT_BODY = "حي على الصلاة، حي على الفلاح";
 
     private MediaPlayer mediaPlayer;
-    private AudioManager audioManager;
-    private AudioFocusRequest audioFocusRequest;
     private AssetFileDescriptor currentAfd;
     private PowerManager.WakeLock wakeLock;
     private boolean screenReceiverRegistered = false;
     private boolean foregroundActive = false;
     private float playbackVolume = 1.0f;
 
-    private final AudioManager.OnAudioFocusChangeListener audioFocusListener =
-            focusChange -> {
-                MediaPlayer player = mediaPlayer;
-                if (player == null) return;
-
-                try {
-                    if (focusChange == AudioManager.AUDIOFOCUS_GAIN) {
-                        player.setVolume(playbackVolume, playbackVolume);
-                    } else if (focusChange == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT
-                            || focusChange == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK) {
-                        player.setVolume(playbackVolume * 0.3f, playbackVolume * 0.3f);
-                    }
-                } catch (Exception e) {
-                    Log.w(TAG, "خطأ في تعديل مستوى الصوت", e);
-                }
-            };
-
+    // مستقبل إطفاء الشاشة (معطل حالياً)
     private final BroadcastReceiver screenOffReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -79,7 +59,6 @@ public final class AdhanService extends android.app.Service {
     @Override
     public void onCreate() {
         super.onCreate();
-        audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
         mediaPlayer = createMediaPlayer();
 
         if (STOP_ON_SCREEN_OFF && !screenReceiverRegistered) {
@@ -127,7 +106,9 @@ public final class AdhanService extends android.app.Service {
             player.reset();
 
             closeCurrentAfd();
-            requestAudioFocus();
+
+            // ✅ لا يوجد AudioFocus هنا! هذا هو الحل لمشكلة الصوت الصامت.
+            // USAGE_ALARM وحده يعطي الأولوية القصوى للصوت.
 
             currentAfd = getAssets().openFd(ASSET_DIR + fileName);
             Log.i(TAG, "محاولة تشغيل الملف: " + ASSET_DIR + fileName);
@@ -184,7 +165,6 @@ public final class AdhanService extends android.app.Service {
             Log.w(TAG, "خطأ أثناء إيقاف المشغل", e);
             releaseMediaPlayer();
         } finally {
-            abandonAudioFocus();
             closeCurrentAfd();
             releaseWakeLock();
             stopForegroundCompat();
@@ -196,6 +176,7 @@ public final class AdhanService extends android.app.Service {
         }
     }
 
+    @SuppressLint("NewApi")
     private void startForegroundSafely(Notification notification) {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -219,15 +200,12 @@ public final class AdhanService extends android.app.Service {
         }
     }
 
+    @SuppressLint("NewApi")
     private void stopForegroundCompat() {
         if (!foregroundActive) return;
         foregroundActive = false;
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                stopForeground(STOP_FOREGROUND_REMOVE);
-            } else {
-                stopForeground(true);
-            }
+            stopForeground(STOP_FOREGROUND_REMOVE);
         } catch (Exception e) {
             Log.w(TAG, "خطأ أثناء إيقاف الخدمة الأمامية", e);
         }
@@ -256,48 +234,6 @@ public final class AdhanService extends android.app.Service {
             }
         } catch (Exception e) {
             Log.w(TAG, "تعذر تحرير قفل الاستيقاظ", e);
-        }
-    }
-
-    private void requestAudioFocus() {
-        if (audioManager == null) {
-            audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
-        }
-        if (audioManager == null) return;
-
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                audioFocusRequest = new AudioFocusRequest.Builder(
-                        AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
-                        .setAudioAttributes(adhanAudioAttributes())
-                        .setAcceptsDelayedFocusGain(false)
-                        .setWillPauseWhenDucked(false)
-                        .setOnAudioFocusChangeListener(audioFocusListener)
-                        .build();
-                audioManager.requestAudioFocus(audioFocusRequest);
-            } else {
-                audioManager.requestAudioFocus(
-                        audioFocusListener,
-                        AudioManager.STREAM_ALARM,
-                        AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK
-                );
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "خطأ في طلب التركيز الصوتي", e);
-        }
-    }
-
-    private void abandonAudioFocus() {
-        if (audioManager == null) return;
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && audioFocusRequest != null) {
-                audioManager.abandonAudioFocusRequest(audioFocusRequest);
-                audioFocusRequest = null;
-            } else {
-                audioManager.abandonAudioFocus(audioFocusListener);
-            }
-        } catch (Exception e) {
-            Log.w(TAG, "خطأ في تحرير التركيز الصوتي", e);
         }
     }
 
@@ -357,7 +293,6 @@ public final class AdhanService extends android.app.Service {
             }
             screenReceiverRegistered = false;
         }
-        abandonAudioFocus();
         closeCurrentAfd();
         releaseWakeLock();
         releaseMediaPlayer();

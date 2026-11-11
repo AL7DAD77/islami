@@ -1274,47 +1274,7 @@ export function MushafViewer({
         </div>
       </header>
 
-      {/* الشريط السفلي للتنقل */}
-      <footer
-        className={cn(
-          'absolute inset-x-0 bottom-4 z-50 flex items-center justify-between px-6 transition-opacity duration-300 pointer-events-auto',
-          showUi ? 'opacity-100' : 'opacity-0 pointer-events-none'
-        )}
-        style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
-      >
-        <button
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation()
-            handlePreviousPage()
-          }}
-          disabled={currentPage === 1}
-          className="flex size-11 items-center justify-center rounded-full border shadow-lg backdrop-blur-md transition-transform active:scale-90 disabled:opacity-30"
-          style={{ backgroundColor: surface, color: fg, borderColor: border }}
-        >
-          <ChevronRight className="size-6" />
-        </button>
-
-        <div
-          className="rounded-full border px-5 py-1.5 text-sm font-bold shadow-sm backdrop-blur-md"
-          style={{ backgroundColor: surface, borderColor: border, color: fg }}
-        >
-          صفحة {formatValue(currentPage)}
-        </div>
-
-        <button
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation()
-            handleNextPage()
-          }}
-          disabled={currentPage === TOTAL_PAGES}
-          className="flex size-11 items-center justify-center rounded-full border shadow-lg backdrop-blur-md transition-transform active:scale-90 disabled:opacity-30"
-          style={{ backgroundColor: surface, color: fg, borderColor: border }}
-        >
-          <ChevronLeft className="size-6" />
-        </button>
-      </footer>
+      {/* ⚠️ تم حذف الشريط السفلي بالكامل (لا أزرار أسفل الصفحة) */}
     </div>
   )
 }

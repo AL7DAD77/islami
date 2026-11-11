@@ -1,12 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Volume2, Play, Square, BatteryWarning } from 'lucide-react'
+import { Volume2, Play, Square, BatteryWarning, FlaskConical } from 'lucide-react'
 import { useSettings, type PrayerKey } from '@/lib/settings'
 import { ADHAN_VOICES, getAdhanVoice } from '@/lib/adhan-list'
 import { PRAYER_NAMES, PRAYER_ORDER } from '@/lib/prayer'
 import { registerPlugin } from '@capacitor/core'
-import { isNativePlatform } from '@/lib/native'
+import { isNativePlatform, testNativeAdhan } from '@/lib/native'
 import { useLanguage } from '@/lib/language-context'
 
 const SystemSettings = isNativePlatform()
@@ -29,6 +29,7 @@ export function AdhanSettings() {
   const [settings, update] = useSettings()
   const [playingId, setPlayingId] = useState<string | null>(previewId)
   const [batteryIgnored, setBatteryIgnored] = useState<boolean>(true)
+  const [isTesting, setIsTesting] = useState<boolean>(false)
   const { dict, locale } = useLanguage()
 
   useEffect(() => {
@@ -90,6 +91,24 @@ export function AdhanSettings() {
     })
   }
 
+  const runAdhanTest = async () => {
+    if (!isNativePlatform() || isTesting) return
+
+    setIsTesting(true)
+    stopPreview()
+    setPlaying(null)
+
+    try {
+      await testNativeAdhan(10, 'makkah_al_banna.mp3', 1)
+    } catch (error) {
+      console.warn('تعذر تشغيل تجربة الأذان:', error)
+    } finally {
+      setTimeout(() => {
+        setIsTesting(false)
+      }, 10000)
+    }
+  }
+
   // ✅ التعديل الجوهري: حفظ في prayerVoices[key] لكل صلاة على حدة
   const setPrayerVoice = (prayer: PrayerKey, id: string) => {
     stopPreview()
@@ -130,6 +149,35 @@ export function AdhanSettings() {
 
   return (
     <div className="flex flex-col gap-6" dir={locale === 'ar' ? 'rtl' : 'ltr'}>
+      {/* زر تجربة مؤقت */}
+      {isNativePlatform() && (
+        <section className="rounded-2xl border border-primary/20 bg-primary/5 p-4">
+          <div className="flex items-start gap-3">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
+              <FlaskConical className="size-5 text-primary" />
+            </div>
+
+            <div className="flex-1">
+              <h3 className="font-bold text-foreground">
+                تجربة الأذان المؤقتة
+              </h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                سيبدأ أذان مكة المكرمة بعد 10 ثوانٍ لاختبار الصوت على الجهاز.
+              </p>
+
+              <button
+                type="button"
+                onClick={runAdhanTest}
+                disabled={isTesting}
+                className="mt-3 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground transition hover:bg-primary/90 disabled:opacity-60"
+              >
+                {isTesting ? 'سيبدأ الأذان بعد 10 ثوانٍ...' : 'تجربة الأذان'}
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* تنبيه البطارية */}
       {!batteryIgnored && (
         <section className="rounded-2xl border-2 border-amber-200 bg-amber-50 p-4 dark:border-amber-900/50 dark:bg-amber-950/30">

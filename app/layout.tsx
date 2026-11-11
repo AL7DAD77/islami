@@ -9,7 +9,7 @@ import { QuranPlayerProvider } from '@/lib/quran-player'
 import { BottomNav } from '@/components/bottom-nav'
 import { FirstRun } from '@/components/setup/first-run'
 import { SplashScreen } from '@/components/splash-screen'
-import { LanguageProvider } from '@/lib/language-context' // ✅ استيراد مزود اللغة
+import { LanguageProvider } from '@/lib/language-context'
 
 const plex = IBM_Plex_Sans_Arabic({
   subsets: ['arabic'],
@@ -48,7 +48,6 @@ export default function RootLayout({
   return (
     <html lang="ar" dir="rtl" className={`${plex.variable} ${amiri.variable}`}>
       <body className="min-h-dvh bg-background text-foreground font-sans antialiased">
-        {/* ✅ تغليف التطبيق بالكامل بمزود اللغة */}
         <LanguageProvider>
           <QuranPlayerProvider>
             <SplashScreen />

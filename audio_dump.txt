@@ -1,0 +1,732 @@
+
+Message handler (watch for unhandled messages):
+  Handler (com.android.server.audio.AudioService$AudioHandler) {1d11903} @ 37367857
+    Looper (AudioService, tid 144) {6f8c080}
+      (Total messages: 0, polling=true, quitting=false)
+
+MediaFocusControl dump time: ١١:٠٣:٤٥ م
+
+Audio Focus stack entries (last is top of stack):
+
+MultiFocusStack:
+size:3
+device:2
+------------------------------
+device = 0
+------------------------------
+device = 2
+------------------------------
+device = 80
+------------------------------
+
+
+No external focus policy
+
+
+
+ Notify on duck:  true
+
+ In ring or call: false
+
+Multi Audio Focus enabled :false
+
+MultiAudioFocus List:
+size:0
+------------------------------
+------------------------------
+
+
+Audio event log: focus commands as seen by MediaFocusControl
+١١-١٠ ١٧:٤٦:٠٢:٠٤٥ requestAudioFocus() from uid/pid 10221/22921 clientId=android.media.AudioManager@8896db7g5.b@7aebbc1 callingPack=com.masarat.salati req=2 flags=0x0 sdk=36
+١١-١٠ ١٨:٤٥:٣٩:٥١٢ requestAudioFocus() from uid/pid 10332/4200 clientId=android.media.AudioManager@1f069a3X.BgR@a9ed4a0 callingPack=com.facebook.orca req=2 flags=0x0 sdk=37
+١١-١٠ ١٨:٤٥:٤٤:٧٠٢ abandonAudioFocus() from uid/pid 10332/4200 clientId=android.media.AudioManager@1f069a3X.BgR@a9ed4a0
+١١-١٠ ١٨:٤٥:٤٩:١٧٥ requestAudioFocus() from uid/pid 10332/4200 clientId=android.media.AudioManager@1f069a3X.BgR@a9ed4a0 callingPack=com.facebook.orca req=2 flags=0x0 sdk=37
+١١-١٠ ١٨:٤٥:٥٦:٦٧٠ abandonAudioFocus() from uid/pid 10332/4200 clientId=android.media.AudioManager@1f069a3X.BgR@a9ed4a0
+١١-١٠ ١٨:٤٦:٠١:٩٧٦ requestAudioFocus() from uid/pid 10332/4200 clientId=android.media.AudioManager@1f069a3X.BgR@a9ed4a0 callingPack=com.facebook.orca req=2 flags=0x0 sdk=37
+١١-١٠ ١٨:٤٦:٢٠:٥٧٥ abandonAudioFocus() from uid/pid 10332/4200 clientId=android.media.AudioManager@1f069a3X.BgR@a9ed4a0
+١١-١٠ ١٩:٠٤:٠١:٠٦٨ requestAudioFocus() from uid/pid 10221/29570 clientId=android.media.AudioManager@32502cg5.b@7e1baf5 callingPack=com.masarat.salati req=2 flags=0x0 sdk=36
+١١-١٠ ١٩:٠٤:٠١:١٧٤ abandonAudioFocus() from uid/pid 10221/29570 clientId=android.media.AudioManager@32502cg5.b@7e1baf5
+١١-١٠ ١٩:٠٤:٠١:٩٧٤ requestAudioFocus() from uid/pid 10221/29570 clientId=android.media.AudioManager@32502cg5.b@89bd06f callingPack=com.masarat.salati req=2 flags=0x0 sdk=36
+١١-١٠ ١٩:٠٤:٠١:٩٧٨ requestAudioFocus() from uid/pid 10221/29570 clientId=android.media.AudioManager@32502cg5.b@89bd06f callingPack=com.masarat.salati req=2 flags=0x0 sdk=36
+١١-١٠ ٢١:٣٤:٥١:٤٥٩ requestAudioFocus() from uid/pid 10332/4200 clientId=android.media.AudioManager@1f069a3X.BgR@a9ed4a0 callingPack=com.facebook.orca req=2 flags=0x0 sdk=37
+١١-١٠ ٢١:٣٤:٥٤:٩٥٣ abandonAudioFocus() from uid/pid 10332/4200 clientId=android.media.AudioManager@1f069a3X.BgR@a9ed4a0
+١١-١٠ ٢١:٣٥:٥٨:٦١٨ requestAudioFocus() from uid/pid 10332/4200 clientId=android.media.AudioManager@1f069a3X.BgR@a9ed4a0 callingPack=com.facebook.orca req=2 flags=0x0 sdk=37
+١١-١٠ ٢١:٣٦:٠٣:٤٧٨ abandonAudioFocus() from uid/pid 10332/4200 clientId=android.media.AudioManager@1f069a3X.BgR@a9ed4a0
+١١-١٠ ٢١:٤٥:١٣:١٧٥ requestAudioFocus() from uid/pid 10332/4200 clientId=android.media.AudioManager@1f069a3X.BgR@a9ed4a0 callingPack=com.facebook.orca req=2 flags=0x0 sdk=37
+١١-١٠ ٢١:٤٥:١٦:٥٣٨ abandonAudioFocus() from uid/pid 10332/4200 clientId=android.media.AudioManager@1f069a3X.BgR@a9ed4a0
+١١-١٠ ٢١:٤٥:٢١:٩٢٤ requestAudioFocus() from uid/pid 10332/4200 clientId=android.media.AudioManager@1f069a3X.BgR@a9ed4a0 callingPack=com.facebook.orca req=2 flags=0x0 sdk=37
+١١-١٠ ٢١:٤٥:٢٥:٠٧٥ abandonAudioFocus() from uid/pid 10332/4200 clientId=android.media.AudioManager@1f069a3X.BgR@a9ed4a0
+١١-١٠ ٢١:٤٥:٣٤:٢٩٠ requestAudioFocus() from uid/pid 10332/4200 clientId=android.media.AudioManager@1f069a3X.BgR@a9ed4a0 callingPack=com.facebook.orca req=2 flags=0x0 sdk=37
+١١-١٠ ٢١:٤٥:٣٩:٨٥٨ abandonAudioFocus() from uid/pid 10332/4200 clientId=android.media.AudioManager@1f069a3X.BgR@a9ed4a0
+١١-١٠ ٢١:٤٥:٤٨:١٥٣ requestAudioFocus() from uid/pid 10332/4200 clientId=android.media.AudioManager@1f069a3X.BgR@a9ed4a0 callingPack=com.facebook.orca req=2 flags=0x0 sdk=37
+١١-١٠ ٢١:٤٥:٥١:٩٨٦ abandonAudioFocus() from uid/pid 10332/4200 clientId=android.media.AudioManager@1f069a3X.BgR@a9ed4a0
+١١-١٠ ٢١:٤٥:٥٧:٦١٥ requestAudioFocus() from uid/pid 10332/4200 clientId=android.media.AudioManager@1f069a3X.BgR@a9ed4a0 callingPack=com.facebook.orca req=2 flags=0x0 sdk=37
+١١-١٠ ٢١:٤٦:٠٠:٥٦٤ abandonAudioFocus() from uid/pid 10332/4200 clientId=android.media.AudioManager@1f069a3X.BgR@a9ed4a0
+١١-١٠ ٢١:٥٣:٣٤:١٨٧ requestAudioFocus() from uid/pid 10332/4200 clientId=android.media.AudioManager@1f069a3X.BgR@a9ed4a0 callingPack=com.facebook.orca req=2 flags=0x0 sdk=37
+١١-١٠ ٢١:٥٣:٣٧:١١٦ abandonAudioFocus() from uid/pid 10332/4200 clientId=android.media.AudioManager@1f069a3X.BgR@a9ed4a0
+١١-١٠ ٢١:٥٣:٤١:٣٥١ requestAudioFocus() from uid/pid 10332/4200 clientId=android.media.AudioManager@1f069a3X.BgR@a9ed4a0 callingPack=com.facebook.orca req=2 flags=0x0 sdk=37
+١١-١٠ ٢١:٥٣:٤٥:٤٠٧ abandonAudioFocus() from uid/pid 10332/4200 clientId=android.media.AudioManager@1f069a3X.BgR@a9ed4a0
+١١-١٠ ٢١:٥٣:٤٩:٥٦٧ requestAudioFocus() from uid/pid 10332/4200 clientId=android.media.AudioManager@1f069a3X.BgR@a9ed4a0 callingPack=com.facebook.orca req=2 flags=0x0 sdk=37
+١١-١٠ ٢١:٥٣:٥٢:٤٧٥ abandonAudioFocus() from uid/pid 10332/4200 clientId=android.media.AudioManager@1f069a3X.BgR@a9ed4a0
+١١-١٠ ٢١:٥٤:١٦:٤٦١ requestAudioFocus() from uid/pid 10332/4200 clientId=android.media.AudioManager@1f069a3X.BgR@a9ed4a0 callingPack=com.facebook.orca req=2 flags=0x0 sdk=37
+١١-١٠ ٢١:٥٤:١٩:٥٥٢ abandonAudioFocus() from uid/pid 10332/4200 clientId=android.media.AudioManager@1f069a3X.BgR@a9ed4a0
+١١-١٠ ٢١:٥٤:٢٤:٣٢٢ requestAudioFocus() from uid/pid 10332/4200 clientId=android.media.AudioManager@1f069a3X.BgR@a9ed4a0 callingPack=com.facebook.orca req=2 flags=0x0 sdk=37
+١١-١٠ ٢١:٥٤:٣٢:٠٩٣ abandonAudioFocus() from uid/pid 10332/4200 clientId=android.media.AudioManager@1f069a3X.BgR@a9ed4a0
+١١-١٠ ٢١:٥٤:٣٧:٨٨٥ requestAudioFocus() from uid/pid 10332/4200 clientId=android.media.AudioManager@1f069a3X.BgR@a9ed4a0 callingPack=com.facebook.orca req=2 flags=0x0 sdk=37
+١١-١٠ ٢١:٥٤:٤٨:٥٩٢ abandonAudioFocus() from uid/pid 10332/4200 clientId=android.media.AudioManager@1f069a3X.BgR@a9ed4a0
+١١-١٠ ٢١:٥٥:٠٤:٢٦٢ requestAudioFocus() from uid/pid 10332/4200 clientId=android.media.AudioManager@1f069a3X.BgR@a9ed4a0 callingPack=com.facebook.orca req=2 flags=0x0 sdk=37
+١١-١٠ ٢١:٥٧:٣٧:٤٢٩ abandonAudioFocus() from uid/pid 10332/4200 clientId=android.media.AudioManager@1f069a3X.BgR@a9ed4a0
+١١-١٠ ٢٢:٤٤:٥١:٧٤٢ requestAudioFocus() from uid/pid 10411/28853 clientId=android.media.AudioManager@4090c0dorg.chromium.content.browser.AudioFocusDelegate@89447c2 callingPack=com.alhaddad.islami req=1 flags=0x1 sdk=36
+١١-١٠ ٢٢:٤٦:٢٤:٩١٠ abandonAudioFocus() from uid/pid 10411/28853 clientId=android.media.AudioManager@4090c0dorg.chromium.content.browser.AudioFocusDelegate@89447c2
+١١-١٠ ٢٢:٥٦:١١:٨٢١ requestAudioFocus() from uid/pid 10332/4200 clientId=android.media.AudioManager@1f069a3X.BgR@a9ed4a0 callingPack=com.facebook.orca req=2 flags=0x0 sdk=37
+١١-١٠ ٢٢:٥٦:١٧:٨٧٠ abandonAudioFocus() from uid/pid 10332/4200 clientId=android.media.AudioManager@1f069a3X.BgR@a9ed4a0
+١١-١٠ ٢٢:٥٦:٣١:٨٩٨ requestAudioFocus() from uid/pid 10332/4200 clientId=android.media.AudioManager@1f069a3X.BgR@a9ed4a0 callingPack=com.facebook.orca req=2 flags=0x0 sdk=37
+١١-١٠ ٢٢:٥٦:٤٧:٠٤٢ abandonAudioFocus() from uid/pid 10332/4200 clientId=android.media.AudioManager@1f069a3X.BgR@a9ed4a0
+١١-١٠ ٢٢:٥٨:٢٦:٥٤٠ requestAudioFocus() from uid/pid 10411/32121 clientId=android.media.AudioManager@9fd1186com.alhaddad.islami.AdhanService$$ExternalSyntheticLambda0@fbb7a47 callingPack=com.alhaddad.islami req=3 flags=0x0 sdk=36
+١١-١٠ ٢٢:٥٨:٣٦:٦٧٤ requestAudioFocus() from uid/pid 10411/32121 clientId=android.media.AudioManager@9fd1186com.alhaddad.islami.AdhanService$$ExternalSyntheticLambda0@fbb7a47 callingPack=com.alhaddad.islami req=3 flags=0x0 sdk=36
+١١-١٠ ٢٣:٠٠:٢٨:١١٧ abandonAudioFocus() from uid/pid 10411/32121 clientId=android.media.AudioManager@9fd1186com.alhaddad.islami.AdhanService$$ExternalSyntheticLambda0@fbb7a47
+١١-١٠ ٢٣:٠٢:٠٨:٨١٠ requestAudioFocus() from uid/pid 10332/4200 clientId=android.media.AudioManager@1f069a3X.BgR@a9ed4a0 callingPack=com.facebook.orca req=2 flags=0x0 sdk=37
+١١-١٠ ٢٣:٠٢:١١:٤٠٢ abandonAudioFocus() from uid/pid 10332/4200 clientId=android.media.AudioManager@1f069a3X.BgR@a9ed4a0
+Multi Audio Focus enabled :false
+
+MultiAudioFocus List:
+size:0
+------------------------------
+------------------------------
+
+Stream volumes (device: index)
+- STREAM_VOICE_CALL:
+   Muted: false
+   Muted Internally: false
+   Min: 1
+   Max: 6
+   streamVolume:6
+   Current: 1 (earpiece): 6, 2 (speaker): 6, 4 (headset): 6, 8 (headphone): 4, 10 (bt_sco): 2, 20 (bt_sco_hs): 6, 80 (bt_a2dp): 1, 40000000 (default): 4
+   Devices: earpiece
+- STREAM_SYSTEM:
+   Muted: true
+   Muted Internally: false
+   Min: 0
+   Max: 15
+   streamVolume:0
+   Current: 1 (earpiece): 15, 2 (speaker): 0, 4 (headset): 15, 8 (headphone): 6, 10 (bt_sco): 6, 20 (bt_sco_hs): 13, 80 (bt_a2dp): 15, 40000000 (default): 6
+   Devices: speaker
+- STREAM_RING:
+   Muted: true
+   Muted Internally: false
+   Min: 0
+   Max: 15
+   streamVolume:0
+   Current: 1 (earpiece): 15, 2 (speaker): 9, 4 (headset): 15, 8 (headphone): 11, 10 (bt_sco): 9, 20 (bt_sco_hs): 15, 80 (bt_a2dp): 12, 40000000 (default): 11
+   Devices: speaker
+- STREAM_MUSIC:
+   Muted: false
+   Muted Internally: false
+   Min: 0
+   Max: 15
+   streamVolume:5
+   Current: 1 (earpiece): 0\0, 2 (speaker): 5\50, 4 (headset): 15\150, 8 (headphone): 15\150, 10 (bt_sco): 6\60, 20 (bt_sco_hs): 0\0, 80 (bt_a2dp): 9\89, 8000 (remote_submix): 15\150, 4000000 (usb_headset): 8\80, 40000000 (default): 7\70
+   Devices: speaker
+- STREAM_ALARM:
+   Muted: false
+   Muted Internally: false
+   Min: 1
+   Max: 15
+   streamVolume:15
+   Current: 2 (speaker): 15, 40000000 (default): 11
+   Devices: speaker
+- STREAM_NOTIFICATION:
+   Muted: true
+   Muted Internally: false
+   Min: 0
+   Max: 15
+   streamVolume:0
+   Current: 1 (earpiece): 15, 2 (speaker): 0, 4 (headset): 15, 8 (headphone): 11, 10 (bt_sco): 6, 20 (bt_sco_hs): 12, 80 (bt_a2dp): 15, 40000000 (default): 11
+   Devices: speaker
+- STREAM_BLUETOOTH_SCO:
+   Muted: false
+   Muted Internally: false
+   Min: 0
+   Max: 15
+   streamVolume:15
+   Current: 1 (earpiece): 15, 2 (speaker): 15, 10 (bt_sco): 15, 20 (bt_sco_hs): 15, 40000000 (default): 7
+   Devices: earpiece
+- STREAM_SYSTEM_ENFORCED:
+   Muted: false
+   Muted Internally: false
+   Min: 0
+   Max: 15
+   streamVolume:14
+   Current: 40000000 (default): 14
+   Devices: speaker
+- STREAM_DTMF:
+   Muted: true
+   Muted Internally: false
+   Min: 0
+   Max: 15
+   streamVolume:0
+   Current: 1 (earpiece): 15, 2 (speaker): 9, 4 (headset): 15, 8 (headphone): 11, 10 (bt_sco): 9, 20 (bt_sco_hs): 15, 80 (bt_a2dp): 12, 40000000 (default): 11
+   Devices: speaker
+- STREAM_TTS:
+   Muted: false
+   Muted Internally: false
+   Min: 0
+   Max: 15
+   streamVolume:5
+   Current: 1 (earpiece): 0, 2 (speaker): 5, 4 (headset): 15, 8 (headphone): 15, 10 (bt_sco): 6, 20 (bt_sco_hs): 0, 80 (bt_a2dp): 9, 8000 (remote_submix): 15, 4000000 (usb_headset): 8, 40000000 (default): 7
+   Devices: speaker
+- STREAM_ACCESSIBILITY:
+   Muted: false
+   Muted Internally: false
+   Min: 1
+   Max: 15
+   streamVolume:6
+   Current: 1 (earpiece): 1, 2 (speaker): 6, 4 (headset): 15, 8 (headphone): 15, 10 (bt_sco): 7, 20 (bt_sco_hs): 1, 80 (bt_a2dp): 9, 8000 (remote_submix): 15, 4000000 (usb_headset): 9, 40000000 (default): 8
+   Devices: speaker
+- STREAM_ASSISTANT:
+   Muted: false
+   Muted Internally: false
+   Min: 0
+   Max: 15
+   streamVolume:9
+   Current: 2 (speaker): 9, 80 (bt_a2dp): 7, 40000000 (default): 7
+   Devices: speaker
+
+- mute affected streams = 0x6f
+
+Volume Groups (device: index)
+- VOLUME GROUP AUDIO_STREAM_ACCESSIBILITY:
+   Min: 1
+   Max: 15
+   Current: 40000000 (default): 8
+   Devices: speaker
+- VOLUME GROUP AUDIO_STREAM_ALARM:
+   Min: 1
+   Max: 15
+   Current: 40000000 (default): 11
+   Devices: speaker
+- VOLUME GROUP AUDIO_STREAM_DTMF:
+   Min: 0
+   Max: 15
+   Current: 40000000 (default): 11
+   Devices: speaker
+- VOLUME GROUP AUDIO_STREAM_ENFORCED_AUDIBLE:
+   Min: 0
+   Max: 15
+   Current: 40000000 (default): 14
+   Devices: speaker
+- VOLUME GROUP AUDIO_STREAM_MUSIC:
+   Min: 0
+   Max: 15
+   Current: 40000000 (default): 7
+   Devices: speaker
+- VOLUME GROUP AUDIO_STREAM_NOTIFICATION:
+   Min: 0
+   Max: 15
+   Current: 40000000 (default): 11
+   Devices: speaker
+- VOLUME GROUP AUDIO_STREAM_RING:
+   Min: 0
+   Max: 15
+   Current: 40000000 (default): 11
+   Devices: speaker
+- VOLUME GROUP AUDIO_STREAM_SYSTEM:
+   Min: 0
+   Max: 15
+   Current: 40000000 (default): 6
+   Devices: speaker
+- VOLUME GROUP AUDIO_STREAM_VOICE_CALL:
+   Min: 1
+   Max: 6
+   Current: 40000000 (default): 4
+   Devices: earpiece
+- VOLUME GROUP AUDIO_STREAM_ASSISTANT:
+   Min: 0
+   Max: 15
+   Current: 40000000 (default): 7
+   Devices: speaker
+- VOLUME GROUP AUDIO_STREAM_CALL_ASSISTANT:
+   Min: 0
+   Max: 15
+   Current: 40000000 (default): 7
+   Devices: speaker
+
+Ringer mode: 
+- mode (internal) = SILENT
+- mode (external) = SILENT
+- zen mode:ZEN_MODE_OFF
+- ringer mode affected streams = 0x126 (STREAM_SYSTEM,STREAM_RING,STREAM_NOTIFICATION,STREAM_DTMF)
+- ringer mode muted streams = 0x126 (STREAM_SYSTEM,STREAM_RING,STREAM_NOTIFICATION,STREAM_DTMF)
+- delegate = SamsungRingerModeDelegate
+
+Audio routes:
+  mMainType=0x0
+  mBluetoothName=null
+
+Other state:
+  mVolumeController=VolumeController(android.os.BinderProxy@c2442f0,mVisible=false)
+  mSafeMediaVolumeState=SAFE_MEDIA_VOLUME_DISABLED
+  mSafeMediaVolumeIndex=90
+  mSafeUsbMediaVolumeIndex=0
+  mSafeUsbMediaVolumeDbfs=-37.0
+  sIndependentA11yVolume=false
+  mPendingVolumeCommand=null
+  mMusicActiveMs=0
+  mMcc=416
+  mCameraSoundForced=false
+  mHasVibrator=true
+  mVolumePolicy=VolumePolicy[volumeDownToEnterSilent=false,volumeUpToExitSilent=true,doNotDisturbWhenSilent=true,vibrateToSilentDebounce=400]
+  mAvrcpAbsVolSupported=false
+  mIsSingleVolume=false
+  mUseFixedVolume=false
+  mFixedVolumeDevices=
+  mExtVolumeController=null
+  mHdmiCecSink=false
+  mHdmiAudioSystemClient=null
+  mHdmiPlaybackClient=null
+  mHdmiTvClient=null
+  mHdmiSystemAudioSupported=false
+  mHdmiCecVolumeControlEnabled=false
+  mIsCallScreeningModeSupported=false
+  mic mute FromSwitch=false FromRestrictions=false FromApi=false from system=false
+Audio policies:
+Audio event log: dynamic policy events (logged when command received by AudioService)
+
+PlaybackActivityMonitor dump time: ١١:٠٣:٤٥ م
+
+  playback listeners:
+ (S)com.android.server.audio.PlaybackActivityMonitor$PlayMonitorClient@59126b9, android (S)com.android.server.audio.PlaybackActivityMonitor$PlayMonitorClient@4b00afe, com.android.bluetooth (S)com.android.server.audio.PlaybackActivityMonitor$PlayMonitorClient@c2425f, com.sec.android.sdhms (S)com.android.server.audio.PlaybackActivityMonitor$PlayMonitorClient@76964ac, com.google.android.gms (S)com.android.server.audio.PlaybackActivityMonitor$PlayMonitorClient@d947575, com.google.android.gms (S)com.android.server.audio.PlaybackActivityMonitor$PlayMonitorClient@17dd90a, com.google.android.gms (S)com.android.server.audio.PlaybackActivityMonitor$PlayMonitorClient@272a57b, com.google.android.gms
+
+
+  players:
+  AudioPlaybackConfiguration piid:23 type:android.media.SoundPool u/pid:1000/1135 state:idle attr:AudioAttributes: usage=USAGE_VOICE_COMMUNICATION_SIGNALLING content=CONTENT_TYPE_SPEECH flags=0x800 tags=stv_call_connection bundle=null
+  AudioPlaybackConfiguration piid:31 type:android.media.SoundPool u/pid:10080/2045 state:idle attr:AudioAttributes: usage=USAGE_ASSISTANCE_SONIFICATION content=CONTENT_TYPE_SONIFICATION flags=0x800 tags= bundle=null
+  AudioPlaybackConfiguration piid:39 type:android.media.SoundPool u/pid:10080/2045 state:idle attr:AudioAttributes: usage=USAGE_ASSISTANCE_SONIFICATION content=CONTENT_TYPE_SONIFICATION flags=0x800 tags= bundle=null
+  AudioPlaybackConfiguration piid:47 type:android.media.SoundPool u/pid:1000/1135 state:idle attr:AudioAttributes: usage=USAGE_ASSISTANCE_SONIFICATION content=CONTENT_TYPE_SONIFICATION flags=0x800 tags= bundle=null
+  AudioPlaybackConfiguration piid:55 type:android.media.SoundPool u/pid:1002/2024 state:idle attr:AudioAttributes: usage=USAGE_VOICE_COMMUNICATION content=CONTENT_TYPE_SPEECH flags=0x800 tags= bundle=null
+  AudioPlaybackConfiguration piid:71 type:android.media.SoundPool u/pid:10262/4344 state:idle attr:AudioAttributes: usage=USAGE_ASSISTANCE_SONIFICATION content=CONTENT_TYPE_SONIFICATION flags=0x800 tags=stv_keyboard bundle=null
+  AudioPlaybackConfiguration piid:1127 type:android.media.SoundPool u/pid:10107/19448 state:idle attr:AudioAttributes: usage=USAGE_ASSISTANCE_SONIFICATION content=CONTENT_TYPE_SONIFICATION flags=0x800 tags= bundle=null
+
+  ducked players piids:
+
+  muted player piids:
+
+  banned uids:
+
+Audio event log: playback activity as reported through PlayerBase
+١١-١٠ ٢٢:٢٢:٥٠:٠١٥ player piid:1175 has OP_PLAY_AUDIO:true in uid:10080
+١١-١٠ ٢٢:٢٢:٥٠:٠٦٩ player piid:1175 state:started uid:10080
+١١-١٠ ٢٢:٢٢:٥٠:٠٧٦ releasing player piid:1167
+١١-١٠ ٢٢:٢٢:٥٠:٥٨٦ new player piid:1183 uid/pid:10080/2045 type:android.media.MediaPlayer attr:AudioAttributes: usage=USAGE_UNKNOWN content=CONTENT_TYPE_UNKNOWN flags=0x800 tags= bundle=null
+١١-١٠ ٢٢:٢٢:٥٠:٥٨٧ player piid:1183 new AudioAttributes:AudioAttributes: usage=USAGE_ASSISTANCE_SONIFICATION content=CONTENT_TYPE_SONIFICATION flags=0x800 tags= bundle=null
+١١-١٠ ٢٢:٢٢:٥٠:٥٨٨ player piid:1183 has OP_PLAY_AUDIO:true in uid:10080
+١١-١٠ ٢٢:٢٢:٥٠:٦٥٢ player piid:1183 state:started uid:10080
+١١-١٠ ٢٢:٢٢:٥٠:٦٥٤ releasing player piid:1175
+١١-١٠ ٢٢:٢٢:٥٠:٩٣١ new player piid:1191 uid/pid:10080/2045 type:android.media.MediaPlayer attr:AudioAttributes: usage=USAGE_UNKNOWN content=CONTENT_TYPE_UNKNOWN flags=0x800 tags= bundle=null
+١١-١٠ ٢٢:٢٢:٥٠:٩٣١ player piid:1191 new AudioAttributes:AudioAttributes: usage=USAGE_ASSISTANCE_SONIFICATION content=CONTENT_TYPE_SONIFICATION flags=0x800 tags= bundle=null
+١١-١٠ ٢٢:٢٢:٥٠:٩٣٥ player piid:1191 has OP_PLAY_AUDIO:true in uid:10080
+١١-١٠ ٢٢:٢٢:٥١:٠٠٢ player piid:1191 state:started uid:10080
+١١-١٠ ٢٢:٢٢:٥١:٠٠٧ releasing player piid:1183
+١١-١٠ ٢٢:٢٢:٥١:٢٩٩ new player piid:1199 uid/pid:10080/2045 type:android.media.MediaPlayer attr:AudioAttributes: usage=USAGE_UNKNOWN content=CONTENT_TYPE_UNKNOWN flags=0x800 tags= bundle=null
+١١-١٠ ٢٢:٢٢:٥١:٣٠٠ player piid:1199 new AudioAttributes:AudioAttributes: usage=USAGE_ASSISTANCE_SONIFICATION content=CONTENT_TYPE_SONIFICATION flags=0x800 tags= bundle=null
+١١-١٠ ٢٢:٢٢:٥١:٣٠١ player piid:1199 has OP_PLAY_AUDIO:true in uid:10080
+١١-١٠ ٢٢:٢٢:٥١:٣٤٧ player piid:1199 state:started uid:10080
+١١-١٠ ٢٢:٢٢:٥١:٣٥٠ releasing player piid:1191
+١١-١٠ ٢٢:٢٢:٥٢:٥٤٦ player piid:1199 state:stopped uid:10080
+١١-١٠ ٢٢:٢٢:٥٢:٥٥١ releasing player piid:1199
+١١-١٠ ٢٢:٢٧:٢٦:٩٤٢ new player piid:1207 uid/pid:10080/2045 type:android.media.MediaPlayer attr:AudioAttributes: usage=USAGE_UNKNOWN content=CONTENT_TYPE_UNKNOWN flags=0x800 tags= bundle=null
+١١-١٠ ٢٢:٢٧:٢٦:٩٤٣ player piid:1207 new AudioAttributes:AudioAttributes: usage=USAGE_ASSISTANCE_SONIFICATION content=CONTENT_TYPE_SONIFICATION flags=0x800 tags= bundle=null
+١١-١٠ ٢٢:٢٧:٢٦:٩٤٦ player piid:1207 has OP_PLAY_AUDIO:true in uid:10080
+١١-١٠ ٢٢:٢٧:٢٦:٩٨٨ player piid:1207 state:started uid:10080
+١١-١٠ ٢٢:٢٧:٢٧:١٧٣ new player piid:1215 uid/pid:10080/2045 type:android.media.MediaPlayer attr:AudioAttributes: usage=USAGE_UNKNOWN content=CONTENT_TYPE_UNKNOWN flags=0x800 tags= bundle=null
+١١-١٠ ٢٢:٢٧:٢٧:١٧٣ player piid:1215 new AudioAttributes:AudioAttributes: usage=USAGE_ASSISTANCE_SONIFICATION content=CONTENT_TYPE_SONIFICATION flags=0x800 tags= bundle=null
+١١-١٠ ٢٢:٢٧:٢٧:١٧٥ player piid:1215 has OP_PLAY_AUDIO:true in uid:10080
+١١-١٠ ٢٢:٢٧:٢٧:٢١٣ player piid:1215 state:started uid:10080
+١١-١٠ ٢٢:٢٧:٢٧:٢١٥ releasing player piid:1207
+١١-١٠ ٢٢:٢٧:٢٨:٤١٧ player piid:1215 state:stopped uid:10080
+١١-١٠ ٢٢:٢٧:٢٨:٤٢٥ releasing player piid:1215
+١١-١٠ ٢٢:٢٩:٢٣:٤٩٤ new player piid:1223 uid/pid:10080/2045 type:android.media.MediaPlayer attr:AudioAttributes: usage=USAGE_UNKNOWN content=CONTENT_TYPE_UNKNOWN flags=0x800 tags= bundle=null
+١١-١٠ ٢٢:٢٩:٢٣:٤٩٥ player piid:1223 new AudioAttributes:AudioAttributes: usage=USAGE_ASSISTANCE_SONIFICATION content=CONTENT_TYPE_SONIFICATION flags=0x800 tags= bundle=null
+١١-١٠ ٢٢:٢٩:٢٣:٤٩٦ player piid:1223 has OP_PLAY_AUDIO:true in uid:10080
+١١-١٠ ٢٢:٢٩:٢٣:٥٣٦ player piid:1223 state:started uid:10080
+١١-١٠ ٢٢:٢٩:٢٣:٧٢٦ new player piid:1231 uid/pid:10080/2045 type:android.media.MediaPlayer attr:AudioAttributes: usage=USAGE_UNKNOWN content=CONTENT_TYPE_UNKNOWN flags=0x800 tags= bundle=null
+١١-١٠ ٢٢:٢٩:٢٣:٧٢٦ player piid:1231 new AudioAttributes:AudioAttributes: usage=USAGE_ASSISTANCE_SONIFICATION content=CONTENT_TYPE_SONIFICATION flags=0x800 tags= bundle=null
+١١-١٠ ٢٢:٢٩:٢٣:٧٢٨ player piid:1231 has OP_PLAY_AUDIO:true in uid:10080
+١١-١٠ ٢٢:٢٩:٢٣:٧٥٩ player piid:1231 state:started uid:10080
+١١-١٠ ٢٢:٢٩:٢٣:٧٦١ releasing player piid:1223
+١١-١٠ ٢٢:٢٩:٢٤:٤٥٨ new player piid:1239 uid/pid:10080/2045 type:android.media.MediaPlayer attr:AudioAttributes: usage=USAGE_UNKNOWN content=CONTENT_TYPE_UNKNOWN flags=0x800 tags= bundle=null
+١١-١٠ ٢٢:٢٩:٢٤:٤٥٩ player piid:1239 new AudioAttributes:AudioAttributes: usage=USAGE_ASSISTANCE_SONIFICATION content=CONTENT_TYPE_SONIFICATION flags=0x800 tags= bundle=null
+١١-١٠ ٢٢:٢٩:٢٤:٤٦١ player piid:1239 has OP_PLAY_AUDIO:true in uid:10080
+١١-١٠ ٢٢:٢٩:٢٤:٥٠٠ player piid:1239 state:started uid:10080
+١١-١٠ ٢٢:٢٩:٢٤:٥٠١ releasing player piid:1231
+١١-١٠ ٢٢:٢٩:٢٥:٥٦٢ new player piid:1247 uid/pid:10080/2045 type:android.media.MediaPlayer attr:AudioAttributes: usage=USAGE_UNKNOWN content=CONTENT_TYPE_UNKNOWN flags=0x800 tags= bundle=null
+١١-١٠ ٢٢:٢٩:٢٥:٥٦٢ player piid:1247 new AudioAttributes:AudioAttributes: usage=USAGE_ASSISTANCE_SONIFICATION content=CONTENT_TYPE_SONIFICATION flags=0x800 tags= bundle=null
+١١-١٠ ٢٢:٢٩:٢٥:٥٦٤ player piid:1247 has OP_PLAY_AUDIO:true in uid:10080
+١١-١٠ ٢٢:٢٩:٢٥:٥٩٤ player piid:1247 state:started uid:10080
+١١-١٠ ٢٢:٢٩:٢٥:٥٩٧ releasing player piid:1239
+١١-١٠ ٢٢:٢٩:٢٥:٩٣٢ new player piid:1255 uid/pid:10080/2045 type:android.media.MediaPlayer attr:AudioAttributes: usage=USAGE_UNKNOWN content=CONTENT_TYPE_UNKNOWN flags=0x800 tags= bundle=null
+١١-١٠ ٢٢:٢٩:٢٥:٩٣٢ player piid:1255 new AudioAttributes:AudioAttributes: usage=USAGE_ASSISTANCE_SONIFICATION content=CONTENT_TYPE_SONIFICATION flags=0x800 tags= bundle=null
+١١-١٠ ٢٢:٢٩:٢٥:٩٣٦ player piid:1255 has OP_PLAY_AUDIO:true in uid:10080
+١١-١٠ ٢٢:٢٩:٢٥:٩٥٦ player piid:1255 state:started uid:10080
+١١-١٠ ٢٢:٢٩:٢٥:٩٥٨ releasing player piid:1247
+١١-١٠ ٢٢:٢٩:٢٧:١٦٠ player piid:1255 state:stopped uid:10080
+١١-١٠ ٢٢:٢٩:٢٧:١٦٢ releasing player piid:1255
+١١-١٠ ٢٢:٢٩:٢٧:١٩٦ new player piid:1263 uid/pid:10080/2045 type:android.media.MediaPlayer attr:AudioAttributes: usage=USAGE_UNKNOWN content=CONTENT_TYPE_UNKNOWN flags=0x800 tags= bundle=null
+١١-١٠ ٢٢:٢٩:٢٧:١٩٩ player piid:1263 new AudioAttributes:AudioAttributes: usage=USAGE_ASSISTANCE_SONIFICATION content=CONTENT_TYPE_SONIFICATION flags=0x800 tags= bundle=null
+١١-١٠ ٢٢:٢٩:٢٧:٢٠١ player piid:1263 has OP_PLAY_AUDIO:true in uid:10080
+١١-١٠ ٢٢:٢٩:٢٧:٢٤٠ player piid:1263 state:started uid:10080
+١١-١٠ ٢٢:٢٩:٢٧:٥٥٩ new player piid:1271 uid/pid:10080/2045 type:android.media.MediaPlayer attr:AudioAttributes: usage=USAGE_UNKNOWN content=CONTENT_TYPE_UNKNOWN flags=0x800 tags= bundle=null
+١١-١٠ ٢٢:٢٩:٢٧:٥٦١ player piid:1271 new AudioAttributes:AudioAttributes: usage=USAGE_ASSISTANCE_SONIFICATION content=CONTENT_TYPE_SONIFICATION flags=0x800 tags= bundle=null
+١١-١٠ ٢٢:٢٩:٢٧:٥٦٢ player piid:1271 has OP_PLAY_AUDIO:true in uid:10080
+١١-١٠ ٢٢:٢٩:٢٧:٥٩٤ player piid:1271 state:started uid:10080
+١١-١٠ ٢٢:٢٩:٢٧:٥٩٧ releasing player piid:1263
+١١-١٠ ٢٢:٢٩:٢٨:٧٦١ player piid:1271 state:stopped uid:10080
+١١-١٠ ٢٢:٢٩:٢٨:٧٦٤ releasing player piid:1271
+١١-١٠ ٢٢:٢٩:٣٩:٩٤١ new player piid:1279 uid/pid:10080/2045 type:android.media.MediaPlayer attr:AudioAttributes: usage=USAGE_UNKNOWN content=CONTENT_TYPE_UNKNOWN flags=0x800 tags= bundle=null
+١١-١٠ ٢٢:٢٩:٣٩:٩٤١ player piid:1279 new AudioAttributes:AudioAttributes: usage=USAGE_ASSISTANCE_SONIFICATION content=CONTENT_TYPE_SONIFICATION flags=0x800 tags= bundle=null
+١١-١٠ ٢٢:٢٩:٣٩:٩٤٣ player piid:1279 has OP_PLAY_AUDIO:true in uid:10080
+١١-١٠ ٢٢:٢٩:٣٩:٩٧٨ player piid:1279 state:started uid:10080
+١١-١٠ ٢٢:٢٩:٤١:٢٢٦ player piid:1279 state:stopped uid:10080
+١١-١٠ ٢٢:٢٩:٤١:٢٢٨ releasing player piid:1279
+١١-١٠ ٢٢:٤٤:٥١:٠٨١ new player piid:1287 uid/pid:10411/28853 type:unknown attr:AudioAttributes: usage=USAGE_MEDIA content=CONTENT_TYPE_UNKNOWN flags=0x0 tags= bundle=null
+١١-١٠ ٢٢:٤٤:٥١:١٩٢ player piid:1287 state:started uid:10411
+١١-١٠ ٢٢:٤٥:٠٣:١٧٩ player piid:1287 state:stopped uid:10411
+١١-١٠ ٢٢:٤٥:٠٩:١٩٩ releasing player piid:1287
+١١-١٠ ٢٢:٥٦:١١:٩٣٦ new player piid:1295 uid/pid:10332/4200 type:android.media.MediaPlayer attr:AudioAttributes: usage=USAGE_UNKNOWN content=CONTENT_TYPE_UNKNOWN flags=0x800 tags= bundle=null
+١١-١٠ ٢٢:٥٦:١٢:٠٧٠ player piid:1295 new AudioAttributes:AudioAttributes: usage=USAGE_NOTIFICATION_RINGTONE content=CONTENT_TYPE_SONIFICATION flags=0x800 tags= bundle=null
+١١-١٠ ٢٢:٥٦:١٢:٠٧٢ player piid:1295 has OP_PLAY_AUDIO:true in uid:10332
+١١-١٠ ٢٢:٥٦:١٧:٧٨٤ releasing player piid:1031
+١١-١٠ ٢٢:٥٦:١٧:٨٤٨ player piid:1295 state:mute uid:10332
+١١-١٠ ٢٢:٥٦:١٧:٨٥٢ releasing player piid:1295
+١١-١٠ ٢٢:٥٦:٣١:٩٥٣ new player piid:1303 uid/pid:10332/4200 type:android.media.MediaPlayer attr:AudioAttributes: usage=USAGE_UNKNOWN content=CONTENT_TYPE_UNKNOWN flags=0x800 tags= bundle=null
+١١-١٠ ٢٢:٥٦:٣١:٩٧٠ player piid:1303 new AudioAttributes:AudioAttributes: usage=USAGE_NOTIFICATION_RINGTONE content=CONTENT_TYPE_SONIFICATION flags=0x800 tags= bundle=null
+١١-١٠ ٢٢:٥٦:٣١:٩٧١ player piid:1303 has OP_PLAY_AUDIO:true in uid:10332
+١١-١٠ ٢٢:٥٦:٤٧:٠٠٨ player piid:1303 state:mute uid:10332
+١١-١٠ ٢٢:٥٦:٤٧:٠١٤ releasing player piid:1303
+١١-١٠ ٢٢:٥٨:٢٦:٤٩٠ new player piid:1311 uid/pid:10411/32121 type:android.media.MediaPlayer attr:AudioAttributes: usage=USAGE_UNKNOWN content=CONTENT_TYPE_UNKNOWN flags=0x800 tags= bundle=null
+١١-١٠ ٢٢:٥٨:٢٦:٤٩٣ player piid:1311 new AudioAttributes:AudioAttributes: usage=USAGE_ALARM content=CONTENT_TYPE_MUSIC flags=0x800 tags= bundle=null
+١١-١٠ ٢٢:٥٨:٢٦:٥٠٠ player piid:1311 has OP_PLAY_AUDIO:true in uid:10411
+١١-١٠ ٢٢:٥٨:٢٦:٧٦٩ player piid:1311 state:started uid:10411
+١١-١٠ ٢٢:٥٨:٣٦:٧١١ player piid:1311 state:started uid:10411
+١١-١٠ ٢٣:٠٠:٢٨:١٣٠ releasing player piid:1311
+١١-١٠ ٢٣:٠٢:٠٨:٩٣٤ new player piid:1319 uid/pid:10332/4200 type:android.media.MediaPlayer attr:AudioAttributes: usage=USAGE_UNKNOWN content=CONTENT_TYPE_UNKNOWN flags=0x800 tags= bundle=null
+١١-١٠ ٢٣:٠٢:٠٨:٩٦٧ player piid:1319 new AudioAttributes:AudioAttributes: usage=USAGE_NOTIFICATION_RINGTONE content=CONTENT_TYPE_SONIFICATION flags=0x800 tags= bundle=null
+١١-١٠ ٢٣:٠٢:٠٨:٩٦٩ player piid:1319 has OP_PLAY_AUDIO:true in uid:10332
+١١-١٠ ٢٣:٠٢:١١:٣٤٦ player piid:1319 state:mute uid:10332
+١١-١٠ ٢٣:٠٢:١١:٣٤٩ releasing player piid:1319
+
+  allowed capture policies:
+
+RecordActivityMonitor dump time: ١١:٠٣:٤٥ م
+
+
+Audio event log: recording activity received by AudioService
+١١-١٠ ١٢:٠٤:٤١:٣٥٣ rec update riid:455 uid:10332 session:449 src:VOICE_COMMUNICATION pack:com.facebook.orca
+١١-١٠ ١٢:٠٦:٣٣:١٥٦ rec stop riid:455 uid:10332 session:449 src:VOICE_COMMUNICATION pack:com.facebook.orca
+١١-١٠ ١٢:٠٨:٥٨:٨٣٦ rec update riid:607 uid:10332 session:601 src:VOICE_COMMUNICATION pack:com.facebook.orca
+١١-١٠ ١٢:٠٩:٢٢:٩٣٥ rec stop riid:607 uid:10332 session:601 src:VOICE_COMMUNICATION pack:com.facebook.orca
+١١-١٠ ٢١:٥٥:١٦:٧٢١ rec update riid:959 uid:10332 session:977 src:VOICE_COMMUNICATION pack:com.facebook.orca
+١١-١٠ ٢١:٥٧:٣٦:٢٨١ rec stop riid:959 uid:10332 session:977 src:VOICE_COMMUNICATION pack:com.facebook.orca
+
+AudioDeviceBroker:
+  Message handler (watch for unhandled messages):
+    Handler (com.android.server.audio.AudioDeviceBroker$BrokerHandler) {15e1f98} @ 37367915
+      Looper (AudioDeviceBroker, tid 145) {a43f3f1}
+        (Total messages: 0, polling=true, quitting=false)
+
+  Preferred devices for strategy:
+
+  Connected devices:
+    [DeviceInfo: type:0x2 (speaker) name:speaker addr: codec: 0]
+
+  APM Connected device (A2DP sink only):
+
+  mForcedUseForComm: FORCE_NONE
+  mForcedUseForCommExt: FORCE_NONE
+  mModeOwnerPid: 0
+  Speakerphone clients:
+    pid: 4200 on: false cb: android.os.BinderProxy@a87bd6
+
+  mBluetoothHeadset: android.bluetooth.BluetoothHeadset@afc1e57
+  mBluetoothHeadsetDevice: null
+  mScoAudioState: SCO_STATE_INACTIVE
+  mScoAudioMode: SCO_MODE_VIRTUAL_CALL
+  Sco clients:
+
+  mHearingAid: null
+  mA2dp: android.bluetooth.BluetoothA2dp@ce19d44
+  mAvrcpAbsVolSupported: false
+
+SoundEffects:
+  Message handler (watch for unhandled messages):
+  Handler (com.android.server.audio.SoundEffectsHelper$SfxHandler) {92de2d} @ 37367924
+    Looper (AS.SfxWorker, tid 143) {2087f62}
+      (Total messages: 0, polling=true, quitting=false)
+  Default attenuation (dB): -6
+Audio event log: Sound Effects Loading
+١١-١٠ ١٠:٥٧:٢٤:٠٩٥ effects loading started
+١١-١٠ ١٠:٥٧:٢٤:٣٦١ effect Effect_Tick.ogg loaded
+١١-١٠ ١٠:٥٧:٢٤:٣٦٢ effect TW_Touch.ogg loaded
+١١-١٠ ١٠:٥٧:٢٤:٣٨٤ effect KeypressInvalid_1.ogg loaded
+١١-١٠ ١٠:٥٧:٢٤:٣٩٦ effect TW_SIP.ogg loaded
+١١-١٠ ١٠:٥٧:٢٤:٤٣٠ effect TW_Silent_mode_off.ogg loaded
+١١-١٠ ١٠:٥٧:٢٤:٤٥٩ effect Timepicker_scroll.ogg loaded
+١١-١٠ ١٠:٥٧:٢٤:٤٧٣ effect S_HW_Touch.ogg loaded
+١١-١٠ ١٠:٥٧:٢٤:٤٧٣ effects loading completed
+١١-١٠ ١٠:٥٧:٢٩:١٠٩ effects unloading started
+١١-١٠ ١٠:٥٧:٢٩:١١٥ effects unloading completed
+١١-١٠ ١٠:٥٧:٢٩:١١٥ effects loading started
+١١-١٠ ١٠:٥٧:٢٩:١٨١ effect Effect_Tick.ogg loaded
+١١-١٠ ١٠:٥٧:٢٩:١٨٩ effect TW_Touch.ogg loaded
+١١-١٠ ١٠:٥٧:٢٩:١٩٦ effect TW_SIP.ogg loaded
+١١-١٠ ١٠:٥٧:٢٩:٢٠٨ effect KeypressInvalid_1.ogg loaded
+١١-١٠ ١٠:٥٧:٢٩:٢٢٤ effect TW_Silent_mode_off.ogg loaded
+١١-١٠ ١٠:٥٧:٢٩:٢٢٦ effect S_HW_Touch.ogg loaded
+١١-١٠ ١٠:٥٧:٢٩:٢٣٨ effect Timepicker_scroll.ogg loaded
+١١-١٠ ١٠:٥٧:٢٩:٢٣٨ effects loading completed
+
+
+
+Event logs:
+Audio event log: phone state (logged after successful call to AudioSystem.setPhoneState(int, int))
+١١-١٠ ٢١:٥٣:٣٧:١٣١ setMode(MODE_NORMAL) from package=com.facebook.orca pid=4200 selected mode=MODE_NORMAL by pid=0
+١١-١٠ ٢١:٥٣:٤١:٤١٢ setMode(MODE_RINGTONE) from package=com.facebook.orca pid=4200 selected mode=MODE_RINGTONE by pid=4200
+١١-١٠ ٢١:٥٣:٤٥:٤٢٦ setMode(MODE_NORMAL) from package=com.facebook.orca pid=4200 selected mode=MODE_NORMAL by pid=0
+١١-١٠ ٢١:٥٣:٤٩:٦٣٠ setMode(MODE_RINGTONE) from package=com.facebook.orca pid=4200 selected mode=MODE_RINGTONE by pid=4200
+١١-١٠ ٢١:٥٣:٥٢:٤٩٠ setMode(MODE_NORMAL) from package=com.facebook.orca pid=4200 selected mode=MODE_NORMAL by pid=0
+١١-١٠ ٢١:٥٤:١٦:٥٠٦ setMode(MODE_RINGTONE) from package=com.facebook.orca pid=4200 selected mode=MODE_RINGTONE by pid=4200
+١١-١٠ ٢١:٥٤:١٩:٥٦٩ setMode(MODE_NORMAL) from package=com.facebook.orca pid=4200 selected mode=MODE_NORMAL by pid=0
+١١-١٠ ٢١:٥٤:٢٤:٣٦٣ setMode(MODE_RINGTONE) from package=com.facebook.orca pid=4200 selected mode=MODE_RINGTONE by pid=4200
+١١-١٠ ٢١:٥٤:٣٢:١٢٠ setMode(MODE_NORMAL) from package=com.facebook.orca pid=4200 selected mode=MODE_NORMAL by pid=0
+١١-١٠ ٢١:٥٤:٣٧:٩٣٠ setMode(MODE_RINGTONE) from package=com.facebook.orca pid=4200 selected mode=MODE_RINGTONE by pid=4200
+١١-١٠ ٢١:٥٤:٤٨:٦٠٨ setMode(MODE_NORMAL) from package=com.facebook.orca pid=4200 selected mode=MODE_NORMAL by pid=0
+١١-١٠ ٢١:٥٥:٠٤:٣٠١ setMode(MODE_RINGTONE) from package=com.facebook.orca pid=4200 selected mode=MODE_RINGTONE by pid=4200
+١١-١٠ ٢١:٥٥:١٦:٠٨٧ setMode(MODE_IN_COMMUNICATION) from package=com.facebook.orca pid=4200 selected mode=MODE_IN_COMMUNICATION by pid=4200
+١١-١٠ ٢١:٥٧:٣٧:٧١٦ setMode(MODE_NORMAL) from package=com.facebook.orca pid=4200 selected mode=MODE_NORMAL by pid=0
+١١-١٠ ٢٢:٥٦:١١:٩٢٣ setMode(MODE_RINGTONE) from package=com.facebook.orca pid=4200 selected mode=MODE_RINGTONE by pid=4200
+١١-١٠ ٢٢:٥٦:١٧:٨٩٤ setMode(MODE_NORMAL) from package=com.facebook.orca pid=4200 selected mode=MODE_NORMAL by pid=0
+١١-١٠ ٢٢:٥٦:٣١:٩٥١ setMode(MODE_RINGTONE) from package=com.facebook.orca pid=4200 selected mode=MODE_RINGTONE by pid=4200
+١١-١٠ ٢٢:٥٦:٤٧:٠٦٦ setMode(MODE_NORMAL) from package=com.facebook.orca pid=4200 selected mode=MODE_NORMAL by pid=0
+١١-١٠ ٢٣:٠٢:٠٨:٩٢٢ setMode(MODE_RINGTONE) from package=com.facebook.orca pid=4200 selected mode=MODE_RINGTONE by pid=4200
+١١-١٠ ٢٣:٠٢:١١:٤٢٧ setMode(MODE_NORMAL) from package=com.facebook.orca pid=4200 selected mode=MODE_NORMAL by pid=0
+
+
+Audio event log: wired/A2DP/hearing aid device connection
+١١-١٠ ١٠:٥٧:٢٩:٥٧٦ BT profile service: connecting A2DP profile
+١١-١٠ ١٠:٥٧:٣٠:٠١٣ BT profile service: connecting HEADSET profile
+١١-١٠ ١٠:٥٧:٣٠:٠٥٩ BT profile service: connecting HEADSET profile
+١١-١٠ ١١:٥٥:٠٤:٢٧٢ startBluetoothSco()) from u/pid:10332/4200
+١١-١٠ ١١:٥٥:٠٤:٥٩١ msg: setBluetoothA2dpDeviceConnectionStateSuppressNoisyIntent  state=2 addr=34:23:38:AE:8E:2D prof=2 supprNoisy=true vol=-1
+١١-١٠ ١١:٥٥:٠٤:٦٢٢ onBluetoothA2dpActiveDeviceChange addr=34:23:38:AE:8E:2D event=DEVICE_CONFIG_CHANGE
+١١-١٠ ١١:٥٥:٠٤:٦٣٠ A2DP sink connected: device addr=34:23:38:AE:8E:2D state=2 codec=AUDIO_FORMAT_AAC vol=-1
+١١-١٠ ١١:٥٥:٠٥:٢٦٣ A2DP device addr=34:23:38:AE:8E:2D now available
+١١-١٠ ١١:٥٥:٠٥:٢٦٨ onBluetoothA2dpActiveDeviceChange addr=34:23:38:AE:8E:2D event=DEVICE_CONFIG_CHANGE
+١١-١٠ ١١:٥٥:٠٥:٨٣٠ APM handleDeviceConfigChange success for A2DP device addr=34:23:38:AE:8E:2D codec=AUDIO_FORMAT_AAC
+١١-١٠ ١١:٥٥:٣٢:٤٨١ stopBluetoothSco()) from u/pid:10332/4200
+١١-١٠ ١١:٥٧:٥٧:٣٣٧ startBluetoothSco()) from u/pid:10332/4200
+١١-١٠ ١١:٥٨:٥٥:٦٧١ stopBluetoothSco()) from u/pid:10332/4200
+١١-١٠ ١١:٥٩:٠٤:٩٣٩ startBluetoothSco()) from u/pid:10332/4200
+١١-١٠ ١٢:٠٠:٠٤:١٤٤ stopBluetoothSco()) from u/pid:10332/4200
+١١-١٠ ١٢:٠٠:٥١:٦١٤ startBluetoothSco()) from u/pid:10332/4200
+١١-١٠ ١٢:٠١:٣٢:٨٤٦ stopBluetoothSco()) from u/pid:10332/4200
+١١-١٠ ١٢:٠٣:٥٠:٢٩٩ startBluetoothSco()) from u/pid:10332/4200
+١١-١٠ ١٢:٠٦:٣٤:٢٠٣ stopBluetoothSco()) from u/pid:10332/4200
+١١-١٠ ١٢:٠٦:٥٥:٢٢١ startBluetoothSco()) from u/pid:10332/4200
+١١-١٠ ١٢:٠٦:٥٨:٩٢٧ stopBluetoothSco()) from u/pid:10332/4200
+١١-١٠ ١٢:٠٧:٠٣:٩٩١ startBluetoothSco()) from u/pid:10332/4200
+١١-١٠ ١٢:٠٧:٠٦:١٧٣ stopBluetoothSco()) from u/pid:10332/4200
+١١-١٠ ١٢:٠٧:١٠:٦٨٧ startBluetoothSco()) from u/pid:10332/4200
+١١-١٠ ١٢:٠٧:١٣:١٩٠ stopBluetoothSco()) from u/pid:10332/4200
+١١-١٠ ١٢:٠٨:١٨:٤٤٠ startBluetoothSco()) from u/pid:10332/4200
+١١-١٠ ١٢:٠٨:٢٠:٨٢٧ stopBluetoothSco()) from u/pid:10332/4200
+١١-١٠ ١٢:٠٨:٢٧:٠٠١ startBluetoothSco()) from u/pid:10332/4200
+١١-١٠ ١٢:٠٨:٢٨:٦٩٦ stopBluetoothSco()) from u/pid:10332/4200
+١١-١٠ ١٢:٠٨:٣٤:٦٧٨ startBluetoothSco()) from u/pid:10332/4200
+١١-١٠ ١٢:٠٨:٣٦:٢٤١ stopBluetoothSco()) from u/pid:10332/4200
+١١-١٠ ١٢:٠٨:٤٦:٦٠٨ startBluetoothSco()) from u/pid:10332/4200
+١١-١٠ ١٢:٠٨:٤٧:٨٨٥ stopBluetoothSco()) from u/pid:10332/4200
+١١-١٠ ١٢:٠٨:٥٢:٩٦٧ startBluetoothSco()) from u/pid:10332/4200
+١١-١٠ ١٢:٠٩:٢٣:٩٦٥ stopBluetoothSco()) from u/pid:10332/4200
+١١-١٠ ١٢:١٨:٤١:٦٦٠ msg: setBluetoothA2dpDeviceConnectionStateSuppressNoisyIntent  state=0 addr=34:23:38:AE:8E:2D prof=2 supprNoisy=false vol=-1
+١١-١٠ ١٢:١٨:٤١:٦٦٨ dropping ACTION_AUDIO_BECOMING_NOISY
+١١-١٠ ١٢:١٨:٤١:٦٧٤ A2DP sink connected: device addr=34:23:38:AE:8E:2D state=0 codec=AUDIO_FORMAT_AAC vol=-1
+١١-١٠ ١٢:١٨:٤١:٧٢٩ A2DP device addr=34:23:38:AE:8E:2D made unavailable
+١١-١٠ ١٢:١٩:٠٣:٨٨٥ msg: setBluetoothA2dpDeviceConnectionStateSuppressNoisyIntent  state=2 addr=34:23:38:AE:8E:2D prof=2 supprNoisy=true vol=-1
+١١-١٠ ١٢:١٩:٠٣:٩٢٩ A2DP sink connected: device addr=34:23:38:AE:8E:2D state=2 codec=AUDIO_FORMAT_AAC vol=-1
+١١-١٠ ١٢:١٩:٠٤:٧١٧ A2DP device addr=34:23:38:AE:8E:2D now available
+١١-١٠ ١٢:١٩:٥٩:٠٣١ msg: setBluetoothA2dpDeviceConnectionStateSuppressNoisyIntent  state=0 addr=34:23:38:AE:8E:2D prof=2 supprNoisy=false vol=-1
+١١-١٠ ١٢:١٩:٥٩:٠٤٧ broadcast ACTION_AUDIO_BECOMING_NOISY
+١١-١٠ ١٢:١٩:٥٩:٥٤٨ A2DP sink connected: device addr=34:23:38:AE:8E:2D state=0 codec=AUDIO_FORMAT_AAC vol=-1
+١١-١٠ ١٢:١٩:٥٩:٥٧٨ A2DP device addr=34:23:38:AE:8E:2D made unavailable
+١١-١٠ ١٨:٤٥:٣٩:٨٠٤ startBluetoothSco()) from u/pid:10332/4200
+١١-١٠ ١٨:٤٥:٣٩:٨٣٢ startBluetoothSco()) from u/pid:10332/4200
+١١-١٠ ١٨:٤٥:٣٩:٨٤٥ startBluetoothSco()) from u/pid:10332/4200
+١١-١٠ ١٨:٤٥:٣٩:٨٥٤ stopBluetoothSco()) from u/pid:10332/4200
+
+
+Audio event log: force use (logged before setForceUse() is executed)
+١١-١٠ ٢١:٥٥:٠٤:٢٧٩ setForceUse(FOR_COMMUNICATION, FORCE_NONE) due to setSpeakerphoneOn(false) from u/pid:10332/4200 Package Name:com.facebook.orca
+١١-١٠ ٢١:٥٥:٠٤:٣٤٢ setForceUse(FOR_VIBRATE_RINGING, FORCE_NONE) due to muteRingerModeStreams() from u/pid:10332/4200 com.facebook.orca
+١١-١٠ ٢١:٥٥:١٦:١٣٥ setForceUse(FOR_VIBRATE_RINGING, FORCE_NONE) due to muteRingerModeStreams() from u/pid:10332/4200 com.facebook.orca
+١١-١٠ ٢١:٥٧:٣٧:٤٤١ setForceUse(FOR_COMMUNICATION, FORCE_NONE) due to setSpeakerphoneOn(false) from u/pid:10332/4200 Package Name:com.facebook.orca
+١١-١٠ ٢١:٥٧:٣٧:٧٩٢ setForceUse(FOR_COMMUNICATION, FORCE_NONE) due to setNewModeOwner
+١١-١٠ ٢١:٥٧:٣٧:٨٠٠ setForceUse(FOR_VIBRATE_RINGING, FORCE_NONE) due to muteRingerModeStreams() from u/pid:10332/4200 com.facebook.orca
+١١-١٠ ٢٢:٠٠:٠٠:٠٧٤ setForceUse(FOR_DOCK, FORCE_ANALOG_DOCK) due to readDockAudioSettings
+١١-١٠ ٢٢:٤٠:١٧:٥٣٠ setForceUse(FOR_DOCK, FORCE_ANALOG_DOCK) due to readDockAudioSettings
+١١-١٠ ٢٢:٥٦:١١:٨٥٥ setForceUse(FOR_COMMUNICATION, FORCE_NONE) due to setSpeakerphoneOn(false) from u/pid:10332/4200 Package Name:com.facebook.orca
+١١-١٠ ٢٢:٥٦:١١:٩٨٥ setForceUse(FOR_VIBRATE_RINGING, FORCE_NONE) due to muteRingerModeStreams() from u/pid:10332/4200 com.facebook.orca
+١١-١٠ ٢٢:٥٦:١٧:٩٢٧ setForceUse(FOR_VIBRATE_RINGING, FORCE_NONE) due to muteRingerModeStreams() from u/pid:10332/4200 com.facebook.orca
+١١-١٠ ٢٢:٥٦:١٧:٩٢٨ setForceUse(FOR_COMMUNICATION, FORCE_NONE) due to setNewModeOwner
+١١-١٠ ٢٢:٥٦:٣١:٩١٦ setForceUse(FOR_COMMUNICATION, FORCE_NONE) due to setSpeakerphoneOn(false) from u/pid:10332/4200 Package Name:com.facebook.orca
+١١-١٠ ٢٢:٥٦:٣١:٩٩٣ setForceUse(FOR_VIBRATE_RINGING, FORCE_NONE) due to muteRingerModeStreams() from u/pid:10332/4200 com.facebook.orca
+١١-١٠ ٢٢:٥٦:٤٧:١٠٨ setForceUse(FOR_VIBRATE_RINGING, FORCE_NONE) due to muteRingerModeStreams() from u/pid:10332/4200 com.facebook.orca
+١١-١٠ ٢٢:٥٦:٤٧:١١١ setForceUse(FOR_COMMUNICATION, FORCE_NONE) due to setNewModeOwner
+١١-١٠ ٢٣:٠٢:٠٨:٨٤٣ setForceUse(FOR_COMMUNICATION, FORCE_NONE) due to setSpeakerphoneOn(false) from u/pid:10332/4200 Package Name:com.facebook.orca
+١١-١٠ ٢٣:٠٢:٠٨:٩٩٥ setForceUse(FOR_VIBRATE_RINGING, FORCE_NONE) due to muteRingerModeStreams() from u/pid:10332/4200 com.facebook.orca
+١١-١٠ ٢٣:٠٢:١١:٤٧٥ setForceUse(FOR_VIBRATE_RINGING, FORCE_NONE) due to muteRingerModeStreams() from u/pid:10332/4200 com.facebook.orca
+١١-١٠ ٢٣:٠٢:١١:٤٧٨ setForceUse(FOR_COMMUNICATION, FORCE_NONE) due to setNewModeOwner
+
+
+Audio event log: volume changes (logged when command received by AudioService)
+١١-١٠ ١١:٥٥:٠٤:٥٦١ BtHelper.receiveBtEvent dev:0x20 volIdx:150
+١١-١٠ ١١:٥٥:٠٤:٥٨٧ avrcpSupportsAbsoluteVolume addr=34:23:38:AE:8E:2D support=true
+١١-١٠ ١١:٥٥:٠٤:٦١٨ a2dp AVC : true
+١١-١٠ ١١:٥٥:٠٤:٦١٩ setActiveBluetoothDevice dev:0x80 volIdx:89
+١١-١٠ ١١:٥٥:٠٤:٦٣١ onSetA2dpSinkConnectionState dev:0x80 volIdx:89
+١١-١٠ ١١:٥٧:٥٧:٤٩٣ BtHelper.receiveBtEvent dev:0x20 volIdx:150
+١١-١٠ ١١:٥٩:٠٥:١٤٦ BtHelper.receiveBtEvent dev:0x20 volIdx:150
+١١-١٠ ١٢:٠٠:٥١:٩٩٨ BtHelper.receiveBtEvent dev:0x20 volIdx:150
+١١-١٠ ١٢:٠٣:٥٠:٦٢٨ BtHelper.receiveBtEvent dev:0x20 volIdx:150
+١١-١٠ ١٢:٠٦:٥٥:٤٣٩ BtHelper.receiveBtEvent dev:0x20 volIdx:150
+١١-١٠ ١٢:٠٧:٠٤:٢١١ BtHelper.receiveBtEvent dev:0x20 volIdx:150
+١١-١٠ ١٢:٠٧:١٠:٩٢٨ BtHelper.receiveBtEvent dev:0x20 volIdx:150
+١١-١٠ ١٢:٠٨:١٩:١٩٢ BtHelper.receiveBtEvent dev:0x20 volIdx:150
+١١-١٠ ١٢:٠٨:٢٧:٤١٦ BtHelper.receiveBtEvent dev:0x20 volIdx:150
+١١-١٠ ١٢:٠٨:٣٤:٨٨٨ BtHelper.receiveBtEvent dev:0x20 volIdx:150
+١١-١٠ ١٢:٠٨:٤٦:٩٥٠ BtHelper.receiveBtEvent dev:0x20 volIdx:150
+١١-١٠ ١٢:٠٨:٥٣:٢٧٦ BtHelper.receiveBtEvent dev:0x20 volIdx:150
+١١-١٠ ١٢:١٨:٤١:٥٢٨ avrcpSupportsAbsoluteVolume addr=null support=false
+١١-١٠ ١٢:١٩:٠٣:٨٥٥ avrcpSupportsAbsoluteVolume addr=34:23:38:AE:8E:2D support=true
+١١-١٠ ١٢:١٩:٠٣:٨٨٦ a2dp AVC : true
+١١-١٠ ١٢:١٩:٠٣:٩٤٤ onSetA2dpSinkConnectionState dev:0x80 volIdx:89
+١١-١٠ ١٢:١٩:٥٨:٩٥٨ avrcpSupportsAbsoluteVolume addr=null support=false
+
+
+Supported System Usages:
+	USAGE_CALL_ASSISTANT
+
+
+Audio event log: ringermode changes
+Audio event log: setMicrophoneMute use (logged after setMicrophoneMute() is executed)
+Audio event log: setMasterMute (logged when command received by AudioService)
+Audio event log: Using Audio
+١١-١٠ ١٠:٥٧:٢٠:٧٢٩ register : android.media.AudioManager$2@2520427, android
+١١-١٠ ١٠:٥٧:٢٩:٧٣٦ register : android.media.IPlaybackConfigDispatcher$Stub$Proxy@23bf0a0, com.android.bluetooth
+١١-١٠ ١١:٠٦:١٢:٠٠٧ register : android.media.IPlaybackConfigDispatcher$Stub$Proxy@9fd5fd9, com.sec.android.sdhms
+١١-١٠ ١١:٥٦:٣٤:٤٧٨ register : android.media.IPlaybackConfigDispatcher$Stub$Proxy@53ce9, com.google.android.gms
+١١-١٠ ١٦:١١:٤١:٢٥٣ unregister : android.media.IPlaybackConfigDispatcher$Stub$Proxy@66643b2
+١١-١٠ ١٦:١١:٤٥:٩١٦ register : android.media.IPlaybackConfigDispatcher$Stub$Proxy@aa2902b, com.google.android.gms
+١١-١٠ ١٦:١١:٤٦:٠٢٠ unregister : android.media.IPlaybackConfigDispatcher$Stub$Proxy@b1a55d0
+١١-١٠ ١٦:١١:٤٩:٥٣٨ register : android.media.IPlaybackConfigDispatcher$Stub$Proxy@f95ccb8, com.google.android.gms
+١١-١٠ ١٨:٢٨:٠٧:٥٦٤ unregister : android.media.IPlaybackConfigDispatcher$Stub$Proxy@9087b70
+١١-١٠ ٢١:٥٧:١٩:٨٩٠ uid:10332is using audio
+١١-١٠ ٢١:٥٧:٣٤:٨٨٧ uid:10332is using audio
+١١-١٠ ٢٢:٥١:٣٢:٠٩٩ register : android.media.IPlaybackConfigDispatcher$Stub$Proxy@25395ba, com.google.android.gms
+١١-١٠ ٢٣:٠٠:١٤:٤٢١ uid:10411is using audio
+Audio event log: App Volume
+Audio event log: Ringtone Change history
+
+Audio Setting:
+  mNbQualityMode=0
+  mAllSoundMute=0
+  mMasterMono=0
+  mMasterBalance=0.0
+  mUhqBtSampleRate=44100
+  mIsSupportDisplayVolumeControl=false
+  mIsDLNAEnabled=false
+  isTalkBackEnabled=false
+  isFactoryMode=false
+  mAdaptSoundEnabled=0
+  mUpscalerEnabled=0
+  mAdjustMediaVolumeOnly=true
+  mSelfiestickIsConnected=false
+  mMediaVolumeStepIndex=10
+  mMediaVolumeSteps=null
+  mIgnoreAudioFocusUid=-1
+  mHeadsetOnlyStream=32
+  mEnableSoundAssistant=false
+  mLRSwitching=0
+  CPUBoostValueForVoIP=0
+  SEC_AUDIO_SAFE_MEDIA_VOLUME=false
+  mSafeMediaVolumeStateForBlueTooth=1
+  SEC_AUDIO_SUPPORT_DUAL_SPEAKER=false
+  mVolumeLimitOn=false
+  mVolumeLimitValue=9
+  mIsPttCallVolumeEnabled=false
+  OneUIVersion=core3.1
+
+Sco Client list entries: 
+
+MultiSound, size:0, isEnabled:false
+  Current Default Device: 0x2
+  Pin Device: 0x0
+  Pin App: 
+  SEC_AUDIO_MULTI_SOUND=true
+  SEC_AUDIO_SUPPORT_D2D=true
+  mPreventOverheatState=mUid:-1, state:false, volume : 1.0, mCureDevice : 0
+
+SEC_AUDIO_DUAL_A2DP_VOLUME=true
+  A2dp Devices: 
+  AvrcpAbsoluteVolumeSupported
+main fine volume : -1
+  Active device: null
+  Dual Sound: false
+Audio event log: Dual A2dp Event history
+١١-١٠ ١١:٥٥:٠٤:٥٨٨ AVC:34:23:38:AE:8E:2D,support:true
+١١-١٠ ١١:٥٥:٠٤:٦١٢ connect :34:23:38:AE:8E:2D,active:34:23:38:AE:8E:2D,state:2
+١١-١٠ ١١:٥٥:٠٤:٦١٦ Restore vol:89,default:89
+١١-١٠ ١١:٥٥:٠٤:٦١٧ setActive:34:23:38:AE:8E:2D,prev:null
+١١-١٠ ١١:٥٥:٠٤:٦١٩ setActive:34:23:38:AE:8E:2D,prev:34:23:38:AE:8E:2D
+١١-١٠ ١٢:١٨:٤١:٥٣٠ AVC:null,support:false
+١١-١٠ ١٢:١٨:٤١:٦٧٣ connect :34:23:38:AE:8E:2D,active:null,state:0
+١١-١٠ ١٢:١٨:٤١:٧٣١ setActive:null,prev:34:23:38:AE:8E:2D
+١١-١٠ ١٢:١٩:٠٣:٨٥٧ AVC:34:23:38:AE:8E:2D,support:true
+١١-١٠ ١٢:١٩:٠٣:٨٨٥ setActive:34:23:38:AE:8E:2D,prev:null
+١١-١٠ ١٢:١٩:٠٣:٩٢١ connect :34:23:38:AE:8E:2D,active:34:23:38:AE:8E:2D,state:2
+١١-١٠ ١٢:١٩:٠٣:٩٢٢ Restore vol:89,default:89
+١١-١٠ ١٢:١٩:٠٣:٩٢٢ setActive:34:23:38:AE:8E:2D,prev:34:23:38:AE:8E:2D
+١١-١٠ ١٢:١٩:٥٨:٩٥٩ AVC:null,support:false
+١١-١٠ ١٢:١٩:٥٩:٠٣٩ connect :34:23:38:AE:8E:2D,active:null,state:0
+١١-١٠ ١٢:١٩:٥٩:٠٤٧ setActive:null,prev:34:23:38:AE:8E:2D
+
+Audio event log: Dual A2dp Volume history
+١١-١٠ ١١:٥٥:٠٤:٥٣٨ setVolume:34:23:38:AE:8E:2D,idx:89
+١١-١٠ ١١:٥٥:٠٤:٦١٨ updateVolume:89,main:89
+١١-١٠ ١١:٥٥:٠٥:٨٥٨ setVolume:34:23:38:AE:8E:2D,idx:89
+١١-١٠ ١١:٥٥:٣٢:٧٣٣ updateVolume:89,main:89
+١١-١٠ ١١:٥٧:٥٧:١٤٣ updateVolume:89,main:89
+١١-١٠ ١١:٥٨:٥٥:٧١٨ updateVolume:89,main:89
+١١-١٠ ١١:٥٩:٠٤:٨٨٣ updateVolume:89,main:89
+١١-١٠ ١٢:٠٠:٠٤:٢٠٩ updateVolume:89,main:89
+١١-١٠ ١٢:٠٠:٥١:٥٥١ updateVolume:89,main:89
+١١-١٠ ١٢:٠١:٣٢:٩٠٣ updateVolume:89,main:89
+١١-١٠ ١٢:٠٣:٥٠:٢٤٩ updateVolume:89,main:89
+١١-١٠ ١٢:٠٦:٣٤:٤٨٣ updateVolume:89,main:89
+١١-١٠ ١٢:٠٦:٥٤:٩٤٣ updateVolume:89,main:89
+١١-١٠ ١٢:٠٦:٥٨:٩٦١ updateVolume:89,main:89
+١١-١٠ ١٢:٠٧:٠٣:٩٢١ updateVolume:89,main:89
+١١-١٠ ١٢:٠٧:٠٦:٢١٨ updateVolume:89,main:89
+١١-١٠ ١٢:٠٧:١٠:٦٤٢ updateVolume:89,main:89
+١١-١٠ ١٢:٠٧:١٣:٢٣٨ updateVolume:89,main:89
+١١-١٠ ١٢:٠٨:١٨:٣٨٩ updateVolume:89,main:89
+١١-١٠ ١٢:٠٨:٢٠:٨٨٠ updateVolume:89,main:89
+١١-١٠ ١٢:٠٨:٢٦:٩٤٢ updateVolume:89,main:89
+١١-١٠ ١٢:٠٨:٢٨:٧٤٧ updateVolume:89,main:89
+١١-١٠ ١٢:٠٨:٣٤:٦٣٥ updateVolume:89,main:89
+١١-١٠ ١٢:٠٨:٣٦:٢٨٨ updateVolume:89,main:89
+١١-١٠ ١٢:٠٨:٤٦:٥٦٣ updateVolume:89,main:89
+١١-١٠ ١٢:٠٨:٤٧:٩٢١ updateVolume:89,main:89
+١١-١٠ ١٢:٠٨:٥٢:٩٢٦ updateVolume:89,main:89
+١١-١٠ ١٢:٠٩:٢٤:٢٥٣ updateVolume:89,main:89
+١١-١٠ ١٢:١٩:٠٣:٧٠٢ setVolume:34:23:38:AE:8E:2D,idx:89
+١١-١٠ ١٢:١٩:٠٤:٧٤٥ setVolume:34:23:38:AE:8E:2D,idx:89

@@ -98,7 +98,6 @@ export default function MorePage() {
     { href: '/sunan', title: dict.morePage.sunan, subtitle: '', icon: <Moon className="size-5" /> },
     { href: '/guide', title: dict.morePage.guide, subtitle: '', icon: <Library className="size-5" /> },
     { href: '/calendar', title: dict.morePage.calendar, subtitle: '', icon: <CalendarDays className="size-5" /> },
-    // ✅ الأطفال (اسم مباشر لضمان الظهور)
     { href: '/kids', title: locale === 'ar' ? 'ركن الأطفال' : 'Kids Corner', subtitle: '', icon: <Baby className="size-5" /> },
   ]
 
@@ -164,14 +163,21 @@ export default function MorePage() {
               icon={<QrCode className="size-5" aria-hidden="true" />}
               onClick={() => setShowQR(true)}
             />
-            {isApp && (
-              <ActionTile
-                title={dict.morePage.exit}
-                subtitle=""
-                icon={<LogOut className="size-5" aria-hidden="true" />}
-                onClick={() => exitNativeApp()}
-              />
-            )}
+            {/* ✅ زر الخروج يظهر دائماً. في الويب لا يفعل شيئاً، وفي التطبيق يغلق التطبيق. */}
+            <ActionTile
+              title={dict.morePage.exit}
+              subtitle=""
+              icon={<LogOut className="size-5" aria-hidden="true" />}
+              onClick={async () => {
+                if (isApp) {
+                  await exitNativeApp()
+                } else {
+                  // في المتصفح، لا تفعل شيئاً
+                  // window.close() قد لا يعمل إلا لنوافذ مفتوحة بواسطة JS
+                  window.close()
+                }
+              }}
+            />
           </div>
         </section>
 
