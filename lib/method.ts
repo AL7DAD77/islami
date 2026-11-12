@@ -78,11 +78,14 @@ function getCustomParams(method: CustomMethodKey): CalculationParameters {
 
   switch (method) {
     case 'JordanAwqaf':
+      // ✅ طريقة الأردن الرسمية (وفقاً لدار الإفتاء الأردنية)
       parameters.fajrAngle = 18
       parameters.ishaAngle = 18
 
+      // ✅ إضافة الدقائق الاحتياطية
       parameters.adjustments.dhuhr = 0
-      parameters.adjustments.maghrib = 0
+      parameters.adjustments.maghrib = 5
+      parameters.adjustments.isha = 5
 
       break
 

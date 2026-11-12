@@ -109,7 +109,6 @@ export function AdhanSettings() {
     }
   }
 
-  // ✅ التعديل الجوهري: حفظ في prayerVoices[key] لكل صلاة على حدة
   const setPrayerVoice = (prayer: PrayerKey, id: string) => {
     stopPreview()
     setPlaying(null)
@@ -147,10 +146,13 @@ export function AdhanSettings() {
     return dict.prayers[dictKey] || PRAYER_NAMES[key as keyof typeof PRAYER_NAMES]
   }
 
+  // ✅ إظهار زر التجربة فقط في وضع التطوير
+  const isDevelopment = process.env.NODE_ENV === 'development'
+
   return (
     <div className="flex flex-col gap-6" dir={locale === 'ar' ? 'rtl' : 'ltr'}>
-      {/* زر تجربة مؤقت */}
-      {isNativePlatform() && (
+      {/* زر تجربة مؤقت - يظهر فقط في وضع التطوير */}
+      {isNativePlatform() && isDevelopment && (
         <section className="rounded-2xl border border-primary/20 bg-primary/5 p-4">
           <div className="flex items-start gap-3">
             <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
@@ -320,7 +322,7 @@ export function AdhanSettings() {
           </button>
         </div>
 
-        {/* ✅ صوت الفجر الافتراضي (منفصل) - بدون مفتاح ترجمة جديد */}
+        {/* ✅ صوت الفجر الافتراضي (منفصل) */}
         <h3 className="mb-2 mt-4 text-sm font-bold text-muted-foreground">
           صوت الفجر الافتراضي
         </h3>

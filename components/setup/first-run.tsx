@@ -1,29 +1,40 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Bell, Check, MapPin } from 'lucide-react'
+import { Bell, Check, MapPin, BatteryCharging } from 'lucide-react'
 import { updateAutoLocation } from '@/lib/location'
-import { requestNativeNotificationPermission } from '@/lib/native'
+import { requestNativeNotificationPermission, isNativePlatform } from '@/lib/native'
 import { useHydrated, useSettings } from '@/lib/settings'
+import { registerPlugin } from '@capacitor/core'
+
+const SystemSettings = isNativePlatform()
+  ? registerPlugin<any>('SystemSettings')
+  : null
 
 const DONE_KEY = 'setup-done-v1'
+const LOCATION_GRANTED_KEY = 'setup-location-granted-v1'
+const NOTIF_GRANTED_KEY = 'setup-notif-granted-v1'
+const BATTERY_GRANTED_KEY = 'setup-battery-granted-v1'
 
-/**
- * شاشة إعداد أولى تظهر مرة واحدة: الموقع ثم الإشعارات.
- * تقوم بتسجيل وتحديث الموقع الجغرافي والإشعارات فورياً مع حفظ الحالة.
- */
 export function FirstRun() {
   const hydrated = useHydrated()
   const [settings] = useSettings()
   const [open, setOpen] = useState(false)
   const [locMsg, setLocMsg] = useState<string | null>(null)
   const [notifOk, setNotifOk] = useState<boolean | null>(null)
-  const [busy, setBusy] = useState<'loc' | 'notif' | null>(null)
+  const [batteryOk, setBatteryOk] = useState<boolean | null>(null)
+  const [busy, setBusy] = useState<'loc' | 'notif' | 'battery' | null>(null)
 
   useEffect(() => {
     if (!hydrated) return
     try {
-      if (!localStorage.getItem(DONE_KEY)) setOpen(true)
+      if (!localStorage.getItem(DONE_KEY)) {
+        setOpen(true)
+      } else {
+        // إذا كانت الشاشة قد أُكملت سابقاً، نتحقق من حالة الصلاحيات
+        setNotifOk(localStorage.getItem(NOTIF_GRANTED_KEY) === 'true')
+        setBatteryOk(localStorage.getItem(BATTERY_GRANTED_KEY) === 'true')
+      }
     } catch {}
   }, [hydrated])
 
@@ -38,12 +49,14 @@ export function FirstRun() {
 
   const askLocation = async () => {
     setBusy('loc')
-    // تفعيل دقة GPS العالية لضمان جلب إحداثيات المدينة الفعلية وتجنب فخ مكة الافتراضي
     const r = await updateAutoLocation({ force: true, askPermission: true, highAccuracy: true })
     setBusy(null)
     
     if (r === 'ok') {
       setLocMsg('تم تحديد موقعك ومواقيت مدينتك بنجاح.')
+      try {
+        localStorage.setItem(LOCATION_GRANTED_KEY, 'true')
+      } catch {}
     } else if (r === 'denied') {
       setLocMsg('لم يُمنح إذن الموقع. يمكنك اختيار مدينتك يدوياً من الإعدادات.')
     } else {
@@ -57,6 +70,29 @@ export function FirstRun() {
     setBusy(null)
     const isGranted = p === 'granted'
     setNotifOk(isGranted)
+    try {
+      localStorage.setItem(NOTIF_GRANTED_KEY, String(isGranted))
+    } catch {}
+  }
+
+  const askBattery = async () => {
+    if (!SystemSettings) return
+    setBusy('battery')
+    try {
+      await SystemSettings.requestIgnoreBatteryOptimizations()
+      // انتظار قصير للسماح للمستخدم بالعودة
+      setTimeout(async () => {
+        try {
+          const res = await SystemSettings.checkBatteryOptimization()
+          setBatteryOk(res.isIgnored)
+          localStorage.setItem(BATTERY_GRANTED_KEY, String(res.isIgnored))
+        } catch {}
+        setBusy(null)
+      }, 1500)
+    } catch (e) {
+      console.log(e)
+      setBusy(null)
+    }
   }
 
   return (
@@ -67,12 +103,12 @@ export function FirstRun() {
       dir="rtl"
       className="fixed inset-0 z-[70] flex items-end justify-center bg-black/50 p-3 sm:items-center"
     >
-      <div className="w-full max-w-md rounded-3xl bg-background p-5 shadow-2xl ring-1 ring-border">
+      <div className="w-full max-w-md rounded-2xl bg-background p-5 shadow-2xl ring-1 ring-border max-h-[90vh] overflow-y-auto">
         <h2 id="setup-title" className="text-lg font-bold">
           {'أهلاً بك في إسلامي'}
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          {'خطوتان سريعتان لتحديد مواقيت الصلاة بدقة وتفعيل الأذان.'}
+          {'ثلاث خطوات سريعة لتحديد مواقيت الصلاة بدقة وتفعيل الأذان.'}
         </p>
 
         <div className="mt-4 flex flex-col gap-3">
@@ -141,6 +177,41 @@ export function FirstRun() {
                 : notifOk
                 ? 'مفعّلة'
                 : 'تفعيل الإشعارات والأذان'}
+            </button>
+          </div>
+
+          {/* قسم البطارية (العمل في الخلفية) */}
+          <div className="rounded-2xl bg-card p-4 ring-1 ring-border">
+            <div className="flex items-start gap-3">
+              <BatteryCharging
+                className="mt-0.5 size-5 shrink-0 text-primary"
+                aria-hidden="true"
+              />
+              <div className="flex-1">
+                <p className="font-bold">{'العمل في الخلفية'}</p>
+                <p className="text-xs text-muted-foreground">
+                  {'لضمان عمل الأذان بدقة حتى لو أُغلق التطبيق أو أُطفئت الشاشة.'}
+                </p>
+                {batteryOk !== null && (
+                  <p className="mt-2 text-xs font-semibold text-primary">
+                    {batteryOk
+                      ? 'تم تفعيل العمل في الخلفية.'
+                      : 'لم يتم التفعيل. يرجى السماح بذلك من إعدادات الهاتف.'}
+                  </p>
+                )}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={askBattery}
+              disabled={busy !== null || batteryOk === true}
+              className="mt-3 w-full rounded-xl bg-primary py-2.5 text-sm font-bold text-primary-foreground transition-opacity disabled:opacity-60"
+            >
+              {busy === 'battery'
+                ? 'جارٍ التفعيل...'
+                : batteryOk
+                ? 'مفعّلة'
+                : 'السماح بالعمل في الخلفية'}
             </button>
           </div>
         </div>

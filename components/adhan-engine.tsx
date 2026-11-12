@@ -435,9 +435,17 @@ export function AdhanEngine() {
 
     audio.addEventListener('ended', handleAudioEnd)
 
-    requestNativeNotificationPermission().catch(() => {
-      // المستخدم قد يرفض الإذن، لا حاجة لإظهار خطأ
-    })
+    // ✅ لا نطلب الإشعارات إذا وافق المستخدم مسبقاً في FirstRun
+    try {
+      const notifGranted = localStorage.getItem('setup-notif-granted-v1') === 'true'
+      if (!notifGranted) {
+        requestNativeNotificationPermission().catch(() => {
+          // المستخدم قد يرفض الإذن، لا حاجة لإظهار خطأ
+        })
+      }
+    } catch {
+      // تجاهل أخطاء localStorage
+    }
 
     return () => {
       isMounted = false

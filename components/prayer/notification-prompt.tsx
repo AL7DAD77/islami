@@ -11,6 +11,7 @@ import {
 import { useLanguage } from '@/lib/language-context'
 
 const DISMISS_KEY = 'notif-dismissed-v2'
+const SETUP_NOTIF_GRANTED_KEY = 'setup-notif-granted-v1'
 
 export function NotificationPrompt() {
   const [show, setShow] = useState(false)
@@ -21,6 +22,14 @@ export function NotificationPrompt() {
     let cancelled = false
 
     const check = async () => {
+      // ✅ لا نعرض النافذة إذا وافق المستخدم في FirstRun
+      try {
+        if (localStorage.getItem(SETUP_NOTIF_GRANTED_KEY) === 'true') {
+          setShow(false)
+          return
+        }
+      } catch {}
+
       const status = await getNotificationStatusAsync()
       if (cancelled) return
       if (status === 'granted' || status === 'unsupported') {
@@ -46,6 +55,10 @@ export function NotificationPrompt() {
   const enable = async () => {
     const permission = await requestNativeNotificationPermission()
     if (permission === 'granted') {
+      // ✅ حفظ حالة الموافقة
+      try {
+        localStorage.setItem(SETUP_NOTIF_GRANTED_KEY, 'true')
+      } catch {}
       await showNativeNotification(dict.notificationPrompt.successTitle, dict.notificationPrompt.successBody)
     }
     setShow(false)

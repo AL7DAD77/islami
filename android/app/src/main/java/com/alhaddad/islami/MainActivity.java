@@ -26,7 +26,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(QuranPlayerPlugin.class);
         registerPlugin(SystemSettingsPlugin.class);
         registerPlugin(PreAdhanScheduler.class);
-        registerPlugin(AppExitPlugin.class); // ✅ تسجيل إضافة الخروج
+        registerPlugin(AppExitPlugin.class);
 
         // 2. تشغيل Capacitor
         super.onCreate(savedInstanceState);
@@ -60,19 +60,20 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
-    // ✅ 7. التحكم في زر الرجوع
+    // ✅ 7. اعتراض زر الرجوع
+    // نترك Capacitor يرسل الحدث إلى React (NativeBackHandler)
     @Override
     public void onBackPressed() {
+        // نرسل الحدث إلى React، وهو سيتخذ القرار
         if (getBridge() != null) {
-            // نرسل الحدث إلى React، ليقرر هو ماذا يفعل
             getBridge().triggerJSEvent("backButton", "window");
         } else {
-            // احتياطي: نقل التطبيق للخلفية بدلاً من إغلاقه
+            // احتياطي: نقل التطبيق للخلفية
             moveTaskToBack(true);
         }
     }
 
-    // ✅ 8. إضافة برمجية صغيرة للسماح لـ React بنقل التطبيق للخلفية
+    // ✅ 8. إضافة AppExit لنقل التطبيق للخلفية
     @CapacitorPlugin(name = "AppExit")
     public static class AppExitPlugin extends Plugin {
         @PluginMethod
