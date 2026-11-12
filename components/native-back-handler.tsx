@@ -9,12 +9,28 @@ const AppExit = Capacitor.isNativePlatform()
   ? registerPlugin<any>('AppExit')
   : null
 
-// جذور التبويبات: من هنا يخرج الرجوع إلى شاشة الهاتف
-const TAB_ROOTS = ['/', '/prayer', '/quran', '/adhkar', '/sahihayn', '/qibla', '/more']
+// الشاشة الرئيسية للتطبيق: الخروج منها فقط يخرج إلى شاشة الهاتف
+const APP_HOME = '/prayer'
+const HOME_PATHS = ['/', '/prayer']
 
 function normalizePath(path: string | null): string {
   if (!path) return '/'
-  return path.length > 1 ? path.replace(/\/+$/, '') : path
+  const trimmed = path.replace(/\/+$/, '')
+  return trimmed === '' ? '/' : trimmed
+}
+
+function segments(path: string): string[] {
+  return path.split('/').filter(Boolean)
+}
+
+// جذر القسم: /more/reminders ← /more
+function sectionRoot(path: string): string {
+  const first = segments(path)[0]
+  return first ? `/${first}` : '/'
+}
+
+function isSubPage(path: string): boolean {
+  return segments(path).length > 1
 }
 
 export function NativeBackHandler() {
@@ -34,23 +50,25 @@ export function NativeBackHandler() {
     let backListener: { remove: () => Promise<void> } | null = null
 
     const handleBackButton = () => {
-      const currentPath = normalizePath(pathnameRef.current)
+      const current = normalizePath(pathnameRef.current)
 
-      // جذر تبويب: الخروج إلى شاشة الهاتف دون قتل التطبيق
-      if (TAB_ROOTS.includes(currentPath)) {
+      // 1. الرئيسية: الخروج إلى شاشة الهاتف دون إغلاق التطبيق
+      if (HOME_PATHS.includes(current)) {
         AppExit?.exit().catch(() => {})
         return
       }
 
-      // صفحة فرعية: ارجع خطوة، وإن لم يوجد سجل انتقل إلى الرئيسية
-      if (window.history.length > 1) {
-        router.back()
-      } else {
-        router.replace('/prayer')
+      // 2. صفحة فرعية: العودة إلى جذر قسمها
+      if (isSubPage(current)) {
+        router.replace(sectionRoot(current))
+        return
       }
+
+      // 3. جذر قسم ليس الرئيسية: العودة إلى الرئيسية للتطبيق
+      router.replace(APP_HOME)
     }
 
-    App.addListener('backButton', handleBackButton).then(listener => {
+    App.addListener('backButton', handleBackButton).then((listener) => {
       if (isActive) {
         backListener = listener
       } else {
