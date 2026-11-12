@@ -5,18 +5,24 @@ import { usePathname, useRouter } from 'next/navigation'
 import { App } from '@capacitor/app'
 import { Capacitor, registerPlugin } from '@capacitor/core'
 
-// تسجيل إضافة الخروج (AppExit) التي تنقل التطبيق للخلفية دون قتله
 const AppExit = Capacitor.isNativePlatform()
   ? registerPlugin<any>('AppExit')
   : null
 
+// جذور التبويبات: من هنا يخرج الرجوع إلى شاشة الهاتف
+const TAB_ROOTS = ['/', '/prayer', '/quran', '/adhkar', '/sahihayn', '/qibla', '/more']
+
+function normalizePath(path: string | null): string {
+  if (!path) return '/'
+  return path.length > 1 ? path.replace(/\/+$/, '') : path
+}
+
 export function NativeBackHandler() {
   const router = useRouter()
   const pathname = usePathname()
-  
-  // استخدام useRef لتخزين pathname الحالي (لقراءته بشكل متزامن)
+
   const pathnameRef = useRef(pathname)
-  
+
   useEffect(() => {
     pathnameRef.current = pathname
   }, [pathname])
@@ -24,36 +30,37 @@ export function NativeBackHandler() {
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return
 
-    let backListener: any = null
+    let isActive = true
+    let backListener: { remove: () => Promise<void> } | null = null
 
-    // دالة متزامنة لاعتراض زر الرجوع
     const handleBackButton = () => {
-      const currentPath = pathnameRef.current
-      
-      // إذا كنا في الصفحة الرئيسية، انقل التطبيق للخلفية (لا تقتله)
-      if (
-        currentPath === '/' || 
-        currentPath === '' || 
-        currentPath === '/prayer'
-      ) {
-        if (AppExit) {
-          AppExit.exit() // ينقل التطبيق للخلفية دون قتله
-        }
-        return true // منع السلوك الافتراضي
+      const currentPath = normalizePath(pathnameRef.current)
+
+      // جذر تبويب: الخروج إلى شاشة الهاتف دون قتل التطبيق
+      if (TAB_ROOTS.includes(currentPath)) {
+        AppExit?.exit().catch(() => {})
+        return
       }
-      
-      // إذا كنا في صفحة فرعية، ارجع للخلف
-      router.back()
-      return true // منع السلوك الافتراضي
+
+      // صفحة فرعية: ارجع خطوة، وإن لم يوجد سجل انتقل إلى الرئيسية
+      if (window.history.length > 1) {
+        router.back()
+      } else {
+        router.replace('/prayer')
+      }
     }
 
-    // تسجيل المستمع
     App.addListener('backButton', handleBackButton).then(listener => {
-      backListener = listener
+      if (isActive) {
+        backListener = listener
+      } else {
+        listener.remove()
+      }
     })
 
     return () => {
-      if (backListener) backListener.remove()
+      isActive = false
+      backListener?.remove()
     }
   }, [router])
 

@@ -6,40 +6,37 @@ import { BookOpen, Clock, Compass, LayoutGrid, Sparkles, BookMarked } from 'luci
 import { cn } from '@/lib/utils'
 import { useLanguage } from '@/lib/language-context'
 
-// قمنا بإزالة الكلمات الثابتة (label) واستبدالها بمفاتيح (key) تقرأ من ملف الترجمة
 const ITEMS = [
   { href: '/prayer', key: 'prayer', icon: Clock, also: ['/calendar'] },
   { href: '/quran', key: 'quran', icon: BookOpen, also: [] as string[] },
   { href: '/adhkar', key: 'adhkar', icon: Sparkles, also: ['/tasbih'] },
-  // ✅ استبدال "الأطفال" بـ "الصحيحين" في نفس المكان
   { href: '/sahihayn', key: 'sahihayn', icon: BookMarked, also: ['/hadith'] },
   { href: '/qibla', key: 'qibla', icon: Compass, also: [] as string[] },
   { href: '/more', key: 'more', icon: LayoutGrid, also: ['/seerah', '/prophets', '/sunan', '/guide'] },
 ]
 
-const matches = (pathname: string, base: string) => pathname === base || pathname.startsWith(base + '/')
+const matches = (pathname: string, base: string) =>
+  pathname === base || pathname.startsWith(base + '/')
 
 export function BottomNav() {
   const pathname = usePathname()
-  const { dict } = useLanguage() // ✅ الحصول على القاموس الحالي
+  const { dict } = useLanguage()
 
   return (
     <nav
-      // ✅ جعل وصف التنقل ديناميكياً
       aria-label={dict.nav.more === 'More' ? 'Main Navigation' : 'التنقل الرئيسي'}
       className="app-bottom-nav fixed inset-x-0 bottom-0 z-40 border-t border-border/50 bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-lg"
     >
       <ul className="mx-auto flex max-w-2xl items-stretch justify-around">
         {ITEMS.map(({ href, key, icon: Icon, also }) => {
           const active = matches(pathname, href) || also.some((b) => matches(pathname, b))
-          
-          // ✅ قراءة اسم الزر من ملف الترجمة، مع Fallback "الصحيحين"
           const label = (dict.nav as any)[key] || (key === 'sahihayn' ? 'الصحيحين' : key)
 
           return (
             <li key={href} className="flex-1">
               <Link
                 href={href}
+                replace // ✅ استبدال الصفحة في السجل بدل الإضافة إليه
                 scroll={false}
                 onClick={(e) => {
                   if (pathname === href) {
