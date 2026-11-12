@@ -100,7 +100,7 @@ public final class AdhanScheduler {
         testItem.id = TEST_ALARM_ID;
         testItem.at = triggerAtMillis;
         testItem.kind = "adhan";
-        testItem.prayer = "test"; // ✅ تم التعديل (كان fajr)
+        testItem.prayer = "test";
         testItem.title = "تجربة الأذان";
         testItem.body = "هذا تنبيه تجريبي - الأذان يعمل بنجاح";
         testItem.file = file == null ? "" : file;
@@ -133,6 +133,10 @@ public final class AdhanScheduler {
         );
 
         long triggerAt = System.currentTimeMillis() + intervalMillis;
+
+        // تشخيص: تسجيل المدة ووقت التنفيذ الفعلي لكل تذكير
+        Log.i(TAG, "جدولة التذكير " + id + " | المدة(دقيقة)=" + (intervalMillis / 60000L)
+                + " | التنفيذ=" + triggerAt);
 
         if (canScheduleExactAlarms(context)) {
             alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent);

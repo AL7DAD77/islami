@@ -13,8 +13,8 @@ import {
   AlertTriangle,
   Bell,
   BellOff,
-  Settings2, // ✅ أيقونة التخصيص
-  ArrowRight, // ✅ أيقونة الرجوع
+  Settings2,
+  ArrowRight,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Capacitor, registerPlugin } from '@capacitor/core'
@@ -50,28 +50,43 @@ const INTERVAL_OPTIONS = [
   { label: '12 ساعة', value: 720 },
 ]
 
+// تحويل الدقائق إلى نص عربي مفهوم
+function formatInterval(minutes: number): string {
+  if (minutes % 60 === 0) {
+    const hours = minutes / 60
+    if (hours === 1) return 'ساعة'
+    if (hours === 2) return 'ساعتان'
+    return `${hours} ساعات`
+  }
+  return `${minutes} دقيقة`
+}
+
+// استخراج القيمة والوحدة من الدقائق المحفوظة لتعبئة خانة التخصيص
+function toCustomFields(minutes: number): { value: string; unit: 'min' | 'hr' } {
+  if (minutes >= 60 && minutes % 60 === 0) {
+    return { value: String(minutes / 60), unit: 'hr' }
+  }
+  return { value: String(minutes), unit: 'min' }
+}
+
 export default function RemindersPage() {
   const { dict } = useLanguage()
-  const [settings, update] = useSettings()
+  const [, update] = useSettings()
   const hydrated = useHydrated()
 
-  const [isSaving, setIsSaving] = useState<
-    'salawat' | 'adhkar' | null
-  >(null)
+  const [isSaving, setIsSaving] = useState<'salawat' | 'adhkar' | null>(null)
 
   const [salawatSound, setSalawatSound] = useState('1')
   const [playingSound, setPlayingSound] = useState<string | null>(null)
 
   const [exactAlarmAllowed, setExactAlarmAllowed] = useState(true)
 
-  // حالات التذكيرات الأساسية
   const [salawatEnabled, setSalawatEnabled] = useState(false)
   const [salawatInterval, setSalawatInterval] = useState(60)
 
   const [adhkarEnabled, setAdhkarEnabled] = useState(false)
   const [adhkarInterval, setAdhkarInterval] = useState(180)
 
-  // ✅ حالات التخصيص (المفقودة)
   const [showCustomSalawat, setShowCustomSalawat] = useState(false)
   const [customSalawatValue, setCustomSalawatValue] = useState('')
   const [customSalawatUnit, setCustomSalawatUnit] = useState<'min' | 'hr'>('min')
@@ -83,34 +98,20 @@ export default function RemindersPage() {
   useEffect(() => {
     if (!hydrated) return
 
-    const savedSalawatEnabled = localStorage.getItem('salawat_enabled') === 'true'
-    const savedSalawatInterval = Number(localStorage.getItem('salawat_interval') || 60)
-    setSalawatEnabled(savedSalawatEnabled)
-    setSalawatInterval(savedSalawatInterval)
+    setSalawatEnabled(localStorage.getItem('salawat_enabled') === 'true')
+    setSalawatInterval(Number(localStorage.getItem('salawat_interval') || 60))
 
-    const savedAdhkarEnabled = localStorage.getItem('adhkar_enabled') === 'true'
-    const savedAdhkarInterval = Number(localStorage.getItem('adhkar_interval') || 180)
-    setAdhkarEnabled(savedAdhkarEnabled)
-    setAdhkarInterval(savedAdhkarInterval)
+    setAdhkarEnabled(localStorage.getItem('adhkar_enabled') === 'true')
+    setAdhkarInterval(Number(localStorage.getItem('adhkar_interval') || 180))
 
     const loadNativeSettings = async () => {
       try {
-        if (
-          Capacitor.getPlatform() === 'android' &&
-          AdhanScheduler &&
-          SystemSettings
-        ) {
+        if (Capacitor.getPlatform() === 'android' && AdhanScheduler && SystemSettings) {
           const statusRes = await AdhanScheduler.status()
-          if (statusRes) {
-            setExactAlarmAllowed(statusRes.exactAlarmAllowed)
-          }
+          if (statusRes) setExactAlarmAllowed(statusRes.exactAlarmAllowed)
 
-          const res = await SystemSettings.getStringPreference({
-            key: 'salawat_sound_id',
-          })
-          if (res && res.value) {
-            setSalawatSound(res.value)
-          }
+          const res = await SystemSettings.getStringPreference({ key: 'salawat_sound_id' })
+          if (res && res.value) setSalawatSound(res.value)
         }
       } catch (e) {
         console.log('Settings error', e)
@@ -120,110 +121,118 @@ export default function RemindersPage() {
     loadNativeSettings()
   }, [hydrated])
 
-  // 💾 حفظ تذكير الصلاة على النبي (صوتي)
+  // الجدولة الأصلية أولاً، ثم الحفظ والمزامنة عند النجاح فقط
   const saveSalawatReminder = async (intervalMinutes: number) => {
     if (intervalMinutes <= 0) return
     setIsSaving('salawat')
 
     try {
+      if (Capacitor.getPlatform() === 'android' && AdhanScheduler) {
+        await AdhanScheduler.scheduleReminder({
+          id: REMINDER_ID_SALAWAT,
+          intervalMillis: intervalMinutes * 60 * 1000,
+          title: SALAWAT_TITLE,
+          body: SALAWAT_BODY,
+          isSilent: false,
+        })
+      }
+
       localStorage.setItem('salawat_enabled', 'true')
       localStorage.setItem('salawat_interval', String(intervalMinutes))
       setSalawatEnabled(true)
       setSalawatInterval(intervalMinutes)
-
-      if (Capacitor.getPlatform() === 'android' && AdhanScheduler) {
-        const intervalMillis = intervalMinutes * 60 * 1000
-        await AdhanScheduler.scheduleReminder({
-          id: REMINDER_ID_SALAWAT,
-          intervalMillis,
-          title: SALAWAT_TITLE,
-          body: SALAWAT_BODY,
-          isSilent: false, // ✅ صوتي
-        })
-      }
+      update({ salawatEnabled: true, salawatInterval: intervalMinutes })
+      setShowCustomSalawat(false)
     } catch (e) {
       console.log('Schedule salawat error', e)
     } finally {
       setIsSaving(null)
-      setShowCustomSalawat(false)
     }
   }
 
-  // 💾 حفظ تذكير الأذكار (صامت)
   const saveAdhkarReminder = async (intervalMinutes: number) => {
     if (intervalMinutes <= 0) return
     setIsSaving('adhkar')
 
     try {
+      if (Capacitor.getPlatform() === 'android' && AdhanScheduler) {
+        await AdhanScheduler.scheduleReminder({
+          id: REMINDER_ID_ADHKAR,
+          intervalMillis: intervalMinutes * 60 * 1000,
+          title: ADHKAR_TITLE,
+          body: ADHKAR_BODY,
+          isSilent: true,
+        })
+      }
+
       localStorage.setItem('adhkar_enabled', 'true')
       localStorage.setItem('adhkar_interval', String(intervalMinutes))
       setAdhkarEnabled(true)
       setAdhkarInterval(intervalMinutes)
-
-      if (Capacitor.getPlatform() === 'android' && AdhanScheduler) {
-        const intervalMillis = intervalMinutes * 60 * 1000
-        await AdhanScheduler.scheduleReminder({
-          id: REMINDER_ID_ADHKAR,
-          intervalMillis,
-          title: ADHKAR_TITLE,
-          body: ADHKAR_BODY,
-          isSilent: true, // ✅ صامت
-        })
-      }
+      update({ adhkarRemindersEnabled: true, adhkarRemindersInterval: intervalMinutes })
+      setShowCustomAdhkar(false)
     } catch (e) {
       console.log('Schedule adhkar error', e)
     } finally {
       setIsSaving(null)
-      setShowCustomAdhkar(false)
     }
   }
 
-  // 💾 حفظ التخصيص (الصلاة على النبي)
+  const openCustomSalawat = () => {
+    const fields = toCustomFields(salawatInterval)
+    setCustomSalawatValue(fields.value)
+    setCustomSalawatUnit(fields.unit)
+    setShowCustomSalawat(true)
+  }
+
+  const openCustomAdhkar = () => {
+    const fields = toCustomFields(adhkarInterval)
+    setCustomAdhkarValue(fields.value)
+    setCustomAdhkarUnit(fields.unit)
+    setShowCustomAdhkar(true)
+  }
+
   const handleSaveCustomSalawat = () => {
     const value = parseInt(customSalawatValue, 10)
     if (isNaN(value) || value <= 0) {
       alert(dict.remindersPage.errors.invalidNumber)
       return
     }
-    const minutes = customSalawatUnit === 'hr' ? value * 60 : value
-    saveSalawatReminder(minutes)
+    saveSalawatReminder(customSalawatUnit === 'hr' ? value * 60 : value)
   }
 
-  // 💾 حفظ التخصيص (الأذكار)
   const handleSaveCustomAdhkar = () => {
     const value = parseInt(customAdhkarValue, 10)
     if (isNaN(value) || value <= 0) {
       alert(dict.remindersPage.errors.invalidNumber)
       return
     }
-    const minutes = customAdhkarUnit === 'hr' ? value * 60 : value
-    saveAdhkarReminder(minutes)
+    saveAdhkarReminder(customAdhkarUnit === 'hr' ? value * 60 : value)
   }
 
-  // 🛑 إيقاف التذكيرات
   const disableSalawatReminder = async () => {
-    localStorage.setItem('salawat_enabled', 'false')
-    setSalawatEnabled(false)
-
-    if (Capacitor.getPlatform() === 'android' && AdhanScheduler) {
-      try {
+    try {
+      if (Capacitor.getPlatform() === 'android' && AdhanScheduler) {
         await AdhanScheduler.cancelReminder({ id: REMINDER_ID_SALAWAT })
-      } catch (e) {
-        console.log('Cancel salawat error', e)
       }
+      localStorage.setItem('salawat_enabled', 'false')
+      setSalawatEnabled(false)
+      update({ salawatEnabled: false })
+    } catch (e) {
+      console.log('Cancel salawat error', e)
     }
   }
 
   const disableAdhkarReminder = async () => {
-    localStorage.setItem('adhkar_enabled', 'false')
-    setAdhkarEnabled(false)
-
-    if (Capacitor.getPlatform() === 'android' && AdhanScheduler) {
-      try {
+    try {
+      if (Capacitor.getPlatform() === 'android' && AdhanScheduler) {
         await AdhanScheduler.cancelReminder({ id: REMINDER_ID_ADHKAR })
-      } catch (e) {
-        console.log('Cancel adhkar error', e)
       }
+      localStorage.setItem('adhkar_enabled', 'false')
+      setAdhkarEnabled(false)
+      update({ adhkarRemindersEnabled: false })
+    } catch (e) {
+      console.log('Cancel adhkar error', e)
     }
   }
 
@@ -244,11 +253,7 @@ export default function RemindersPage() {
 
     stopPreview()
 
-    const fileName =
-      soundId === '1'
-        ? 'salawat_voice.mp3'
-        : `salawat_voice_${soundId}.mp3`
-
+    const fileName = soundId === '1' ? 'salawat_voice.mp3' : `salawat_voice_${soundId}.mp3`
     const audio = new Audio(`/audio/salawat/${fileName}`)
     audio.onended = () => stopPreview()
 
@@ -270,10 +275,7 @@ export default function RemindersPage() {
 
     if (Capacitor.getPlatform() === 'android' && SystemSettings) {
       try {
-        await SystemSettings.setStringPreference({
-          key: 'salawat_sound_id',
-          value: val,
-        })
+        await SystemSettings.setStringPreference({ key: 'salawat_sound_id', value: val })
       } catch (e) {}
     }
   }
@@ -284,9 +286,7 @@ export default function RemindersPage() {
       await AdhanScheduler.requestExactAlarm()
       setTimeout(async () => {
         const res = await AdhanScheduler.status()
-        if (res) {
-          setExactAlarmAllowed(res.exactAlarmAllowed)
-        }
+        if (res) setExactAlarmAllowed(res.exactAlarmAllowed)
       }, 1500)
     } catch (e) {
       console.log(e)
@@ -333,19 +333,14 @@ export default function RemindersPage() {
                 <Heart className="size-5" />
               </span>
               <div>
-                <h3 className="font-bold text-[#0a1f1a]">
-                  {dict.remindersPage.salawatTitle}
-                </h3>
-                <p className="text-xs text-muted-foreground">
-                  {dict.remindersPage.salawatDesc}
-                </p>
+                <h3 className="font-bold text-[#0a1f1a]">{dict.remindersPage.salawatTitle}</h3>
+                <p className="text-xs text-muted-foreground">{dict.remindersPage.salawatDesc}</p>
               </div>
             </div>
 
-            {/* زر التخصيص */}
             <button
               type="button"
-              onClick={() => setShowCustomSalawat(!showCustomSalawat)}
+              onClick={() => (showCustomSalawat ? setShowCustomSalawat(false) : openCustomSalawat())}
               className="text-xs font-bold text-emerald-700 flex items-center gap-1 hover:underline"
             >
               {showCustomSalawat ? (
@@ -360,7 +355,12 @@ export default function RemindersPage() {
             </button>
           </div>
 
-          {/* حقول التخصيص */}
+          {salawatEnabled && (
+            <p className="mb-3 text-xs font-bold text-emerald-700">
+              {`يتكرر كل ${formatInterval(salawatInterval)}`}
+            </p>
+          )}
+
           {showCustomSalawat ? (
             <div className="flex items-center gap-2 bg-[#f4ece1] p-2 rounded-xl relative z-10">
               <input
@@ -416,34 +416,24 @@ export default function RemindersPage() {
             </>
           )}
 
-          {/* زر التشغيل / الإيقاف */}
           <div className="mt-4 flex items-center justify-between border-t border-[#e8dccb] pt-4">
             <p className="text-sm font-bold text-[#0a1f1a]">تشغيل التذكير</p>
             <button
               type="button"
+              disabled={isSaving === 'salawat'}
               onClick={() => {
-                if (salawatEnabled) {
-                  disableSalawatReminder()
-                } else {
-                  saveSalawatReminder(salawatInterval)
-                }
+                if (salawatEnabled) disableSalawatReminder()
+                else saveSalawatReminder(salawatInterval)
               }}
               className={cn(
-                'flex size-10 items-center justify-center rounded-xl transition active:scale-90',
-                salawatEnabled
-                  ? 'bg-emerald-600 text-white'
-                  : 'bg-gray-200 text-gray-600',
+                'flex size-10 items-center justify-center rounded-xl transition active:scale-90 disabled:opacity-70',
+                salawatEnabled ? 'bg-emerald-600 text-white' : 'bg-gray-200 text-gray-600',
               )}
             >
-              {salawatEnabled ? (
-                <Bell className="size-5" />
-              ) : (
-                <BellOff className="size-5" />
-              )}
+              {salawatEnabled ? <Bell className="size-5" /> : <BellOff className="size-5" />}
             </button>
           </div>
 
-          {/* نغمة التذكير */}
           <div className="mt-4">
             <p className="mb-2 text-xs font-medium text-muted-foreground flex items-center gap-1">
               <Music className="size-3.5" /> {dict.remindersPage.tone}
@@ -467,11 +457,7 @@ export default function RemindersPage() {
                     : 'bg-rose-100 text-rose-700 hover:bg-rose-200',
                 )}
               >
-                {playingSound === salawatSound ? (
-                  <Square className="size-4" />
-                ) : (
-                  <Play className="size-4" />
-                )}
+                {playingSound === salawatSound ? <Square className="size-4" /> : <Play className="size-4" />}
               </button>
             </div>
           </div>
@@ -485,19 +471,14 @@ export default function RemindersPage() {
                 <BookOpen className="size-5" />
               </span>
               <div>
-                <h3 className="font-bold text-[#0a1f1a]">
-                  {dict.remindersPage.adhkarTitle}
-                </h3>
-                <p className="text-xs text-muted-foreground">
-                  {dict.remindersPage.adhkarDesc}
-                </p>
+                <h3 className="font-bold text-[#0a1f1a]">{dict.remindersPage.adhkarTitle}</h3>
+                <p className="text-xs text-muted-foreground">{dict.remindersPage.adhkarDesc}</p>
               </div>
             </div>
 
-            {/* زر التخصيص */}
             <button
               type="button"
-              onClick={() => setShowCustomAdhkar(!showCustomAdhkar)}
+              onClick={() => (showCustomAdhkar ? setShowCustomAdhkar(false) : openCustomAdhkar())}
               className="text-xs font-bold text-blue-700 flex items-center gap-1 hover:underline"
             >
               {showCustomAdhkar ? (
@@ -512,7 +493,12 @@ export default function RemindersPage() {
             </button>
           </div>
 
-          {/* حقول التخصيص */}
+          {adhkarEnabled && (
+            <p className="mb-3 text-xs font-bold text-blue-700">
+              {`يتكرر كل ${formatInterval(adhkarInterval)}`}
+            </p>
+          )}
+
           {showCustomAdhkar ? (
             <div className="flex items-center gap-2 bg-[#f4ece1] p-2 rounded-xl relative z-10">
               <input
@@ -568,30 +554,21 @@ export default function RemindersPage() {
             </>
           )}
 
-          {/* زر التشغيل / الإيقاف */}
           <div className="mt-4 flex items-center justify-between border-t border-[#e8dccb] pt-4">
             <p className="text-sm font-bold text-[#0a1f1a]">تشغيل التذكير</p>
             <button
               type="button"
+              disabled={isSaving === 'adhkar'}
               onClick={() => {
-                if (adhkarEnabled) {
-                  disableAdhkarReminder()
-                } else {
-                  saveAdhkarReminder(adhkarInterval)
-                }
+                if (adhkarEnabled) disableAdhkarReminder()
+                else saveAdhkarReminder(adhkarInterval)
               }}
               className={cn(
-                'flex size-10 items-center justify-center rounded-xl transition active:scale-90',
-                adhkarEnabled
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-200 text-gray-600',
+                'flex size-10 items-center justify-center rounded-xl transition active:scale-90 disabled:opacity-70',
+                adhkarEnabled ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600',
               )}
             >
-              {adhkarEnabled ? (
-                <Bell className="size-5" />
-              ) : (
-                <BellOff className="size-5" />
-              )}
+              {adhkarEnabled ? <Bell className="size-5" /> : <BellOff className="size-5" />}
             </button>
           </div>
         </section>
