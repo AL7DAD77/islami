@@ -7,24 +7,113 @@ import { distanceKm } from '@/lib/prayer'
 import { getSettings, updateSettings, type AppSettings } from '@/lib/settings'
 
 const PLACEHOLDER = 'موقعي الحالي'
+const LOCAL_NAME_RADIUS_KM = 25
+const MIN_MOVE_TO_REFRESH_KM = 0.3
 
-/** 
- * اسم المدينة: يتم البحث بدقة عن أقرب مدينة حقيقية للإحداثيات الفعلية،
- * مع منع الاعتماد نهائياً على أي قيمة افتراضية مثل مكة المكرمة.
+interface PlaceName {
+  city: string
+  country: string
+  countryCode: string
+}
+
+interface NominatimAddress {
+  neighbourhood?: string
+  suburb?: string
+  quarter?: string
+  city_district?: string
+  village?: string
+  town?: string
+  city?: string
+  county?: string
+  state?: string
+  country?: string
+  country_code?: string
+}
+
+/**
+ * يجلب الحي أو المنطقة الدقيقة (مثل أم أذينة أو الروابي) قبل اسم المدينة الكبرى.
+ * يعيد null عند غياب الإنترنت أو فشل الخدمة، فيتم الانتقال للبديل.
  */
-export async function resolvePlace(lat: number, lng: number) {
-  try {
-    const place = await reverseGeocode(lat, lng)
+async function resolveDistrict(lat: number, lng: number): Promise<PlaceName | null> {
+  const url =
+    'https://nominatim.openstreetmap.org/reverse?format=jsonv2' +
+    `&lat=${lat}&lon=${lng}&zoom=16&addressdetails=1&accept-language=ar`
 
-    if (place.city && place.city !== 'مكة المكرمة') {
-      return place
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 8000)
+
+  try {
+    const res = await fetch(url, {
+      headers: { Accept: 'application/json' },
+      signal: controller.signal,
+    })
+
+    if (!res.ok) return null
+
+    const data = await res.json()
+    const a: NominatimAddress = data?.address ?? {}
+
+    // الحي أولاً، ثم المدينة الكبرى إن لم يوجد حي
+    const district =
+      a.neighbourhood ||
+      a.suburb ||
+      a.quarter ||
+      a.city_district ||
+      a.village ||
+      ''
+
+    const city = a.city || a.town || a.county || a.state || ''
+    const name = district || city
+
+    if (!name) return null
+
+    return {
+      city: name,
+      country: a.country ?? '',
+      countryCode: (a.country_code ?? '').toUpperCase(),
     }
   } catch {
-    // لا يوجد إنترنت أو فشل خدمة تحديد المدينة عبر الإنترنت
+    return null
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+/**
+ * الأولوية: الحي من الخدمة الدقيقة، ثم خدمة التحديد العامة،
+ * ثم أقرب مدينة مسجلة ضمن نطاق قريب، وأخيراً "موقعي الحالي".
+ */
+export async function resolvePlace(lat: number, lng: number): Promise<PlaceName> {
+  const detailed = await resolveDistrict(lat, lng)
+
+  if (detailed && detailed.countryCode) {
+    return detailed
   }
 
-  // البحث في أقرب مدينة مسجلة بغض النظر عن النطاق الضيق لضمان الدقة وعدم الوقوع في الخطأ
-  const near = nearestCity(lat, lng, 500, CITIES)
+  let general: PlaceName | null = null
+
+  try {
+    const place = await reverseGeocode(lat, lng)
+    if (place.city && place.city !== 'مكة المكرمة') {
+      general = place
+    }
+  } catch {
+    // لا يوجد إنترنت، ننتقل للبديل المحلي
+  }
+
+  if (detailed) {
+    return {
+      city: detailed.city,
+      country: detailed.country || general?.country || '',
+      countryCode: general?.countryCode ?? '',
+    }
+  }
+
+  if (general) {
+    return general
+  }
+
+  const near = nearestCity(lat, lng, LOCAL_NAME_RADIUS_KM, CITIES)
 
   if (near) {
     return {
@@ -43,9 +132,6 @@ export async function resolvePlace(lat: number, lng: number) {
 
 export type AutoLocationResult = 'ok' | 'denied' | 'error' | 'skipped'
 
-/**
- * يحدّث الموقع ويحفظ الإحداثيات الخام بدقة تامة.
- */
 export async function updateAutoLocation(
   opts: LocationOptions & { force?: boolean } = {},
 ): Promise<AutoLocationResult> {
@@ -57,7 +143,7 @@ export async function updateAutoLocation(
 
   const locationResult = await getNativeLocation({
     askPermission: opts.askPermission,
-    highAccuracy: opts.highAccuracy ?? true, // رفع دقة GPS لضمان التطابق الفعلي
+    highAccuracy: opts.highAccuracy ?? true,
   })
 
   if (locationResult.status === 'denied') {
@@ -92,18 +178,18 @@ export async function updateAutoLocation(
     lng,
   )
 
-  // إذا كانت المدينة القديمة خاطئة أو افتراضية (مثل مكة خطأً)، نجبر التحديث فورا
-  const isDefaultOrWrong = 
-    savedLocation.city === 'مكة المكرمة' || 
+  const isDefaultOrWrong =
+    savedLocation.city === 'مكة المكرمة' ||
     savedLocation.city === PLACEHOLDER ||
     !savedLocation.countryCode
 
+  // نعيد تحديد الاسم عند كل تشغيل قسري، أو تحرك ولو يسيراً، أو إذا كان الاسم خاطئاً
   const needsPlaceName =
-    movedKm >= 5 ||
+    opts.force ||
     isDefaultOrWrong ||
-    opts.force
+    movedKm >= MIN_MOVE_TO_REFRESH_KM
 
-  let place: { city: string; country: string; countryCode: string } = {
+  let place: PlaceName = {
     city: savedLocation.city,
     country: savedLocation.country,
     countryCode: savedLocation.countryCode,
@@ -116,10 +202,10 @@ export async function updateAutoLocation(
   updateSettings((latest: AppSettings) => {
     const detectedCountry = place.countryCode || latest.location.countryCode || ''
 
-    // ضبط طريقة الحساب تلقائياً بناءً على الدولة المكتشفة إحداثياً
-    const nextMethod = place.countryCode
-      ? methodForCountry(place.countryCode, latest.method)
-      : latest.method
+    const nextMethod =
+      place.countryCode && !latest.methodManual
+        ? methodForCountry(place.countryCode, latest.method)
+        : latest.method
 
     return {
       locationStatus: 'ok',
@@ -127,8 +213,15 @@ export async function updateAutoLocation(
         ...latest.location,
         lat,
         lng,
-        city: (needsPlaceName && place.city !== PLACEHOLDER) ? place.city : latest.location.city,
-        country: needsPlaceName ? place.country || latest.location.country : latest.location.country,
+        city:
+          needsPlaceName && place.city !== PLACEHOLDER
+            ? place.city
+            : needsPlaceName
+              ? PLACEHOLDER
+              : latest.location.city,
+        country: needsPlaceName
+          ? place.country || latest.location.country
+          : latest.location.country,
         countryCode: detectedCountry,
         auto: true,
       },

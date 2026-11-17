@@ -10,6 +10,14 @@ export function PrayerTimesList() {
   // 0 يعني اليوم الحالي، 1 الغد، -1 الأمس...
   const [dayOffset, setDayOffset] = useState(0)
 
+  // اسم الموقع المعروض: لا نعرض المدينة الافتراضية (مكة) قبل تحديد الموقع
+  const cityLabel =
+    settings.locationStatus === 'ok'
+      ? settings.location.city
+      : settings.locationStatus === 'unknown'
+        ? 'جارٍ تحديد الموقع...'
+        : 'موقعي الحالي'
+
   // حساب التاريخ بناءً على الإزاحة
   const targetDate = new Date()
   targetDate.setDate(targetDate.getDate() + dayOffset)
@@ -34,7 +42,7 @@ export function PrayerTimesList() {
       <header className="mb-6 flex flex-col items-center justify-between gap-3 rounded-2xl bg-card p-4 ring-1 ring-border shadow-sm">
         <div className="flex items-center gap-2 text-primary font-bold">
           <MapPin className="size-5 shrink-0" />
-          <span>{settings.location.city || 'موقعي الحالي'}</span>
+          <span>{cityLabel}</span>
         </div>
 
         {/* شريط التنقل بين الأيام بالسحب/الضغط */}

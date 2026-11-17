@@ -182,13 +182,13 @@ export function PrayerSettings() {
     }
   }, [query, openCityPicker])
 
+  // اختيار مدينة: تتغير الطريقة حسب الدولة فقط إذا لم يختر المستخدم طريقة يدوياً
   const applyManualCity = (
     name: string,
     country: string,
     cc: string,
     lat: number,
     lng: number,
-    method?: MethodKey,
   ) => {
     update(s => {
       const countryChanged = !!cc && cc !== s.location.countryCode
@@ -203,9 +203,10 @@ export function PrayerSettings() {
           countryCode: cc,
           auto: false,
         },
-        method: countryChanged
-          ? (method ?? methodForCountry(cc, s.method))
-          : s.method,
+        method:
+          countryChanged && !s.methodManual
+            ? methodForCountry(cc, s.method)
+            : s.method,
       }
     })
 
@@ -214,7 +215,7 @@ export function PrayerSettings() {
   }
 
   const selectCity = (c: City) =>
-    applyManualCity(c.name, c.country, c.cc, c.lat, c.lng, c.method)
+    applyManualCity(c.name, c.country, c.cc, c.lat, c.lng)
 
   const selectOnline = (c: OnlineCity) =>
     applyManualCity(
@@ -230,6 +231,23 @@ export function PrayerSettings() {
   const onlineMatches = online.filter(
     o => !localNames.has(normalizeArabic(o.name)),
   )
+
+  // اختيار طريقة يدوياً: تُحفظ كاختيار نهائي للمستخدم
+  const selectMethodManually = (method: MethodKey) => {
+    update({ method, methodManual: true })
+    setOpenMethodPicker(false)
+  }
+
+  // العودة إلى الطريقة التلقائية حسب دولة الموقع الحالي
+  const resetMethodToAutomatic = () => {
+    update(s => ({
+      methodManual: false,
+      method: s.location.countryCode
+        ? methodForCountry(s.location.countryCode, s.method)
+        : s.method,
+    }))
+    setOpenMethodPicker(false)
+  }
 
   const toggleVibration = async () => {
     const nextValue = !settings.vibrationEnabled
@@ -415,16 +433,19 @@ export function PrayerSettings() {
           />
         </button>
 
+        {settings.methodManual && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            تم اختيار الطريقة يدوياً، ولن تتغير تلقائياً عند تغيير الموقع.
+          </p>
+        )}
+
         {openMethodPicker && (
           <div className="mt-2 max-h-60 overflow-y-auto rounded-xl border border-border">
             {METHODS.map(m => (
               <button
                 key={m.id}
                 type="button"
-                onClick={() => {
-                  update({ method: m.id })
-                  setOpenMethodPicker(false)
-                }}
+                onClick={() => selectMethodManually(m.id)}
                 className="flex w-full items-center justify-between border-b border-border px-3 py-2.5 text-right text-sm text-foreground last:border-0 hover:bg-muted"
               >
                 <span>
@@ -440,6 +461,16 @@ export function PrayerSettings() {
               </button>
             ))}
           </div>
+        )}
+
+        {settings.methodManual && (
+          <button
+            type="button"
+            onClick={resetMethodToAutomatic}
+            className="mt-3 w-full rounded-xl bg-muted px-3 py-2.5 text-sm text-foreground transition active:scale-95"
+          >
+            استخدام طريقة الدولة تلقائياً
+          </button>
         )}
 
         <div className="mt-3">

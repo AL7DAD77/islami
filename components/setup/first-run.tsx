@@ -12,7 +12,6 @@ const SystemSettings = isNativePlatform()
   : null
 
 const DONE_KEY = 'setup-done-v1'
-const LOCATION_GRANTED_KEY = 'setup-location-granted-v1'
 const NOTIF_GRANTED_KEY = 'setup-notif-granted-v1'
 const BATTERY_GRANTED_KEY = 'setup-battery-granted-v1'
 
@@ -25,13 +24,16 @@ export function FirstRun() {
   const [batteryOk, setBatteryOk] = useState<boolean | null>(null)
   const [busy, setBusy] = useState<'loc' | 'notif' | 'battery' | null>(null)
 
+  // هل تم تحديد الموقع فعلاً؟ الافتراضي (مكة) لا يُعد تحديداً
+  const locationResolved =
+    settings.locationStatus === 'ok' && settings.location.auto
+
   useEffect(() => {
     if (!hydrated) return
     try {
       if (!localStorage.getItem(DONE_KEY)) {
         setOpen(true)
       } else {
-        // إذا كانت الشاشة قد أُكملت سابقاً، نتحقق من حالة الصلاحيات
         setNotifOk(localStorage.getItem(NOTIF_GRANTED_KEY) === 'true')
         setBatteryOk(localStorage.getItem(BATTERY_GRANTED_KEY) === 'true')
       }
@@ -49,18 +51,19 @@ export function FirstRun() {
 
   const askLocation = async () => {
     setBusy('loc')
-    const r = await updateAutoLocation({ force: true, askPermission: true, highAccuracy: true })
+    const r = await updateAutoLocation({
+      force: true,
+      askPermission: true,
+      highAccuracy: true,
+    })
     setBusy(null)
-    
+
     if (r === 'ok') {
       setLocMsg('تم تحديد موقعك ومواقيت مدينتك بنجاح.')
-      try {
-        localStorage.setItem(LOCATION_GRANTED_KEY, 'true')
-      } catch {}
     } else if (r === 'denied') {
       setLocMsg('لم يُمنح إذن الموقع. يمكنك اختيار مدينتك يدوياً من الإعدادات.')
     } else {
-      setLocMsg('تعذّر تحديد الموقع. تأكد من تفعيل الـ GPS واحتفاظ التطبيق بالإذن.')
+      setLocMsg('تعذّر تحديد الموقع. تأكد من تفعيل الـ GPS وإعطاء التطبيق الإذن.')
     }
   }
 
@@ -80,7 +83,6 @@ export function FirstRun() {
     setBusy('battery')
     try {
       await SystemSettings.requestIgnoreBatteryOptimizations()
-      // انتظار قصير للسماح للمستخدم بالعودة
       setTimeout(async () => {
         try {
           const res = await SystemSettings.checkBatteryOptimization()
@@ -94,6 +96,19 @@ export function FirstRun() {
       setBusy(null)
     }
   }
+
+  // زر المتابعة: إن لم يُحدد الموقع، يبدأ التحديد أولاً بدل إغلاق الشاشة
+  const handleContinue = async () => {
+    if (!locationResolved) {
+      await askLocation()
+      return
+    }
+    finish()
+  }
+
+  const currentCityLabel = locationResolved
+    ? settings.location.city
+    : 'جارٍ تحديد الموقع...'
 
   return (
     <div
@@ -139,7 +154,7 @@ export function FirstRun() {
             >
               {busy === 'loc'
                 ? 'جارٍ التحديد...'
-                : locMsg
+                : locationResolved
                 ? 'إعادة التحديد'
                 : 'تحديد موقعي الآن'}
             </button>
@@ -216,7 +231,7 @@ export function FirstRun() {
           </div>
         </div>
 
-        {/* أزرار الإنهاء والتخطي */}
+        {/* أزرار التخطي والمتابعة */}
         <div className="mt-5 flex gap-3">
           <button
             type="button"
@@ -227,8 +242,9 @@ export function FirstRun() {
           </button>
           <button
             type="button"
-            onClick={finish}
-            className="flex flex-1 items-center justify-center gap-1 rounded-xl bg-primary py-2.5 text-sm font-bold text-primary-foreground transition-opacity hover:opacity-90"
+            onClick={handleContinue}
+            disabled={busy !== null}
+            className="flex flex-1 items-center justify-center gap-1 rounded-xl bg-primary py-2.5 text-sm font-bold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
           >
             <Check className="size-4" aria-hidden="true" />
             {'متابعة'}
@@ -236,7 +252,7 @@ export function FirstRun() {
         </div>
 
         <p className="mt-3 text-center text-[11px] text-muted-foreground">
-          {`المدينة المحددة حالياً: ${settings.location.city}`}
+          {`المدينة المحددة: ${currentCityLabel}`}
         </p>
       </div>
     </div>

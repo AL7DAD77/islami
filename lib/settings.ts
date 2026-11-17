@@ -52,6 +52,8 @@ export interface WirdSettings {
 
 export interface AppSettings {
   method: MethodKey
+  // true إذا اختار المستخدم الطريقة يدوياً، فلا تُغيَّر تلقائياً عند تغيير الدولة
+  methodManual: boolean
   madhab: Madhab
 
   location: LocationSettings
@@ -98,6 +100,7 @@ const STORAGE_KEY = 'adhan-app-settings'
 
 export const DEFAULT_SETTINGS: AppSettings = {
   method: 'UmmAlQura',
+  methodManual: false,
   madhab: 'shafi',
 
   location: {
@@ -259,6 +262,13 @@ function normalizeSettings(value: unknown): AppSettings {
   const method =
     typeof value.method === 'string' ? value.method : DEFAULT_SETTINGS.method
 
+  // ترحيل: الإعدادات القديمة لا تحتوي هذا الحقل.
+  // من غيّر الطريقة سابقاً نعتبره مختاراً يدوياً حتى لا تتغير دون علمه.
+  const methodManual =
+    typeof value.methodManual === 'boolean'
+      ? value.methodManual
+      : method !== DEFAULT_SETTINGS.method
+
   const madhab =
     value.madhab === 'hanafi' ? 'hanafi' : 'shafi'
 
@@ -320,6 +330,7 @@ function normalizeSettings(value: unknown): AppSettings {
 
   return {
     method: method as MethodKey,
+    methodManual,
     madhab,
 
     location,
@@ -422,6 +433,16 @@ function writeStoredSettings(settings: AppSettings): void {
 
 let currentSettings: AppSettings | null = null
 
+// قائمة المستمعين: كل شاشة مفتوحة تُخطَر فور أي تغيير
+const listeners = new Set<(s: AppSettings) => void>()
+
+export function subscribeSettings(fn: (s: AppSettings) => void): () => void {
+  listeners.add(fn)
+  return () => {
+    listeners.delete(fn)
+  }
+}
+
 export function getSettings(): AppSettings {
   if (!currentSettings) {
     currentSettings = readStoredSettings()
@@ -461,15 +482,20 @@ export function updateSettings(update: SettingsUpdate): AppSettings {
     },
   }
 
-  currentSettings = normalizeSettings(next)
-  writeStoredSettings(currentSettings)
+  const saved = normalizeSettings(next)
+  currentSettings = saved
+  writeStoredSettings(saved)
 
-  return currentSettings
+  // إخطار كل الشاشات المفتوحة بالقيمة الجديدة فوراً
+  listeners.forEach(fn => fn(saved))
+
+  return saved
 }
 
 export function resetSettings(): AppSettings {
   currentSettings = structuredClone(DEFAULT_SETTINGS)
   writeStoredSettings(currentSettings)
+  listeners.forEach(fn => fn(currentSettings!))
 
   return currentSettings
 }
@@ -485,12 +511,13 @@ export function useSettings(): UseSettingsResult {
   )
 
   const update = useCallback((value: SettingsUpdate) => {
-    const next = updateSettings(value)
-    setState(next)
+    updateSettings(value)
   }, [])
 
   useEffect(() => {
     setState(getSettings())
+
+    const unsubscribe = subscribeSettings(setState)
 
     const handleStorage = () => {
       setState(getSettings())
@@ -499,6 +526,7 @@ export function useSettings(): UseSettingsResult {
     window.addEventListener('storage', handleStorage)
 
     return () => {
+      unsubscribe()
       window.removeEventListener('storage', handleStorage)
     }
   }, [])

@@ -29,6 +29,32 @@ export const METHODS: { key: MethodKey; label: string }[] = [
   { key: 'Tehran', label: 'طهران' },
 ]
 
+/**
+ * الطريقة الرسمية لكل دولة حسب رمزها (ISO 3166-1 alpha-2).
+ * ملاحظة: لم يُتحقق بعد من مطابقة كل دولة سوى الأردن.
+ */
+const METHOD_BY_COUNTRY: Partial<Record<string, MethodKey>> = {
+  SA: 'UmmAlQura',
+  EG: 'Egyptian',
+  JO: 'JordanAwqaf',
+  DZ: 'AlgeriaMinistry',
+  TN: 'TunisiaMinistry',
+  MA: 'MoroccoHabous',
+  KW: 'Kuwait',
+  QA: 'Qatar',
+  AE: 'Dubai',
+  TR: 'Turkey',
+  PK: 'Karachi',
+  SG: 'Singapore',
+  IR: 'Tehran',
+  US: 'NorthAmerica',
+  CA: 'NorthAmerica',
+}
+
+export function methodForCountry(countryCode: string): MethodKey {
+  return METHOD_BY_COUNTRY[countryCode.toUpperCase()] ?? 'MuslimWorldLeague'
+}
+
 export interface DayTimes {
   fajr: Date
   sunrise: Date
@@ -61,14 +87,15 @@ function getCustomParams(method: CustomMethodKey) {
 
   switch (method) {
     case 'JordanAwqaf':
-      p.fajrAngle = 18
-      p.ishaAngle = 18
-      p.adjustments.fajr = -2
-      p.adjustments.sunrise = -1
-      p.adjustments.dhuhr = 1
+      // معايرة على جدول وزارة الأوقاف لعمّان (15/11 - 31/12/2026)
+      p.fajrAngle = 16.1
+      p.ishaAngle = 16.2
+      p.adjustments.fajr = -10
+      p.adjustments.sunrise = -7
+      p.adjustments.dhuhr = 0
       p.adjustments.asr = 0
-      p.adjustments.maghrib = 4
-      p.adjustments.isha = 0
+      p.adjustments.maghrib = 7
+      p.adjustments.isha = 9
       break
 
     case 'AlgeriaMinistry':
@@ -104,6 +131,11 @@ function getParams(method: MethodKey) {
   return params
 }
 
+// تقريب الوقت إلى أقرب دقيقة، كما تفعل الجداول الرسمية
+function roundToMinute(d: Date): Date {
+  return new Date(Math.round(d.getTime() / 60000) * 60000)
+}
+
 export function getPrayerTimes(
   settings: AppSettings,
   date: Date = new Date(),
@@ -120,13 +152,14 @@ export function getPrayerTimes(
 
   const t = new PrayerTimes(coords, date, params)
 
+  // كل الأوقات مُقرَّبة هنا مرة واحدة، فيتطابق العرض والأذان والإشعار
   return {
-    fajr: t.fajr,
-    sunrise: t.sunrise,
-    dhuhr: t.dhuhr,
-    asr: t.asr,
-    maghrib: t.maghrib,
-    isha: t.isha,
+    fajr: roundToMinute(t.fajr),
+    sunrise: roundToMinute(t.sunrise),
+    dhuhr: roundToMinute(t.dhuhr),
+    asr: roundToMinute(t.asr),
+    maghrib: roundToMinute(t.maghrib),
+    isha: roundToMinute(t.isha),
   }
 }
 

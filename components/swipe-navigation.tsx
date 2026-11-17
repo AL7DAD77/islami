@@ -8,8 +8,7 @@ const MAIN_PAGES = ['/prayer', '/quran', '/adhkar', '/sahihayn', '/qibla', '/mor
 
 /**
  * التنقل بالسحب بين الأقسام الرئيسية فقط.
- * لا يعمل داخل الصفحات الفرعية (مثل المصحف وصفحات الأذكار) حتى لا يتعارض مع التمرير
- * ومع سحب المصحف الخاص بها.
+ * يستخدم replace حتى لا تتراكم الأقسام في سجل الرجوع.
  */
 export function SwipeNavigation() {
   const router = useRouter()
@@ -20,8 +19,11 @@ export function SwipeNavigation() {
     enabled: index !== -1,
     onSwipe: (dir) => {
       // RTL: السحب لليمين = القسم السابق في الترتيب
-      if (dir === 'right' && index > 0) router.push(MAIN_PAGES[index - 1])
-      else if (dir === 'left' && index < MAIN_PAGES.length - 1) router.push(MAIN_PAGES[index + 1])
+      if (dir === 'right' && index > 0) {
+        router.replace(MAIN_PAGES[index - 1])
+      } else if (dir === 'left' && index < MAIN_PAGES.length - 1) {
+        router.replace(MAIN_PAGES[index + 1])
+      }
     },
   })
 

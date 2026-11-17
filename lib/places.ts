@@ -9,6 +9,13 @@ export interface City {
   method: MethodKey
 }
 
+export interface ReversePlace {
+  city: string
+  district: string // الحي أو المنطقة الأدق إن وُجدت، وإلا نص فارغ
+  country: string
+  countryCode: string
+}
+
 type Row = [name: string, lat: number, lng: number]
 
 function group(
@@ -423,23 +430,42 @@ export function adhanUrl(id: string) {
   return `https://cdn.aladhan.com/audio/adhans/${id}.mp3`
 }
 
-export async function reverseGeocode(lat: number, lng: number) {
-  const res = await fetch(
-    `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=ar`,
-  )
+/**
+ * يحدد اسم الموقع من الإحداثيات.
+ * يعيد المدينة الكبرى في `city`، والحي أو المنطقة الأدق في `district` إن وُجدت.
+ * إذا لم تُرجع الخدمة أي اسم يعيد `city` فارغاً، ليتولى المستدعي البديل
+ * (مدينة مسجلة قريبة أو "موقعي الحالي")، ولا يُعاد نص عرض كأنه اسم حقيقي.
+ */
+export async function reverseGeocode(
+  lat: number,
+  lng: number,
+): Promise<ReversePlace> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 8000)
 
-  if (!res.ok) {
-    throw new Error('geocode failed')
-  }
+  try {
+    const res = await fetch(
+      `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=ar`,
+      { signal: controller.signal },
+    )
 
-  const data = await res.json()
+    if (!res.ok) {
+      throw new Error('geocode failed')
+    }
 
-  return {
-    city: (data.city ||
-      data.locality ||
-      data.principalSubdivision ||
-      'موقعي الحالي') as string,
-    country: (data.countryName || '') as string,
-    countryCode: (data.countryCode || '') as string,
+    const data = await res.json()
+
+    const city = (data.city || '') as string
+    const locality = (data.locality || '') as string
+    const subdivision = (data.principalSubdivision || '') as string
+
+    return {
+      city: city || subdivision || '',
+      district: locality && locality !== city ? locality : '',
+      country: (data.countryName || '') as string,
+      countryCode: (data.countryCode || '') as string,
+    }
+  } finally {
+    clearTimeout(timer)
   }
 }

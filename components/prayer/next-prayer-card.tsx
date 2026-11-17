@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { MapPin, Loader2 } from 'lucide-react'
 import { useHydrated, useSettings } from '@/lib/settings'
 import { PRAYER_NAMES, formatCountdown, formatTime, getNextPrayer } from '@/lib/prayer'
@@ -17,6 +17,12 @@ export function NextPrayerCard() {
 
   const [now, setNow] = useState(() => new Date())
   const [isUpdatingLocation, setIsUpdatingLocation] = useState(false)
+
+  // هل تم تحديد الموقع فعلياً؟ الاسم الافتراضي (مكة) لا يُعد تحديداً
+  const locationResolved =
+    settings.locationStatus === 'ok' && settings.location.auto
+
+  const autoStarted = useRef(false)
 
   useEffect(() => {
     const id = window.setInterval(() => setNow(new Date()), 1000)
@@ -50,6 +56,16 @@ export function NextPrayerCard() {
     }
   }
 
+  // بدء التحديد تلقائياً مرة واحدة عند أول تشغيل إن لم يكن الموقع محدداً
+  useEffect(() => {
+    if (!hydrated || autoStarted.current) return
+    if (locationResolved) return
+
+    autoStarted.current = true
+    handleUpdateLocation()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated, locationResolved])
+
   if (!hydrated) {
     return <div className="h-52 animate-pulse rounded-3xl bg-primary/80" aria-hidden="true" />
   }
@@ -68,7 +84,6 @@ export function NextPrayerCard() {
     formatCountdown(next.time.getTime() - now.getTime()),
   )
 
-  // ✅ إصلاح التاريخ الميلادي ليستخدم formatValue
   const formattedGregorianDate = formatValue(
     now.toLocaleDateString(
       locale === 'ar' ? 'ar-EG' : 'en-US',
@@ -80,6 +95,17 @@ export function NextPrayerCard() {
       },
     ),
   )
+
+  // الاسم المعروض: "جارٍ التحديد" أثناء البحث، ثم اسم المدينة المحددة فعلياً
+  const cityLabel = isUpdatingLocation
+    ? locale === 'ar'
+      ? 'جاري التحديد...'
+      : 'Locating...'
+    : locationResolved
+      ? settings.location.city
+      : locale === 'ar'
+        ? 'جارٍ تحديد الموقع...'
+        : 'Detecting location...'
 
   return (
     <section
@@ -94,7 +120,6 @@ export function NextPrayerCard() {
       <div className="relative flex items-start justify-between gap-4">
         <div>
           <p className="text-sm opacity-80">{formatHijri(now, settings.hijriAdjust)}</p>
-          {/* ✅ استخدام المتغير الجديد */}
           <p className="text-xs opacity-70">{formattedGregorianDate}</p>
         </div>
 
@@ -114,13 +139,7 @@ export function NextPrayerCard() {
           ) : (
             <MapPin className="size-3.5" aria-hidden="true" />
           )}
-          <span>
-            {isUpdatingLocation
-              ? locale === 'ar'
-                ? 'جاري التحديد...'
-                : 'Locating...'
-              : settings.location.city}
-          </span>
+          <span>{cityLabel}</span>
         </button>
       </div>
 

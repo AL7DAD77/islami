@@ -51,11 +51,15 @@ function distanceKm(
   return 2 * R * Math.asin(Math.sqrt(h))
 }
 
-/** أقرب مدينة من القائمة المحلية (تُستخدم عند فشل تحديد اسم المدينة بلا إنترنت) */
+/**
+ * أقرب مدينة مسجلة ضمن نطاق محدد بالكيلومتر.
+ * القيمة الافتراضية قريبة (25 كم) حتى لا يُسمّى الموقع باسم مدينة بعيدة.
+ * استخدم نطاقاً أوسع فقط عندما تحتاج الدولة وليس الاسم.
+ */
 export function nearestCity(
   lat: number,
   lng: number,
-  maxKm = 500, // ✅ تم رفع النطاق إلى 500 كم لضمان التعرف على الدولة وطريقتها الرسمية حتى في المناطق البعيدة
+  maxKm = 25,
   list: City[] = CITIES,
 ): City | null {
   let best: City | null = null
@@ -73,6 +77,10 @@ export function nearestCity(
   return best && bestDistance <= maxKm ? best : null
 }
 
+/**
+ * طريقة الحساب الرسمية للدولة من رمزها (ISO).
+ * الاحتياطي الافتراضي MuslimWorldLeague، وليس طريقة دولة بعينها.
+ */
 export function methodForCountry(
   countryCode: string | undefined,
   fallback: MethodKey = 'MuslimWorldLeague',

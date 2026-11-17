@@ -182,7 +182,17 @@
     "notDetermined": "Location not determined",
     "message": "The times shown are for",
     "messageEnd": ". Please enable location permission or select your city manually.",
-    "openSettings": "Open Location Settings"
+    "openSettings": "Open Location Settings",
+    "detecting": "Detecting your location...",
+    "pendingMessage": "The times shown may not match your city until your location is detected."
+  },
+  "nextPrayerCard": {
+    "nextPrayer": "Next Prayer",
+    "locating": "Locating...",
+    "detecting": "Detecting location...",
+    "tapHint": "Tap to auto-detect location",
+    "permissionDenied": "Location permission denied. Please enable it from phone settings.",
+    "gpsError": "Failed to get location. Please ensure GPS is enabled."
   },
   "ibadatiCard": {
     "title": "My Worship",
