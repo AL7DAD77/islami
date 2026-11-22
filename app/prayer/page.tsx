@@ -10,6 +10,7 @@ import { LocationBanner } from '@/components/prayer/location-banner'
 import { TileLink } from '@/components/ui-kit'
 import { IbadatiCard } from '@/components/prayer/ibadati-card'
 import { SearchButton } from '@/components/search-button'
+import { ThreeDotsSettingsMenu } from '@/components/three-dots-settings-menu'
 import { useLanguage } from '@/lib/language-context'
 
 export default function PrayerPage() {
@@ -30,6 +31,7 @@ export default function PrayerPage() {
             >
               <CalendarDays className="size-5" aria-hidden="true" />
             </Link>
+            <ThreeDotsSettingsMenu />
           </>
         }
       />

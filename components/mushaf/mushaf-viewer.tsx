@@ -12,17 +12,23 @@ import {
 import { useRouter, useSearchParams } from 'next/navigation'
 
 import {
+  BookOpen,
   Bookmark,
   ChevronRight,
-  ChevronLeft,
+  Compass,
   Headphones,
+  List,
   Loader2,
   Moon,
   Pause,
   Play,
+  Sparkles,
   Sun,
+  Trash2,
+  X,
 } from 'lucide-react'
 
+import * as BookmarksLib from '@/lib/bookmarks'
 import {
   isBookmarked,
   saveReadingPosition,
@@ -84,6 +90,16 @@ interface QuarterIndexItem {
   verseKey: string
 }
 
+interface SavedBookmarkItem {
+  id?: string
+  surah?: number
+  surahNumber?: number
+  surahName?: string
+  page?: number
+  pageNumber?: number
+  createdAt?: number
+}
+
 interface Point {
   x: number
   y: number
@@ -93,6 +109,16 @@ interface PinchState {
   distance: number
   scale: number
 }
+
+type MenuSection =
+  | 'main'
+  | 'bookmarks'
+  | 'khatmah'
+  | 'wird'
+  | 'dua'
+  | 'index'
+
+type IndexTab = 'surahs' | 'juz' | 'pages'
 
 const TOTAL_PAGES = 604
 const MIN_SCALE = 1
@@ -106,13 +132,14 @@ const SURAH_HEADER_RATIO = 0.72
 
 const PRINT_GREEN = '#4f6b2e'
 const PRINT_GOLD = '#b8924a'
-const PRINT_CREAM = '#fbf6ea'
 
 const META_URL = '/mushaf/meta.json'
 const PAGES_URL = '/mushaf-qcf4/pages'
 const QUARTER_INDEX_URL = '/mushaf/quarter-index.json'
 
 const NIGHT_MODE_KEY = 'mushaf-night-mode'
+const WIRD_PAGES_KEY = 'mushaf-daily-wird-pages'
+const TARGET_PAGE_OVERRIDE_KEY = 'mushaf-target-page-override'
 const RECITER_SERVER_KEY = 'selected_reciter_server'
 const RECITER_NAME_KEY = 'selected_reciter_name'
 
@@ -121,8 +148,229 @@ const DEFAULT_RECITER_SERVER =
 
 const DEFAULT_RECITER_NAME = 'مشاري العفاسي'
 
+const KHATMAH_DUA =
+  'اللهم ارحمني بالقرآن واجعله لي إماماً ونوراً وهدى ورحمة، اللهم ذكرني منه ما نسيت وعلمني منه ما جهلت وارزقني تلاوته آناء الليل وأطراف النهار واجعله لي حجة يا رب العالمين.'
+
 function clampPage(page: number): number {
   return Math.min(Math.max(page, 1), TOTAL_PAGES)
+}
+
+function getSavedReadingPage(): number | null {
+  try {
+    const libAny = BookmarksLib as unknown as Record<string, unknown>
+    const fn =
+      typeof libAny.loadReadingPosition === 'function'
+        ? (libAny.loadReadingPosition as () => { page?: number } | null)
+        : typeof libAny.getReadingPosition === 'function'
+          ? (libAny.getReadingPosition as () => { page?: number } | null)
+          : null
+
+    if (fn) {
+      const pos = fn()
+      if (pos && typeof pos.page === 'number' && pos.page >= 1 && pos.page <= TOTAL_PAGES) {
+        return clampPage(pos.page)
+      }
+    }
+
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i)
+      if (!k || !k.toLowerCase().includes('reading')) continue
+      const raw = localStorage.getItem(k)
+      if (!raw) continue
+      const parsed = JSON.parse(raw)
+      if (parsed && typeof parsed.page === 'number' && parsed.page >= 1 && parsed.page <= TOTAL_PAGES) {
+        return clampPage(parsed.page)
+      }
+    }
+  } catch {
+    // تجاهل أخطاء القراءة المحلية
+  }
+  return null
+}
+
+function consumeTargetPageOverride(): number | null {
+  try {
+    const rawOverride = localStorage.getItem(TARGET_PAGE_OVERRIDE_KEY)
+    if (!rawOverride) return null
+    localStorage.removeItem(TARGET_PAGE_OVERRIDE_KEY)
+    const parsed = Number(rawOverride)
+    if (Number.isInteger(parsed) && parsed >= 1 && parsed <= TOTAL_PAGES) {
+      return clampPage(parsed)
+    }
+  } catch {
+    // تجاهل أخطاء التخزين المحلي
+  }
+  return null
+}
+
+function extractBookmarksList(
+  bookmarkState: unknown,
+  metaData: MushafMetaData | null,
+): Array<{
+  key: string
+  surahNumber: number
+  surahName: string
+  page: number
+}> {
+  const candidates: SavedBookmarkItem[] = []
+
+  if (Array.isArray(bookmarkState)) {
+    candidates.push(...(bookmarkState as SavedBookmarkItem[]))
+  } else if (bookmarkState && typeof bookmarkState === 'object') {
+    const obj = bookmarkState as Record<string, unknown>
+    for (const field of ['bookmarks', 'items', 'list', 'pages']) {
+      if (Array.isArray(obj[field])) {
+        candidates.push(...(obj[field] as SavedBookmarkItem[]))
+      }
+    }
+  }
+
+  if (candidates.length === 0) {
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i)
+        if (!key || !key.toLowerCase().includes('bookmark')) continue
+        const raw = localStorage.getItem(key)
+        if (!raw) continue
+        const parsed = JSON.parse(raw)
+        if (Array.isArray(parsed)) {
+          candidates.push(...(parsed as SavedBookmarkItem[]))
+        } else if (parsed && typeof parsed === 'object') {
+          const pObj = parsed as Record<string, unknown>
+          for (const field of ['bookmarks', 'items', 'list', 'pages']) {
+            if (Array.isArray(pObj[field])) {
+              candidates.push(...(pObj[field] as SavedBookmarkItem[]))
+            }
+          }
+        }
+      }
+    } catch {
+      // تجاهل أخطاء القراءة المحلية
+    }
+  }
+
+  const normalized: Array<{
+    key: string
+    surahNumber: number
+    surahName: string
+    page: number
+  }> = []
+
+  const seen = new Set<string>()
+
+  for (let i = 0; i < candidates.length; i++) {
+    const item = candidates[i]
+    if (!item || typeof item !== 'object') continue
+    const rawPage = Number(item.page ?? item.pageNumber)
+    if (!Number.isInteger(rawPage) || rawPage < 1 || rawPage > TOTAL_PAGES) continue
+    const page = clampPage(rawPage)
+    const rawSurah = Number(item.surah ?? item.surahNumber ?? 1)
+    const surahNumber =
+      Number.isInteger(rawSurah) && rawSurah >= 1 && rawSurah <= 114
+        ? rawSurah
+        : 1
+    const surahName =
+      item.surahName ||
+      metaData?.surahNames[surahNumber - 1] ||
+      `سورة ${surahNumber}`
+
+    const uniqueKey = `${surahNumber}-${page}`
+    if (seen.has(uniqueKey)) continue
+    seen.add(uniqueKey)
+
+    normalized.push({
+      key: item.id || `${uniqueKey}-${i}`,
+      surahNumber,
+      surahName,
+      page,
+    })
+  }
+
+  return normalized
+}
+
+function DenseOrnamentSide({
+  isNightMode,
+  mirror = false,
+}: {
+  isNightMode: boolean
+  mirror?: boolean
+}) {
+  const strokeColor = isNightMode ? '#d4af37' : '#7b5026'
+  const fillColor = isNightMode ? '#c59d30' : '#8e5d2c'
+
+  return (
+    <svg
+      viewBox="0 0 120 44"
+      className={cn(
+        'h-[90%] w-20 shrink-0 sm:w-28',
+        mirror && '-scale-x-100',
+      )}
+      style={{ color: strokeColor }}
+      aria-hidden
+    >
+      <rect
+        x="2"
+        y="3"
+        width="116"
+        height="38"
+        rx="4"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        opacity="0.85"
+      />
+      <rect
+        x="5"
+        y="6"
+        width="110"
+        height="32"
+        rx="2.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="0.8"
+        strokeDasharray="3 2"
+        opacity="0.7"
+      />
+      <g transform="translate(22, 22)">
+        <circle cx="0" cy="0" r="13" fill="none" stroke="currentColor" strokeWidth="1.1" />
+        <circle cx="0" cy="0" r="9.5" fill="none" stroke="currentColor" strokeWidth="0.9" opacity="0.8" />
+        <polygon
+          points="0,-12 3.5,-3.5 12,0 3.5,3.5 0,12 -3.5,3.5 -12,0 -3.5,-3.5"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1"
+        />
+        <polygon
+          points="0,-8 8,-8 8,8 -8,8 -8,-8"
+          transform="rotate(45)"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="0.85"
+          opacity="0.75"
+        />
+        <circle cx="0" cy="0" r="3.2" fill={fillColor} />
+      </g>
+      <g fill="none" stroke="currentColor" strokeWidth="1">
+        <path d="M38 7 C46 7, 46 22, 54 22 C46 22, 46 37, 38 37" opacity="0.85" />
+        <path d="M54 7 C62 7, 62 22, 70 22 C62 22, 62 37, 54 37" opacity="0.85" />
+        <path d="M70 7 C78 7, 78 22, 86 22 C78 22, 78 37, 70 37" opacity="0.85" />
+        <path d="M86 7 C94 7, 94 22, 102 22 C94 22, 94 37, 86 37" opacity="0.85" />
+        <path d="M38 22 H112" strokeWidth="0.8" opacity="0.65" />
+      </g>
+      <g fill={fillColor} opacity="0.85">
+        <circle cx="46" cy="14" r="1.4" />
+        <circle cx="46" cy="30" r="1.4" />
+        <circle cx="62" cy="14" r="1.4" />
+        <circle cx="62" cy="30" r="1.4" />
+        <circle cx="78" cy="14" r="1.4" />
+        <circle cx="78" cy="30" r="1.4" />
+        <circle cx="94" cy="14" r="1.4" />
+        <circle cx="94" cy="30" r="1.4" />
+        <polygon points="108,18 111,22 108,26 105,22" />
+      </g>
+    </svg>
+  )
 }
 
 function isHeaderLine(line: Line): boolean {
@@ -265,7 +513,7 @@ export function MushafViewer({
 
   const pageParam = Number(searchParams.get('page'))
   const initialPage =
-    pageParam > 0 ? pageParam : undefined
+    pageParam > 0 ? clampPage(pageParam) : undefined
 
   const [currentPage, setCurrentPage] = useState<number>(
     initialPage || 1,
@@ -285,6 +533,12 @@ export function MushafViewer({
   const [isPageLoading, setIsPageLoading] = useState(true)
   const [hasError, setHasError] = useState(false)
   const [isNightMode, setIsNightMode] = useState(false)
+
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [menuSection, setMenuSection] = useState<MenuSection>('main')
+  const [indexTab, setIndexTab] = useState<IndexTab>('surahs')
+  const [wirdPages, setWirdPages] = useState<number>(10)
+  const [jumpPageInput, setJumpPageInput] = useState<string>('')
 
   const [fontPx, setFontPx] = useState(REFERENCE_FONT_SIZE)
   const [rowPx, setRowPx] = useState<number | undefined>(
@@ -353,6 +607,8 @@ export function MushafViewer({
     return index
   }, [currentPage, metaData])
 
+  const activeSurahNumber = currentSurahIndex + 1
+
   const surahName = useMemo(() => {
     return metaData?.surahNames[currentSurahIndex] || ''
   }, [currentSurahIndex, metaData])
@@ -395,7 +651,78 @@ export function MushafViewer({
     return result
   }, [currentPage, quarterIndex])
 
-  // تحميل meta.json
+  const bookmarksList = useMemo(
+    () => extractBookmarksList(bookmarkState, metaData),
+    [bookmarkState, metaData],
+  )
+
+  // معالجة زر الرجوع في النظام (Capacitor) للعودة أولاً إلى الشاشة الرئيسية للتطبيق
+  useEffect(() => {
+    let listenerRemove: (() => void) | undefined
+    let isMounted = true
+
+    const attachBackButton = async () => {
+      try {
+        const capWindow = window as unknown as {
+          Capacitor?: {
+            isNativePlatform?: () => boolean
+            Plugins?: {
+              App?: {
+                addListener?: (
+                  eventName: 'backButton',
+                  cb: (data: { canGoBack: boolean }) => void,
+                ) => Promise<{ remove: () => void }> | { remove: () => void }
+                exitApp?: () => void
+              }
+            }
+          }
+        }
+
+        const appPlugin = capWindow.Capacitor?.Plugins?.App
+        if (!appPlugin?.addListener) return
+
+        const handle = await appPlugin.addListener('backButton', () => {
+          if (!isMounted) return
+
+          if (menuOpen) {
+            if (menuSection !== 'main') {
+              setMenuSection('main')
+            } else {
+              setMenuOpen(false)
+            }
+            return
+          }
+
+          const currentPath = window.location.pathname || '/'
+          if (currentPath !== '/') {
+            router.replace('/')
+            return
+          }
+
+          appPlugin.exitApp?.()
+        })
+
+        if (isMounted && handle?.remove) {
+          listenerRemove = () => {
+            handle.remove()
+          }
+        }
+      } catch {
+        // تجاهل في بيئة الويب
+      }
+    }
+
+    attachBackButton()
+
+    return () => {
+      isMounted = false
+      if (listenerRemove) {
+        listenerRemove()
+      }
+    }
+  }, [menuOpen, menuSection, router])
+
+  // تحميل meta.json والانتقال التلقائي لآخر موضع قراءة
   useEffect(() => {
     let isActive = true
 
@@ -414,11 +741,18 @@ export function MushafViewer({
 
         setMetaData(meta)
 
-        if (!initialPage) {
-          const startPage =
-            meta.surahStartPage[initialSurah - 1] || 1
+        if (initialPage) {
+          setCurrentPage(initialPage)
+        } else {
+          const overridePage = consumeTargetPageOverride()
+          const savedPage = overridePage ?? getSavedReadingPage()
+          const surahStart = meta.surahStartPage[initialSurah - 1] || 1
 
-          setCurrentPage(clampPage(startPage))
+          if (savedPage && (initialSurah === 1 || savedPage >= surahStart)) {
+            setCurrentPage(savedPage)
+          } else {
+            setCurrentPage(clampPage(surahStart))
+          }
         }
       } catch (error) {
         console.error('خطأ في تحميل بيانات المصحف:', error)
@@ -436,9 +770,14 @@ export function MushafViewer({
     }
   }, [initialPage, initialSurah])
 
-  // تحميل فهرس أرباع الأحزاب
+  // تحميل فهرس أرباع الأحزاب والورد اليومي المحفوظ
   useEffect(() => {
     let isActive = true
+
+    try {
+      const savedWird = Number(localStorage.getItem(WIRD_PAGES_KEY))
+      if (savedWird > 0) setWirdPages(savedWird)
+    } catch {}
 
     const loadQuarterIndex = async () => {
       try {
@@ -605,10 +944,12 @@ export function MushafViewer({
       clearTimeout(uiTimeoutRef.current)
     }
 
+    if (menuOpen) return
+
     uiTimeoutRef.current = setTimeout(() => {
       setShowUi(false)
     }, 3000)
-  }, [])
+  }, [menuOpen])
 
   useEffect(() => {
     resetUiTimeout()
@@ -628,6 +969,12 @@ export function MushafViewer({
         return
       }
 
+      if (menuOpen) {
+        setMenuOpen(false)
+        setMenuSection('main')
+        return
+      }
+
       setShowUi((previous) => {
         const next = !previous
 
@@ -638,7 +985,7 @@ export function MushafViewer({
         return next
       })
     },
-    [resetUiTimeout],
+    [menuOpen, resetUiTimeout],
   )
 
   useEffect(() => {
@@ -665,14 +1012,36 @@ export function MushafViewer({
   }, [currentPage, resetUiTimeout])
 
   useEffect(() => {
-    if (!currentPage || !metaData) return
+    if (!currentPage || !metaData || !surahName) return
 
     saveReadingPosition(
-      initialSurah,
+      activeSurahNumber,
       surahName,
       currentPage,
     )
-  }, [currentPage, initialSurah, metaData, surahName])
+  }, [activeSurahNumber, currentPage, metaData, surahName])
+
+  const navigateToPage = useCallback(
+    (targetPage: number) => {
+      const clamped = clampPage(targetPage)
+      vibrateDevice(12)
+      setCurrentPage(clamped)
+      setMenuOpen(false)
+      setMenuSection('main')
+      setShowUi(true)
+      resetUiTimeout()
+    },
+    [resetUiTimeout, vibrateDevice],
+  )
+
+  const handleBackToMainApp = useCallback(
+    (event: React.MouseEvent) => {
+      event.stopPropagation()
+      vibrateDevice(10)
+      router.replace('/')
+    },
+    [router, vibrateDevice],
+  )
 
   const handlePreviousPage = useCallback(() => {
     setCurrentPage((previous) => {
@@ -729,6 +1098,8 @@ export function MushafViewer({
 
   const handleTouchStart = useCallback(
     (event: React.TouchEvent) => {
+      if (menuOpen) return
+
       if (event.touches.length === 2) {
         pinchStartRef.current = {
           distance: Math.hypot(
@@ -751,11 +1122,13 @@ export function MushafViewer({
         }
       }
     },
-    [userScale],
+    [menuOpen, userScale],
   )
 
   const handleTouchMove = useCallback(
     (event: React.TouchEvent) => {
+      if (menuOpen) return
+
       if (
         event.touches.length === 2 &&
         pinchStartRef.current
@@ -817,12 +1190,12 @@ export function MushafViewer({
         )
       }
     },
-    [clampPan, userScale],
+    [clampPan, menuOpen, userScale],
   )
 
   const handleTouchEnd = useCallback(
     (event: React.TouchEvent) => {
-      if (event.touches.length > 0) return
+      if (menuOpen || event.touches.length > 0) return
 
       if (
         userScale === MIN_SCALE &&
@@ -845,10 +1218,11 @@ export function MushafViewer({
       pointerStartRef.current = null
       pinchStartRef.current = null
     },
-    [handleNextPage, handlePreviousPage, userScale],
+    [handleNextPage, handlePreviousPage, menuOpen, userScale],
   )
 
   const handleDoubleClick = useCallback(() => {
+    if (menuOpen) return
     vibrateDevice(15)
 
     if (userScale > MIN_SCALE) {
@@ -859,7 +1233,7 @@ export function MushafViewer({
 
     setUserScale(DOUBLE_TAP_SCALE)
     setPan({ x: 0, y: 0 })
-  }, [userScale, vibrateDevice])
+  }, [menuOpen, userScale, vibrateDevice])
 
   const handlePlayToggle = useCallback(
     (event: React.MouseEvent) => {
@@ -869,7 +1243,7 @@ export function MushafViewer({
 
       if (
         player.playing &&
-        player.surah === initialSurah
+        player.surah === activeSurahNumber
       ) {
         vibrateDevice(10)
         player.toggle()
@@ -907,14 +1281,14 @@ export function MushafViewer({
       }
 
       player.play(
-        initialSurah,
+        activeSurahNumber,
         surahName,
         player.reciter || defaultReciter,
         player.moshafServer || server,
       )
     },
     [
-      initialSurah,
+      activeSurahNumber,
       surahName,
       player,
       resetUiTimeout,
@@ -930,14 +1304,14 @@ export function MushafViewer({
       vibrateDevice(18)
 
       toggleBookmark(
-        initialSurah,
+        activeSurahNumber,
         surahName,
         currentPage,
       )
     },
     [
+      activeSurahNumber,
       currentPage,
-      initialSurah,
       surahName,
       resetUiTimeout,
       vibrateDevice,
@@ -962,18 +1336,30 @@ export function MushafViewer({
     [resetUiTimeout, vibrateDevice],
   )
 
+  const handleSaveWird = (pagesCount: number) => {
+    const valid = Math.min(Math.max(pagesCount, 1), 604)
+    setWirdPages(valid)
+    try {
+      localStorage.setItem(WIRD_PAGES_KEY, String(valid))
+    } catch {}
+    navigateToPage(currentPage + valid)
+  }
+
   const isBookmarkedPage = isBookmarked(
     bookmarkState,
-    initialSurah,
+    activeSurahNumber,
     currentPage,
   )
 
   const isCurrentSurahPlaying =
-    player.playing && player.surah === initialSurah
+    player.playing && player.surah === activeSurahNumber
+
+  const khatmahPercent = Math.round((currentPage / TOTAL_PAGES) * 100)
+  const remainingPages = Math.max(0, TOTAL_PAGES - currentPage)
 
   const surface = isNightMode
-    ? 'rgba(24, 24, 27, 0.88)'
-    : 'rgba(255, 255, 255, 0.88)'
+    ? 'rgba(24, 24, 27, 0.92)'
+    : 'rgba(255, 255, 255, 0.94)'
 
   const bg = isNightMode ? '#101010' : '#fdfbf7'
   const fg = isNightMode ? '#f4f4f5' : '#06140f'
@@ -989,7 +1375,6 @@ export function MushafViewer({
 
   const printGreen = isNightMode ? '#d4af37' : PRINT_GREEN
   const printGold = isNightMode ? '#8a7030' : PRINT_GOLD
-  const headerFrameBg = isNightMode ? '#16161a' : PRINT_CREAM
 
   const versesCount = currentSurahInfo?.verses
 
@@ -1169,15 +1554,66 @@ export function MushafViewer({
                   >
                     {isHeader ? (
                       <div
-                        className="flex h-full w-[96%] items-center justify-center rounded-md"
+                        className="relative flex h-full w-[98%] items-center justify-between overflow-hidden rounded-lg px-1"
                         style={{
-                          border: `3px double ${printGold}`,
-                          boxShadow: `inset 0 0 0 1px ${printGreen}`,
-                          backgroundColor: headerFrameBg,
-                          padding: '0 8px',
+                          backgroundColor: isNightMode
+                            ? '#18140e'
+                            : '#f5ebd6',
+                          border: `1.5px solid ${
+                            isNightMode ? '#b38b36' : '#7b5026'
+                          }`,
+                          boxShadow: isNightMode
+                            ? 'inset 0 0 0 2px rgba(212, 175, 55, 0.25)'
+                            : 'inset 0 0 0 2px #d7b980, 0 1px 3px rgba(79, 53, 24, 0.14)',
                         }}
                       >
-                        {renderLineContent(line, fontPx, printGreen)}
+                        <DenseOrnamentSide isNightMode={isNightMode} />
+
+                        {/* البطاقة الوسطية لاسم السورة وبياناتها */}
+                        <div
+                          className="mx-1 flex h-[86%] min-w-[44%] max-w-[66%] flex-col items-center justify-center rounded-md px-2.5"
+                          style={{
+                            backgroundColor: isNightMode
+                              ? '#101012'
+                              : '#fffdf7',
+                            border: `1px solid ${
+                              isNightMode ? '#c59d30' : '#9d713e'
+                            }`,
+                            boxShadow:
+                              'inset 0 0 0 1px rgba(184, 146, 74, 0.35)',
+                          }}
+                        >
+                          <div className="leading-none">
+                            {renderLineContent(
+                              line,
+                              fontPx * 0.95,
+                              isNightMode ? '#e8c46d' : '#2b1d0f',
+                            )}
+                          </div>
+
+                          <div
+                            className="mt-0.5 flex items-center gap-1.5 text-[10px] font-bold leading-tight"
+                            style={{
+                              color: isNightMode ? '#d4af37' : '#6e4722',
+                            }}
+                          >
+                            <span>ترتيب {formatValue(activeSurahNumber)}</span>
+                            {currentSurahInfo?.place ? (
+                              <>
+                                <span>•</span>
+                                <span>{currentSurahInfo.place}</span>
+                              </>
+                            ) : null}
+                            {currentSurahInfo?.verses ? (
+                              <>
+                                <span>•</span>
+                                <span>{formatValue(currentSurahInfo.verses)} آية</span>
+                              </>
+                            ) : null}
+                          </div>
+                        </div>
+
+                        <DenseOrnamentSide isNightMode={isNightMode} mirror />
                       </div>
                     ) : (
                       renderLineContent(line, fontPx, fg)
@@ -1194,22 +1630,45 @@ export function MushafViewer({
       <header
         className={cn(
           'absolute inset-x-0 top-0 z-50 flex items-start justify-between gap-2 p-3 transition-all duration-300 pointer-events-auto',
-          showUi ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'
+          showUi || menuOpen
+            ? 'opacity-100 translate-y-0'
+            : 'opacity-0 -translate-y-4 pointer-events-none',
         )}
         style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
       >
-        <button
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation()
-            router.back()
-          }}
-          className="flex size-10 items-center justify-center rounded-full border shadow-lg backdrop-blur-md transition-transform active:scale-90"
-          style={{ backgroundColor: surface, borderColor: border, color: fg }}
-          aria-label="رجوع"
-        >
-          <ChevronRight className="size-5" />
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={handleBackToMainApp}
+            className="flex size-10 items-center justify-center rounded-full border shadow-lg backdrop-blur-md transition-transform active:scale-90"
+            style={{ backgroundColor: surface, borderColor: border, color: fg }}
+            aria-label="العودة إلى الرئيسية"
+          >
+            <ChevronRight className="size-5" />
+          </button>
+
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation()
+              vibrateDevice(10)
+              setMenuOpen((prev) => {
+                const next = !prev
+                if (!next) setMenuSection('main')
+                return next
+              })
+            }}
+            className="flex items-center gap-1.5 rounded-full border px-3 py-2 text-xs font-bold shadow-lg backdrop-blur-md transition-transform active:scale-95"
+            style={{
+              backgroundColor: menuOpen ? primary : surface,
+              borderColor: border,
+              color: menuOpen ? primaryText : fg,
+            }}
+          >
+            {menuOpen ? <X className="size-4" /> : <List className="size-4" />}
+            <span>القائمة</span>
+          </button>
+        </div>
 
         <div
           className="flex items-center gap-1 rounded-full border px-2 py-1 shadow-lg backdrop-blur-md"
@@ -1274,7 +1733,412 @@ export function MushafViewer({
         </div>
       </header>
 
-      {/* ⚠️ تم حذف الشريط السفلي بالكامل (لا أزرار أسفل الصفحة) */}
+      {/* القائمة المنسدلة الشاملة فوق صفحة المصحف */}
+      {menuOpen && (
+        <div
+          onClick={(event) => event.stopPropagation()}
+          className="fixed inset-x-3 top-20 z-[60] mx-auto max-h-[75dvh] w-auto max-w-md overflow-y-auto rounded-3xl border p-4 shadow-2xl backdrop-blur-xl"
+          style={{
+            backgroundColor: surface,
+            borderColor: border,
+            color: fg,
+          }}
+        >
+          {menuSection !== 'main' && (
+            <div className="mb-3 flex items-center justify-between border-b pb-2.5" style={{ borderColor: border }}>
+              <button
+                type="button"
+                onClick={() => setMenuSection('main')}
+                className="flex items-center gap-1 text-xs font-bold"
+                style={{ color: accent }}
+              >
+                <ChevronRight className="size-4" />
+                <span>العودة للقائمة</span>
+              </button>
+              <span className="text-sm font-bold">
+                {menuSection === 'bookmarks' && 'العلامات المرجعية'}
+                {menuSection === 'khatmah' && 'ختمة القرآن'}
+                {menuSection === 'wird' && 'الورد اليومي'}
+                {menuSection === 'dua' && 'دعاء ختم القرآن'}
+                {menuSection === 'index' && 'الفهرس'}
+              </span>
+            </div>
+          )}
+
+          {menuSection === 'main' && (
+            <div className="flex flex-col gap-2">
+              <div
+                className="flex items-center justify-between rounded-2xl border p-3"
+                style={{ borderColor: border }}
+              >
+                <div>
+                  <p className="text-[11px] opacity-70">الموضع الحالي</p>
+                  <p className="text-sm font-bold">
+                    {surahName} · صفحة {formatValue(currentPage)}
+                  </p>
+                </div>
+                <span
+                  className="rounded-xl px-2.5 py-1 text-xs font-bold"
+                  style={{ backgroundColor: primary, color: primaryText }}
+                >
+                  {formatValue(khatmahPercent)}%
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setMenuSection('bookmarks')}
+                className="flex items-center justify-between rounded-2xl border p-3 text-right transition-colors hover:bg-black/5"
+                style={{ borderColor: border }}
+              >
+                <span className="flex items-center gap-2.5 text-sm font-bold">
+                  <Bookmark className="size-4" style={{ color: accent }} />
+                  <span>العلامات المرجعية</span>
+                </span>
+                <span className="text-xs opacity-75">
+                  {formatValue(bookmarksList.length)} علامة
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setMenuSection('khatmah')}
+                className="flex items-center justify-between rounded-2xl border p-3 text-right transition-colors hover:bg-black/5"
+                style={{ borderColor: border }}
+              >
+                <span className="flex items-center gap-2.5 text-sm font-bold">
+                  <Compass className="size-4" style={{ color: accent }} />
+                  <span>ختمة القرآن</span>
+                </span>
+                <span className="text-xs opacity-75">
+                  متبقي {formatValue(remainingPages)} صفحة
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setMenuSection('wird')}
+                className="flex items-center justify-between rounded-2xl border p-3 text-right transition-colors hover:bg-black/5"
+                style={{ borderColor: border }}
+              >
+                <span className="flex items-center gap-2.5 text-sm font-bold">
+                  <BookOpen className="size-4" style={{ color: accent }} />
+                  <span>الورد اليومي</span>
+                </span>
+                <span className="text-xs opacity-75">
+                  {formatValue(wirdPages)} صفحات
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false)
+                  setMenuSection('main')
+                  router.push('/quran/reciters')
+                }}
+                className="flex items-center justify-between rounded-2xl border p-3 text-right transition-colors hover:bg-black/5"
+                style={{ borderColor: border }}
+              >
+                <span className="flex items-center gap-2.5 text-sm font-bold">
+                  <Headphones className="size-4" style={{ color: accent }} />
+                  <span>القراء والتلاوات</span>
+                </span>
+                <span className="text-xs opacity-75">اختيار القارئ</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setMenuSection('dua')}
+                className="flex items-center justify-between rounded-2xl border p-3 text-right transition-colors hover:bg-black/5"
+                style={{ borderColor: border }}
+              >
+                <span className="flex items-center gap-2.5 text-sm font-bold">
+                  <Sparkles className="size-4" style={{ color: accent }} />
+                  <span>دعاء ختم القرآن</span>
+                </span>
+                <span className="text-xs opacity-75">عرض الدعاء</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setJumpPageInput(String(currentPage))
+                  setMenuSection('index')
+                }}
+                className="flex items-center justify-between rounded-2xl p-3 text-right font-bold transition-opacity active:opacity-80"
+                style={{ backgroundColor: primary, color: primaryText }}
+              >
+                <span className="flex items-center gap-2.5 text-sm">
+                  <List className="size-4" />
+                  <span>الفهرس</span>
+                </span>
+                <span className="text-xs opacity-90">السور · الأجزاء · الصفحات</span>
+              </button>
+            </div>
+          )}
+
+          {menuSection === 'bookmarks' && (
+            <div className="space-y-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  vibrateDevice(15)
+                  toggleBookmark(activeSurahNumber, surahName, currentPage)
+                }}
+                className="w-full rounded-2xl py-2.5 text-xs font-bold"
+                style={{ backgroundColor: primary, color: primaryText }}
+              >
+                {isBookmarkedPage
+                  ? `إزالة علامة صفحة ${formatValue(currentPage)}`
+                  : `حفظ علامة للصفحة الحالية (${formatValue(currentPage)})`}
+              </button>
+
+              {bookmarksList.length === 0 ? (
+                <div
+                  className="rounded-2xl border p-4 text-center text-xs opacity-75"
+                  style={{ borderColor: border }}
+                >
+                  لا توجد علامات مرجعية محفوظة حالياً.
+                </div>
+              ) : (
+                <div className="max-h-60 space-y-1.5 overflow-y-auto pl-1">
+                  {bookmarksList.map((bm) => (
+                    <div
+                      key={bm.key}
+                      className="flex items-center justify-between rounded-xl border px-3 py-2 text-xs font-bold"
+                      style={{ borderColor: border }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => navigateToPage(bm.page)}
+                        className="flex flex-1 items-center justify-between text-right"
+                      >
+                        <span>
+                          {bm.surahName} · ص {formatValue(bm.page)}
+                        </span>
+                        <span style={{ color: accent }}>انتقال</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          vibrateDevice(12)
+                          toggleBookmark(bm.surahNumber, bm.surahName, bm.page)
+                        }}
+                        className="mr-2 rounded-lg p-1.5 opacity-75 hover:opacity-100"
+                        aria-label="حذف العلامة"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {menuSection === 'khatmah' && (
+            <div className="space-y-3 text-sm">
+              <div className="rounded-2xl border p-3.5" style={{ borderColor: border }}>
+                <div className="mb-2 flex items-center justify-between font-bold">
+                  <span>نسبة الإنجاز</span>
+                  <span>{formatValue(khatmahPercent)}%</span>
+                </div>
+                <div className="h-2.5 w-full overflow-hidden rounded-full bg-black/10">
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{
+                      width: `${khatmahPercent}%`,
+                      backgroundColor: accent,
+                    }}
+                  />
+                </div>
+                <div className="mt-3 flex justify-between text-xs opacity-80">
+                  <span>الصفحة الحالية: {formatValue(currentPage)}</span>
+                  <span>المتبقي: {formatValue(remainingPages)} صفحة</span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => navigateToPage(currentPage)}
+                className="w-full rounded-2xl py-2.5 text-sm font-bold"
+                style={{ backgroundColor: primary, color: primaryText }}
+              >
+                متابعة القراءة من صفحة {formatValue(currentPage)}
+              </button>
+            </div>
+          )}
+
+          {menuSection === 'wird' && (
+            <div className="space-y-3">
+              <p className="text-xs opacity-80">
+                اختر مقدار الورد اليومي للانتقال المباشر إليه من صفحتك الحالية:
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                {[5, 10, 20].map((count) => (
+                  <button
+                    key={count}
+                    type="button"
+                    onClick={() => handleSaveWird(count)}
+                    className="rounded-2xl border py-2.5 text-xs font-bold transition-colors"
+                    style={{
+                      borderColor: border,
+                      backgroundColor: wirdPages === count ? primary : 'transparent',
+                      color: wirdPages === count ? primaryText : fg,
+                    }}
+                  >
+                    +{formatValue(count)} صفحات
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {menuSection === 'dua' && (
+            <div className="rounded-2xl border p-4 text-center leading-8 text-sm font-medium" style={{ borderColor: border }}>
+              {KHATMAH_DUA}
+            </div>
+          )}
+
+          {menuSection === 'index' && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-3 gap-1.5 rounded-2xl border p-1" style={{ borderColor: border }}>
+                <button
+                  type="button"
+                  onClick={() => setIndexTab('surahs')}
+                  className="rounded-xl py-1.5 text-xs font-bold"
+                  style={{
+                    backgroundColor: indexTab === 'surahs' ? primary : 'transparent',
+                    color: indexTab === 'surahs' ? primaryText : fg,
+                  }}
+                >
+                  السور
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIndexTab('juz')}
+                  className="rounded-xl py-1.5 text-xs font-bold"
+                  style={{
+                    backgroundColor: indexTab === 'juz' ? primary : 'transparent',
+                    color: indexTab === 'juz' ? primaryText : fg,
+                  }}
+                >
+                  الأجزاء
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIndexTab('pages')}
+                  className="rounded-xl py-1.5 text-xs font-bold"
+                  style={{
+                    backgroundColor: indexTab === 'pages' ? primary : 'transparent',
+                    color: indexTab === 'pages' ? primaryText : fg,
+                  }}
+                >
+                  الصفحات
+                </button>
+              </div>
+
+              {indexTab === 'surahs' && (
+                <div className="max-h-64 space-y-1.5 overflow-y-auto pl-1">
+                  {metaData.surahNames.map((name, idx) => {
+                    const startPage = metaData.surahStartPage[idx] || 1
+                    const isActive = idx === currentSurahIndex
+                    return (
+                      <button
+                        key={name + idx}
+                        type="button"
+                        onClick={() => navigateToPage(startPage)}
+                        className="flex w-full items-center justify-between rounded-xl border px-3 py-2 text-xs font-bold transition-colors"
+                        style={{
+                          borderColor: border,
+                          backgroundColor: isActive ? primary : 'transparent',
+                          color: isActive ? primaryText : fg,
+                        }}
+                      >
+                        <span>
+                          {formatValue(idx + 1)}. {name}
+                        </span>
+                        <span>ص {formatValue(startPage)}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+
+              {indexTab === 'juz' && (
+                <div className="max-h-64 space-y-1.5 overflow-y-auto pl-1">
+                  {metaData.juzStartPage.map((startPage, idx) => {
+                    const juzNum = idx + 1
+                    const isActive = juzNum === currentJuzNumber
+                    return (
+                      <button
+                        key={juzNum}
+                        type="button"
+                        onClick={() => navigateToPage(startPage)}
+                        className="flex w-full items-center justify-between rounded-xl border px-3 py-2 text-xs font-bold transition-colors"
+                        style={{
+                          borderColor: border,
+                          backgroundColor: isActive ? primary : 'transparent',
+                          color: isActive ? primaryText : fg,
+                        }}
+                      >
+                        <span>الجزء {formatValue(juzNum)}</span>
+                        <span>ص {formatValue(startPage)}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+
+              {indexTab === 'pages' && (
+                <div className="space-y-3">
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      min={1}
+                      max={TOTAL_PAGES}
+                      value={jumpPageInput}
+                      onChange={(e) => setJumpPageInput(e.target.value)}
+                      placeholder="رقم الصفحة (١ - ٦٠٤)"
+                      className="flex-1 rounded-xl border bg-transparent px-3 py-2 text-sm font-bold outline-none"
+                      style={{ borderColor: border, color: fg }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const num = Number(jumpPageInput)
+                        if (num >= 1 && num <= TOTAL_PAGES) {
+                          navigateToPage(num)
+                        }
+                      }}
+                      className="rounded-xl px-4 py-2 text-xs font-bold"
+                      style={{ backgroundColor: primary, color: primaryText }}
+                    >
+                      انتقال
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-4 gap-1.5 max-h-44 overflow-y-auto">
+                    {Array.from({ length: 60 }, (_, i) => i * 10 + 1).map((pg) => (
+                      <button
+                        key={pg}
+                        type="button"
+                        onClick={() => navigateToPage(pg)}
+                        className="rounded-xl border py-1.5 text-xs font-bold"
+                        style={{ borderColor: border }}
+                      >
+                        ص {formatValue(pg)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

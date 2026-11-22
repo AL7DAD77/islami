@@ -509,5 +509,16 @@
     "hadithNumber": "حديث رقم",
     "narrator": "الراوي:",
     "hadithLibrary": "مكتبة الحديث النبوي"
-  }
+  },
+  "share": {
+  "shareAsImage": "مشاركة كصورة",
+  "shareAyah": "مشاركة آية من تطبيق إسلامي",
+  "shareDialogTitle": "مشاركة الآية",
+  "downloadApp": "حمل التطبيق",
+  "error": "حدث خطأ أثناء توليد الصورة. يرجى المحاولة مرة أخرى."
+},
+"mushaf": {
+  "surah": "سورة",
+  "page": "صفحة"
+}
 }

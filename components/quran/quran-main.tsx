@@ -1,64 +1,98 @@
 'use client'
 
-import { CalendarCheck, Headphones, BookOpen } from 'lucide-react'
-import Link from 'next/link'
-import { Suspense } from 'react'
-import { SurahList } from '@/components/quran/surah-list'
-import { BookmarksCard } from '@/components/quran/bookmarks-card'
-import { KhatmahTracker } from '@/components/quran/khatmah-tracker'
-import { SearchButton } from '@/components/search-button'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { Loader2 } from 'lucide-react'
+import * as BookmarksLib from '@/lib/bookmarks'
 import { useLanguage } from '@/lib/language-context'
 
+interface SavedReadingPos {
+  surah?: number
+  page?: number
+}
+
+const TARGET_PAGE_OVERRIDE_KEY = 'mushaf-target-page-override'
+
+function resolveLastReadingPosition(): SavedReadingPos | null {
+  try {
+    const libAny = BookmarksLib as unknown as Record<string, unknown>
+    const fn =
+      typeof libAny.loadReadingPosition === 'function'
+        ? (libAny.loadReadingPosition as () => SavedReadingPos | null)
+        : typeof libAny.getReadingPosition === 'function'
+          ? (libAny.getReadingPosition as () => SavedReadingPos | null)
+          : null
+
+    if (fn) {
+      const pos = fn()
+      if (pos && (typeof pos.page === 'number' || typeof pos.surah === 'number')) {
+        return pos
+      }
+    }
+
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (!key || !key.toLowerCase().includes('reading')) continue
+      const raw = localStorage.getItem(key)
+      if (!raw) continue
+      const parsed = JSON.parse(raw) as SavedReadingPos
+      if (parsed && (typeof parsed.page === 'number' || typeof parsed.surah === 'number')) {
+        return parsed
+      }
+    }
+  } catch {
+    // تجاهل أخطاء القراءة المحلية
+  }
+
+  return null
+}
+
 export function QuranMain({ surahs }: { surahs: any[] }) {
-  const { dict, locale } = useLanguage()
+  const router = useRouter()
+  const { locale } = useLanguage()
+  const [navigated, setNavigated] = useState(false)
+
+  useEffect(() => {
+    if (navigated) return
+    setNavigated(true)
+
+    const saved = resolveLastReadingPosition()
+    const rawSurah =
+      saved?.surah && Number.isInteger(saved.surah) && saved.surah >= 1 && saved.surah <= 114
+        ? saved.surah
+        : 1
+
+    const surahExists = Array.isArray(surahs)
+      ? surahs.some((s) => Number(s?.id ?? s?.number) === rawSurah)
+      : true
+
+    const safeSurah = surahExists ? rawSurah : 1
+
+    try {
+      if (saved?.page && Number.isInteger(saved.page) && saved.page >= 1 && saved.page <= 604) {
+        localStorage.setItem(TARGET_PAGE_OVERRIDE_KEY, String(saved.page))
+      } else {
+        localStorage.removeItem(TARGET_PAGE_OVERRIDE_KEY)
+      }
+    } catch {
+      // تجاهل أخطاء التخزين المحلي
+    }
+
+    router.replace(`/quran/${safeSurah}`)
+  }, [navigated, router, surahs])
 
   return (
-    <div className="min-h-screen bg-background pb-24" dir={locale === 'ar' ? 'rtl' : 'ltr'}>
-      <div className="container mx-auto px-4 py-6 max-w-4xl space-y-6">
-        
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-foreground">{dict.quranPage.title}</h1>
-            <p className="text-sm text-muted-foreground mt-1">{dict.quranPage.subtitle}</p>
-          </div>
-          <div className="bg-card rounded-full shadow-sm border border-border p-1">
-            <Suspense fallback={<div className="size-10" />}>
-              <SearchButton />
-            </Suspense>
-          </div>
-        </div>
-
-        <div className="empty:hidden">
-          <BookmarksCard />
-        </div>
-
-        <KhatmahTracker />
-
-        <div className="grid grid-cols-2 gap-4">
-          <Link href="/quran/wird" className="relative overflow-hidden rounded-2xl bg-[#0a1f1a] p-4 text-white shadow-lg shadow-[#0a1f1a]/10 hover:bg-[#0a1f1a]/90 transition-colors">
-            <div className="absolute right-0 top-0 -mr-4 -mt-4 size-24 rounded-full bg-white/5 blur-2xl"></div>
-            <CalendarCheck className="size-6 text-[#d4af37] mb-3" />
-            <h3 className="font-bold text-base">{dict.quranPage.dailyWird}</h3>
-            <p className="text-xs text-white/70 mt-1">{dict.quranPage.dailyWirdDesc}</p>
-          </Link>
-          
-          <Link href="/quran/reciters" className="relative overflow-hidden rounded-2xl bg-card p-4 text-foreground shadow-sm border border-border hover:bg-muted transition-colors">
-            <Headphones className="size-6 text-foreground mb-3" />
-            <h3 className="font-bold text-base">{dict.quranPage.reciters}</h3>
-            <p className="text-xs text-muted-foreground mt-1">{dict.quranPage.recitersDesc}</p>
-          </Link>
-        </div>
-
-        <div className="pt-2">
-          <div className="flex items-center gap-2 mb-4">
-            <BookOpen className="size-5 text-[#d4af37]" />
-            <h2 className="text-lg font-bold text-foreground">{dict.quranPage.surahIndex}</h2>
-          </div>
-          <div className="bg-card rounded-3xl shadow-sm border border-border overflow-hidden p-2">
-             <SurahList surahs={surahs} />
-          </div>
-        </div>
-
+    <div
+      className="flex min-h-dvh w-full items-center justify-center bg-background text-foreground"
+      dir={locale === 'ar' ? 'rtl' : 'ltr'}
+    >
+      <div className="flex flex-col items-center gap-3">
+        <Loader2 className="size-7 animate-spin text-primary" />
+        <p className="text-sm font-bold">
+          {locale === 'ar'
+            ? 'جارٍ الانتقال إلى آخر موضع قراءة...'
+            : 'Opening your last reading position...'}
+        </p>
       </div>
     </div>
   )

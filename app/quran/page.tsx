@@ -6,6 +6,6 @@ export const metadata: Metadata = { title: 'القرآن الكريم | Islami' 
 
 export default async function QuranPage() {
   const surahs = await getSurahList()
-  
+
   return <QuranMain surahs={surahs} />
 }

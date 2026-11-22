@@ -6,6 +6,7 @@ import android.media.AudioManager;
 import android.os.Build;
 import android.os.Bundle;
 
+import androidx.activity.OnBackPressedCallback;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
@@ -58,27 +59,26 @@ public class MainActivity extends BridgeActivity {
         } catch (Exception e) {
             e.printStackTrace();
         }
+
+        // 7. معالج الرجوع الوحيد (يعمل على كل النسخ عبر androidx.activity)
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                // نرسل الحدث إلى React، وهو يقرر: رجوع داخل التطبيق أو خروج
+                if (getBridge() != null) {
+                    getBridge().triggerJSEvent("backButton", "window");
+                } else {
+                    moveTaskToBack(true);
+                }
+            }
+        });
     }
 
-    // ✅ 7. اعتراض زر الرجوع
-    // نترك Capacitor يرسل الحدث إلى React (NativeBackHandler)
-    @Override
-    public void onBackPressed() {
-        // نرسل الحدث إلى React، وهو سيتخذ القرار
-        if (getBridge() != null) {
-            getBridge().triggerJSEvent("backButton", "window");
-        } else {
-            // احتياطي: نقل التطبيق للخلفية
-            moveTaskToBack(true);
-        }
-    }
-
-    // ✅ 8. إضافة AppExit لنقل التطبيق للخلفية
+    // 8. إضافة AppExit: تنقل التطبيق للخلفية دون قتله
     @CapacitorPlugin(name = "AppExit")
     public static class AppExitPlugin extends Plugin {
         @PluginMethod
         public void exit(PluginCall call) {
-            // moveTaskToBack(true) ينقل التطبيق للخلفية دون قتله
             getActivity().moveTaskToBack(true);
             call.resolve(new JSObject());
         }

@@ -509,5 +509,16 @@
     "hadithNumber": "Hadith No.",
     "narrator": "Narrator:",
     "hadithLibrary": "Hadith Library"
-  }
+  },
+  "share": {
+  "shareAsImage": "Share as Image",
+  "shareAyah": "Share Ayah from Islami App",
+  "shareDialogTitle": "Share Ayah",
+  "downloadApp": "Download App",
+  "error": "An error occurred while generating the image. Please try again."
+},
+"mushaf": {
+  "surah": "Surah",
+  "page": "Page"
+}
 }

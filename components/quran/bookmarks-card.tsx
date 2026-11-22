@@ -9,13 +9,19 @@ import { useLanguage } from '@/lib/language-context'
 export function BookmarksCard() {
   const { dict, locale } = useLanguage()
   const { bookmarks, position } = useBookmarkState()
+  
   if (!position && bookmarks.length === 0) return null
 
   const formatNumber = (n: number) => locale === 'ar' ? toArabicNumber(n) : n.toString()
 
+  // التحقق الصارم: هل الرقم صالح؟ (يمنع بناء رابط undefined)
+  const isValidPosition = position && 
+    typeof position.surah === 'number' && position.surah >= 1 && position.surah <= 114 &&
+    typeof position.page === 'number' && position.page >= 1 && position.page <= 604
+
   return (
     <>
-      {position && (
+      {isValidPosition && (
         <Link
           href={`/quran/${position.surah}?page=${position.page}`}
           className="flex items-center gap-3 rounded-2xl bg-card p-3 shadow-sm ring-1 ring-border hover:bg-secondary"

@@ -167,7 +167,8 @@ public final class NotificationHelper {
 
             boolean showNext = next != null && (previous == null || next.at - now <= now - previous.at);
 
-            String title = "إسلامي | " + getHijriDate(now);
+            String hijriDate = getHijriDate(now);
+            String title = "إسلامي | " + hijriDate;
             String body = showNext
                     ? "متبقي على " + next.name + " " + formatTime(next.at)
                     : "مضى على " + previous.name + " " + formatTime(previous.at);
@@ -182,6 +183,9 @@ public final class NotificationHelper {
                 expandedView.setImageViewBitmap(R.id.notif_logo, appIcon);
                 expandedView.setImageViewBitmap(R.id.notif_watermark, appIcon);
             }
+
+            // ✅ التاريخ الهجري داخل الإشعار الموسع
+            expandedView.setTextViewText(R.id.notif_hijri, hijriDate);
 
             PrayerTime target = showNext ? next : previous;
             expandedView.setTextViewText(R.id.notif_prayer_name, target.name);
