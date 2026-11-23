@@ -12,6 +12,8 @@ import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
+import android.icu.util.IslamicCalendar;
+import android.icu.util.ULocale;
 import android.media.AudioAttributes;
 import android.net.Uri;
 import android.os.Build;
@@ -167,7 +169,7 @@ public final class NotificationHelper {
 
             boolean showNext = next != null && (previous == null || next.at - now <= now - previous.at);
 
-            String hijriDate = getHijriDate(now);
+            String hijriDate = getHijriDate(context, now);
             String title = "إسلامي | " + hijriDate;
             String body = showNext
                     ? "متبقي على " + next.name + " " + formatTime(next.at)
@@ -383,22 +385,42 @@ public final class NotificationHelper {
         return time.replace("AM", "ص").replace("PM", "م");
     }
 
-    private static String getHijriDate(long timeMs) {
+    private static int getHijriAdjustDays(Context context) {
+        try {
+            if (context == null) return 0;
+            SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            if (prefs.contains("hijriAdjust")) {
+                return prefs.getInt("hijriAdjust", 0);
+            }
+            if (prefs.contains("hijri_adjust")) {
+                return prefs.getInt("hijri_adjust", 0);
+            }
+        } catch (Exception ignored) {
+        }
+        return 0;
+    }
+
+    private static String getHijriDate(Context context, long timeMs) {
+        int adjustDays = getHijriAdjustDays(context);
+        long adjustedTimeMs = timeMs + (adjustDays * 86_400_000L);
+
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
-            return new SimpleDateFormat("dd/MM/yyyy", new Locale("ar")).format(new Date(timeMs));
+            return new SimpleDateFormat("dd/MM/yyyy", new Locale("ar")).format(new Date(adjustedTimeMs));
         }
 
         try {
-            android.icu.util.IslamicCalendar calendar = new android.icu.util.IslamicCalendar();
-            calendar.setTimeInMillis(timeMs);
+            IslamicCalendar calendar = new IslamicCalendar(
+                    new ULocale("en_US@calendar=islamic-umalqura")
+            );
+            calendar.setTimeInMillis(adjustedTimeMs);
 
-            int day = calendar.get(android.icu.util.Calendar.DAY_OF_MONTH);
-            int month = calendar.get(android.icu.util.Calendar.MONTH);
-            int year = calendar.get(android.icu.util.Calendar.YEAR);
+            int day = calendar.get(IslamicCalendar.DAY_OF_MONTH);
+            int month = calendar.get(IslamicCalendar.MONTH);
+            int year = calendar.get(IslamicCalendar.YEAR);
 
             return day + " " + getHijriMonthName(month) + " " + year + " هـ";
         } catch (Exception e) {
-            return new SimpleDateFormat("dd/MM/yyyy", new Locale("ar")).format(new Date(timeMs));
+            return new SimpleDateFormat("dd/MM/yyyy", new Locale("ar")).format(new Date(adjustedTimeMs));
         }
     }
 
@@ -455,7 +477,6 @@ public final class NotificationHelper {
     private static final class PrayerTime {
         final String name;
         final long at;
-
         PrayerTime(String name, long at) {
             this.name = name;
             this.at = at;

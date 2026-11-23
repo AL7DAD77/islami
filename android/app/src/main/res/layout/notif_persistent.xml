@@ -4,14 +4,13 @@
     android:layout_height="wrap_content"
     android:background="#08130F">
 
-    <!-- Watermark خفيف وأنيق (في الخلفية) -->
+    <!-- خلفية شعار التطبيق داخل الإشعار الدائم -->
     <ImageView
         android:id="@+id/notif_watermark"
-        android:layout_width="120dp"
-        android:layout_height="120dp"
-        android:layout_gravity="center"
-        android:alpha="0.08"
-        android:scaleType="fitCenter"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:alpha="0.22"
+        android:scaleType="centerCrop"
         android:contentDescription="Watermark" />
 
     <LinearLayout
