@@ -25,7 +25,6 @@ import {
   Sparkles,
   Sun,
   Trash2,
-  X,
 } from 'lucide-react'
 
 import * as BookmarksLib from '@/lib/bookmarks'
@@ -296,8 +295,8 @@ function DenseOrnamentSide({
   isNightMode: boolean
   mirror?: boolean
 }) {
-  const strokeColor = isNightMode ? '#d4af37' : '#7b5026'
-  const fillColor = isNightMode ? '#c59d30' : '#8e5d2c'
+  const strokeColor = isNightMode ? '#d4af37' : '#09090b'
+  const fillColor = isNightMode ? '#c59d30' : '#09090b'
 
   return (
     <svg
@@ -388,14 +387,11 @@ function isBismillahLine(line: Line): boolean {
 }
 
 function fontOf(word: Word): string {
-  if (
-    word.type === 'surah_header' ||
-    word.type === 'bismillah'
-  ) {
+  if (word.type === 'surah_header') {
     return 'QCF4_QBSML'
   }
 
-  return word.font
+  return word.font || 'QCF4_QBSML'
 }
 
 function glyphOf(word: Word): string {
@@ -423,6 +419,7 @@ function renderLineContent(
   }
 
   if (isSingleGlyphLine) {
+    const firstWord = line.words[0]
     const glyphSize = isHeaderLine(line)
       ? size * SURAH_HEADER_RATIO
       : size
@@ -432,10 +429,10 @@ function renderLineContent(
         style={{
           ...baseStyle,
           fontSize: `${glyphSize}px`,
-          fontFamily: 'QCF4_QBSML',
+          fontFamily: fontOf(firstWord),
         }}
       >
-        {glyphOf(line.words[0])}
+        {glyphOf(firstWord)}
       </span>
     )
   }
@@ -1560,11 +1557,11 @@ export function MushafViewer({
                             ? '#18140e'
                             : '#f5ebd6',
                           border: `1.5px solid ${
-                            isNightMode ? '#b38b36' : '#7b5026'
+                            isNightMode ? '#d4af37' : '#09090b'
                           }`,
                           boxShadow: isNightMode
                             ? 'inset 0 0 0 2px rgba(212, 175, 55, 0.25)'
-                            : 'inset 0 0 0 2px #d7b980, 0 1px 3px rgba(79, 53, 24, 0.14)',
+                            : 'inset 0 0 0 2px rgba(9, 9, 11, 0.25), 0 1px 3px rgba(9, 9, 11, 0.14)',
                         }}
                       >
                         <DenseOrnamentSide isNightMode={isNightMode} />
@@ -1577,24 +1574,24 @@ export function MushafViewer({
                               ? '#101012'
                               : '#fffdf7',
                             border: `1px solid ${
-                              isNightMode ? '#c59d30' : '#9d713e'
+                              isNightMode ? '#d4af37' : '#09090b'
                             }`,
                             boxShadow:
-                              'inset 0 0 0 1px rgba(184, 146, 74, 0.35)',
+                              'inset 0 0 0 1px rgba(9, 9, 11, 0.2)',
                           }}
                         >
                           <div className="leading-none">
                             {renderLineContent(
                               line,
                               fontPx * 0.95,
-                              isNightMode ? '#e8c46d' : '#2b1d0f',
+                              isNightMode ? '#f4f4f5' : '#09090b',
                             )}
                           </div>
 
                           <div
                             className="mt-0.5 flex items-center gap-1.5 text-[10px] font-bold leading-tight"
                             style={{
-                              color: isNightMode ? '#d4af37' : '#6e4722',
+                              color: isNightMode ? '#d4af37' : '#09090b',
                             }}
                           >
                             <span>ترتيب {formatValue(activeSurahNumber)}</span>
@@ -1665,7 +1662,7 @@ export function MushafViewer({
               color: menuOpen ? primaryText : fg,
             }}
           >
-            {menuOpen ? <X className="size-4" /> : <List className="size-4" />}
+            <List className="size-4" />
             <span>القائمة</span>
           </button>
         </div>

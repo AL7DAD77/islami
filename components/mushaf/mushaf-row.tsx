@@ -4,9 +4,11 @@ import type { MushafLine, MushafMeta } from '@/lib/mushaf'
 
 export type AyahRef = { s: number; a: number }
 
+const DEFAULT_BASMALAH = 'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ'
+
 /**
- * سطر واحد من صفحة المصحف: اسم سورة، أو بسملة، أو آيات (مضبوطة على العرض أو متوسَّطة).
- * التحديد والتظليل والعلامات اختيارية: بدونها يكون السطر للقراءة فقط (كما في الورد اليومي).
+ * سطر واحد من صفحة المصحف: اسم سورة، أو بسملة، أو آيات (مضبوطة على العرض أو متوسِّطة).
+ * التحديد والتظليل والعلامات اختيارية: بدونهما يكون السطر للقراءة فقط (كما في الورد اليومي).
  */
 export function MushafRow({
   line,
@@ -24,25 +26,31 @@ export function MushafRow({
   onSelect?: (surah: number, ayah: number) => void
 }) {
   if (line.t === 's') {
+    const surahName = meta.surahNames[line.n - 1] ?? ''
     return (
-      <div className="flex items-center justify-center">
+      <div className="flex h-full w-full items-center justify-center overflow-hidden">
         <div
-          className="flex h-[82%] w-full items-center justify-center rounded-md border-2 border-double border-amber-700/60 bg-amber-500/10"
-          style={{ fontSize: '1.05em' }}
+          className="flex h-[84%] w-full items-center justify-center rounded-md border-2 border-double border-amber-700/60 bg-amber-500/10 font-bold text-foreground"
+          style={{ fontSize: '1.18em' }}
         >
-          {`سورة ${meta.surahNames[line.n - 1]}`}
+          {`سورة ${surahName}`}
         </div>
       </div>
     )
   }
 
   if (line.t === 'b') {
-    return <div className="flex items-center justify-center whitespace-nowrap">{meta.basmalah}</div>
+    const basmalahText = meta.basmalah && meta.basmalah.trim().length > 0 ? meta.basmalah : DEFAULT_BASMALAH
+    return (
+      <div className="flex h-full w-full items-center justify-center whitespace-nowrap font-semibold text-foreground">
+        {basmalahText}
+      </div>
+    )
   }
 
   return (
     <div
-      className="flex items-center whitespace-nowrap"
+      className="flex h-full w-full items-center whitespace-nowrap font-semibold text-foreground"
       style={{
         justifyContent: line.c ? 'center' : 'space-between',
         columnGap: `${meta.spaceEm}em`,
