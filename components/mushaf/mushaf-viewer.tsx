@@ -185,6 +185,21 @@ function formatSizeMb(bytes: number): string {
   return `${mb.toFixed(1)} ميجابايت`
 }
 
+function parseVerseKey(verseKey?: string | null): {
+  surah?: number
+  ayah?: number
+} {
+  if (!verseKey || typeof verseKey !== 'string') return {}
+  const parts = verseKey.split(':')
+  if (parts.length !== 2) return {}
+  const surah = Number(parts[0])
+  const ayah = Number(parts[1])
+  return {
+    surah: Number.isInteger(surah) && surah >= 1 && surah <= 114 ? surah : undefined,
+    ayah: Number.isInteger(ayah) && ayah >= 1 ? ayah : undefined,
+  }
+}
+
 function getSavedReadingPage(): number | null {
   try {
     const libAny = BookmarksLib as unknown as Record<string, unknown>
@@ -580,8 +595,10 @@ export function MushafViewer({
   const vibrationEnabled = settings.vibrationEnabled
 
   const pageParam = Number(searchParams.get('page'))
-  const initialPage =
-    pageParam > 0 ? clampPage(pageParam) : undefined
+  const hasExplicitPageParam = pageParam > 0
+  const initialPage = hasExplicitPageParam
+    ? clampPage(pageParam)
+    : undefined
 
   const [currentPage, setCurrentPage] = useState<number>(
     initialPage || 1,
@@ -622,6 +639,7 @@ export function MushafViewer({
   const downloadAbortRef = useRef<AbortController | null>(null)
   const activeObjectUrlRef = useRef<string | null>(null)
   const lastFollowedVerseRef = useRef<string | null>(null)
+ const versePageCacheRef = useRef<Map<string, number>>(new Map())
   const fallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isLeavingToHomeRef = useRef(false)
 
@@ -824,60 +842,121 @@ export function MushafViewer({
     [bookmarkState, metaData, bookmarksTick],
   )
 
+  const resolvedPlayingVerseKey = useMemo(() => {
+    if (!player.playing) return null
+    if (player.activeVerseKey) return player.activeVerseKey
+    if (player.activeSurah && player.activeAyah) {
+      return `${player.activeSurah}:${player.activeAyah}`
+    }
+    return null
+  }, [player.playing, player.activeVerseKey, player.activeSurah, player.activeAyah])
+
   const isVerseOnCurrentPage = useMemo(() => {
-    if (!player.playing || !player.activeVerseKey || !pageData) {
+    if (!player.playing || !resolvedPlayingVerseKey || !pageData) {
       return false
     }
     return pageData.lines.some((line) =>
-      line.words.some((word) => word.verse_key === player.activeVerseKey),
+      line.words.some((word) => word.verse_key === resolvedPlayingVerseKey),
     )
-  }, [pageData, player.activeVerseKey, player.playing])
+  }, [pageData, player.playing, resolvedPlayingVerseKey])
 
+  // تتبع الآية الجارية والانتقال التلقائي إلى صفحتها بدقة
   useEffect(() => {
-    if (!player.playing || !player.activeSurah || !metaData?.surahStartPage) {
+    if (!player.playing || !resolvedPlayingVerseKey || !metaData?.surahStartPage) {
       lastFollowedVerseRef.current = null
       return
     }
 
     if (!autoFollowVerse || menuOpen) return
 
-    const verseKey = player.activeVerseKey
-    if (!verseKey) return
-
     if (isVerseOnCurrentPage) {
-      lastFollowedVerseRef.current = verseKey
+      versePageCacheRef.current.set(resolvedPlayingVerseKey, currentPage)
+      lastFollowedVerseRef.current = resolvedPlayingVerseKey
       return
     }
 
-    if (lastFollowedVerseRef.current === verseKey) {
+    if (lastFollowedVerseRef.current === resolvedPlayingVerseKey) {
       return
     }
 
-    const surahStart = metaData.surahStartPage[player.activeSurah - 1]
-    if (!surahStart) return
+    const parsed = parseVerseKey(resolvedPlayingVerseKey)
+    const surahNum = player.activeSurah || parsed.surah
+    const ayahNum = player.activeAyah || parsed.ayah || 1
 
+    if (!surahNum || surahNum < 1 || surahNum > 114) return
+
+    const cachedPage = versePageCacheRef.current.get(resolvedPlayingVerseKey)
+    if (cachedPage && cachedPage >= 1 && cachedPage <= TOTAL_PAGES) {
+      lastFollowedVerseRef.current = resolvedPlayingVerseKey
+      if (cachedPage !== currentPage) {
+        setCurrentPage(cachedPage)
+      }
+      return
+    }
+
+    const surahStart = metaData.surahStartPage[surahNum - 1] || 1
     let nextSurahStart = TOTAL_PAGES + 1
-    for (let i = player.activeSurah; i < metaData.surahStartPage.length; i++) {
+    for (let i = surahNum; i < metaData.surahStartPage.length; i++) {
       if (metaData.surahStartPage[i] > surahStart) {
         nextSurahStart = metaData.surahStartPage[i]
         break
       }
     }
 
-    const totalVerses = SURAH_INFO[player.activeSurah - 1]?.verses || 1
-    const currentAyah = player.activeAyah || 1
-    const ratio = Math.min(Math.max((currentAyah - 1) / totalVerses, 0), 0.99999)
+    const totalVerses = SURAH_INFO[surahNum - 1]?.verses || 1
+    const ratio = Math.min(Math.max((ayahNum - 1) / totalVerses, 0), 0.99999)
     const spanPages = Math.max(1, nextSurahStart - surahStart)
-    const estimatedTargetPage = clampPage(
-      surahStart + Math.floor(ratio * spanPages),
-    )
+    const estimatedPage = clampPage(surahStart + Math.floor(ratio * spanPages))
 
-    lastFollowedVerseRef.current = verseKey
+    let cancelled = false
 
-    if (estimatedTargetPage !== currentPage) {
-      setCurrentPage(estimatedTargetPage)
-    } else if (currentPage < TOTAL_PAGES) {
-      setCurrentPage(currentPage + 1)
+    const locateAndFollow = async () => {
+      const candidatePages = Array.from(
+        new Set([
+          estimatedPage,
+          clampPage(estimatedPage - 1),
+          clampPage(estimatedPage + 1),
+          surahStart,
+        ]),
+      )
+
+      for (const pg of candidatePages) {
+        if (cancelled) return
+        try {
+          const padded = String(pg).padStart(3, '0')
+          const res = await fetch(`${PAGES_URL}/${padded}.json`)
+          if (!res.ok) continue
+          const json: PageData = await res.json()
+          const found = json.lines.some((line) =>
+            line.words.some((w) => w.verse_key === resolvedPlayingVerseKey),
+          )
+          if (found) {
+            versePageCacheRef.current.set(resolvedPlayingVerseKey, pg)
+            if (!cancelled) {
+              lastFollowedVerseRef.current = resolvedPlayingVerseKey
+              if (pg !== currentPage) {
+                setCurrentPage(pg)
+              }
+            }
+            return
+          }
+        } catch {
+          // تجاهل أخطاء الفحص الاستباقي والاعتماد على التقدير
+        }
+      }
+
+      if (!cancelled) {
+        lastFollowedVerseRef.current = resolvedPlayingVerseKey
+        if (estimatedPage !== currentPage) {
+          setCurrentPage(estimatedPage)
+        }
+      }
+    }
+
+    void locateAndFollow()
+
+    return () => {
+      cancelled = true
     }
   }, [
     autoFollowVerse,
@@ -887,9 +966,8 @@ export function MushafViewer({
     metaData,
     player.activeAyah,
     player.activeSurah,
-    player.activeVerseKey,
     player.playing,
-    player.progress,
+    resolvedPlayingVerseKey,
   ])
 
   const goToMainAppRoute = useCallback((): boolean => {
@@ -1000,6 +1078,7 @@ export function MushafViewer({
     }
   }, [goToMainAppRoute])
 
+  // تحميل بيانات المصحف والانتقال إلى آخر موضع قراءة محفوظ
   useEffect(() => {
     let isActive = true
 
@@ -1018,18 +1097,18 @@ export function MushafViewer({
 
         setMetaData(meta)
 
-        if (initialPage) {
+        const overridePage = consumeTargetPageOverride()
+        const savedPage = getSavedReadingPage()
+        const surahStart = meta.surahStartPage[initialSurah - 1] || 1
+
+        if (overridePage) {
+          setCurrentPage(overridePage)
+        } else if (savedPage && (initialSurah === 1 || savedPage >= surahStart)) {
+          setCurrentPage(savedPage)
+        } else if (initialPage) {
           setCurrentPage(initialPage)
         } else {
-          const overridePage = consumeTargetPageOverride()
-          const savedPage = overridePage ?? getSavedReadingPage()
-          const surahStart = meta.surahStartPage[initialSurah - 1] || 1
-
-          if (savedPage && (initialSurah === 1 || savedPage >= surahStart)) {
-            setCurrentPage(savedPage)
-          } else {
-            setCurrentPage(clampPage(surahStart))
-          }
+          setCurrentPage(clampPage(surahStart))
         }
       } catch (error) {
         console.error('خطأ في تحميل بيانات المصحف:', error)
@@ -1055,7 +1134,11 @@ export function MushafViewer({
       if (savedWird > 0) setWirdPages(savedWird)
 
       const savedFollow = localStorage.getItem(AUTO_FOLLOW_VERSE_KEY)
-      if (savedFollow === 'false') setAutoFollowVerse(false)
+      if (savedFollow === 'false') {
+        setAutoFollowVerse(false)
+      } else {
+        setAutoFollowVerse(true)
+      }
     } catch {}
 
     const loadQuarterIndex = async () => {
@@ -1166,6 +1249,7 @@ export function MushafViewer({
     }
   }, [pageData])
 
+  // قياس أبعاد الصفحة وموازنة حجم الخط وارتفاع السطر لإظهار جميع الأسطر كاملة
   useLayoutEffect(() => {
     if (!isPageMeasured || !pageData) return
 
@@ -1194,14 +1278,21 @@ export function MushafViewer({
         return
       }
 
-      const nextFont =
+      const lineCount = Math.max(pageData.lines.length, 1)
+      const computedRowHeight = availableHeight / lineCount
+
+      const widthBasedFont =
         (REFERENCE_FONT_SIZE *
           availableWidth *
           FIT_PADDING) /
         widestLine
 
+      const heightBasedFont = computedRowHeight * 0.78
+
+      const nextFont = Math.min(widthBasedFont, heightBasedFont)
+
       setFontPx(nextFont)
-      setRowPx(availableHeight / pageData.lines.length)
+      setRowPx(computedRowHeight)
     }
 
     measure()
@@ -1322,9 +1413,12 @@ export function MushafViewer({
     (event: React.MouseEvent) => {
       event.stopPropagation()
       vibrateDevice(10)
+      if (currentPage && metaData && surahName) {
+        saveReadingPosition(activeSurahNumber, surahName, currentPage)
+      }
       goToMainAppRoute()
     },
-    [goToMainAppRoute, vibrateDevice],
+    [activeSurahNumber, currentPage, goToMainAppRoute, metaData, surahName, vibrateDevice],
   )
 
   const handlePreviousPage = useCallback(() => {
@@ -1803,6 +1897,7 @@ export function MushafViewer({
 
   const handleAutoFollowToggle = useCallback(() => {
     vibrateDevice(10)
+    lastFollowedVerseRef.current = null
     setAutoFollowVerse((prev) => {
       const next = !prev
       try {
@@ -1886,12 +1981,8 @@ export function MushafViewer({
       style={{
         backgroundColor: bg,
         color: fg,
-        touchAction: 'none',
         overscrollBehavior: 'none',
       }}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
       onClick={handleToggleUi}
     >
       <Qcf4Fonts />
@@ -1927,11 +2018,13 @@ export function MushafViewer({
         </span>
       </div>
 
-      {/* منطقة المصحف: محفوظة بالكامل دون تغيير أبعادها أو طريقة قياسها */}
+      {/* منطقة المصحف: عرض جميع الأسطر كاملة دون قص أو إزاحة */}
       <div
         ref={containerRef}
         className="relative min-h-0 flex-1 overflow-hidden"
         style={{
+          paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 6px)',
+          touchAction: userScale > MIN_SCALE ? 'none' : 'pan-x',
           transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${userScale})`,
           transformOrigin: 'center center',
           transition:
@@ -1939,6 +2032,9 @@ export function MushafViewer({
               ? 'transform 180ms ease-out'
               : 'transform 60ms linear',
         }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
       >
         {(isPageLoading || !isPageMeasured) && !hasError && (
           <div className="absolute inset-0 z-10 flex items-center justify-center">
@@ -2019,7 +2115,7 @@ export function MushafViewer({
                   <div
                     key={lineIndex}
                     className={cn(
-                      'flex items-center',
+                      'flex items-center overflow-visible',
                       centered
                         ? 'justify-center'
                         : 'justify-between',
@@ -2093,7 +2189,7 @@ export function MushafViewer({
                       </div>
                     ) : (
                       renderLineContent(line, fontPx, fg, {
-                        activeVerseKey: player.activeVerseKey,
+                        activeVerseKey: resolvedPlayingVerseKey,
                         isNightMode,
                         enableHighlight: player.playing,
                       })
@@ -2106,7 +2202,7 @@ export function MushafViewer({
         ) : null}
       </div>
 
-      {/* الشريط العلوي العائم للتشغيل والحفظ والإعدادات: مزاح بوضوح عن حواف الهاتف */}
+      {/* الشريط العلوي العائم للتشغيل والحفظ والإعدادات */}
       <header
         className={cn(
           'pointer-events-none absolute inset-x-0 top-12 z-50 flex flex-wrap items-center justify-between gap-2 transition-all duration-300',
@@ -2224,7 +2320,7 @@ export function MushafViewer({
         </div>
       </header>
 
-      {/* الشريط السفلي العائم: مزاح بوضوح عن الحافة السفلية والجانبية للهاتف */}
+      {/* الشريط السفلي العائم */}
       <nav
         aria-label="شريط أدوات المصحف السفلي"
         onClick={(event) => event.stopPropagation()}
@@ -2344,9 +2440,9 @@ export function MushafViewer({
                   <p className="text-sm font-extrabold">
                     {surahName} · صفحة {formatValue(currentPage)}
                   </p>
-                  {player.playing && player.activeVerseKey && (
+                  {player.playing && resolvedPlayingVerseKey && (
                     <p className="mt-0.5 text-[11px] font-bold opacity-85">
-                      الآية الجارية: {formatValue(player.activeVerseKey)}
+                      الآية الجارية: {formatValue(resolvedPlayingVerseKey)}
                     </p>
                   )}
                   {playingFromOffline && isCurrentSurahPlaying && (
