@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react'
@@ -12,9 +13,9 @@ import type { ReactNode } from 'react'
 import { Capacitor, registerPlugin } from '@capacitor/core'
 import type { Reciter } from '@/lib/quran'
 import { surahAudioUrl } from '@/lib/quran'
+import { SURAH_INFO } from '@/lib/quran-info'
 import { saveLastPlayed } from '@/lib/last-played'
 
-// ✅ مصفوفة أسماء السور لضمان ظهور الاسم الصحيح في الإشعار
 const SURAH_NAMES = [
   "الفاتحة", "البقرة", "آل عمران", "النساء", "المائدة", "الأنعام", "الأعراف", "الأنفال", "التوبة", "يونس",
   "هود", "يوسف", "الرعد", "إبراهيم", "الحجر", "النحل", "الإسراء", "الكهف", "مريم", "طه",
@@ -39,6 +40,9 @@ type PlayerState = {
   loading: boolean
   progress: number
   repeat: boolean
+  activeSurah: number | null
+  activeAyah: number | null
+  activeVerseKey: string | null
   play: (surah: number, surahName: string, reciter: Reciter, server: string) => void
   toggle: () => void
   stop: () => void
@@ -46,7 +50,6 @@ type PlayerState = {
   changeReciter: (reciter: Reciter, server: string) => void
 }
 
-// ✅ إضافة artist إلى النوع
 type NativeTrack = { id: string; title: string; artist: string; url: string }
 type NativeState = {
   playing: boolean; loading: boolean; progress: number; repeat: boolean;
@@ -73,18 +76,27 @@ function nativePlayerAvailable(): boolean {
   } catch { return false }
 }
 
-// ✅ التعديل هنا: استقبال اسم القارئ وإضافته لكل سورة
 function buildQueue(startSurah: number, server: string, startSurahName: string, artistName: string): NativeTrack[] {
   const items: NativeTrack[] = []
   for (let number = startSurah; number <= 114; number++) {
     items.push({
       id: String(number),
       title: `سورة ${number === startSurah ? startSurahName : SURAH_NAMES[number - 1]}`,
-      artist: artistName, // ✅ تمرير اسم القارئ
+      artist: artistName,
       url: surahAudioUrl(server, number),
     })
   }
   return items
+}
+
+function estimateAyahFromProgress(surahNumber: number, progressPercent: number): number | null {
+  if (!Number.isInteger(surahNumber) || surahNumber < 1 || surahNumber > 114) {
+    return null
+  }
+  const totalVerses = SURAH_INFO[surahNumber - 1]?.verses || 1
+  const clampedRatio = Math.max(0, Math.min(0.99999, progressPercent / 100))
+  const ayah = Math.floor(clampedRatio * totalVerses) + 1
+  return Math.min(Math.max(ayah, 1), totalVerses)
 }
 
 export function QuranPlayerProvider({ children }: { children: ReactNode }) {
@@ -107,7 +119,7 @@ export function QuranPlayerProvider({ children }: { children: ReactNode }) {
   const queueStartRef = useRef(1)
   const commandVersionRef = useRef(0)
   const busyRef = useRef(0)
-  
+
   const playRef = useRef<(number: number, name: string, reciter: Reciter, server: string) => void>(() => {})
 
   const applySelection = useCallback((selection: Selection) => {
@@ -128,12 +140,17 @@ export function QuranPlayerProvider({ children }: { children: ReactNode }) {
     setRepeatState(state.repeat)
 
     if (typeof state.index === 'number' && state.index >= 0) {
-      const currentSurahNumber = queueStartRef.current + state.index
+      const currentSurahNumber = Math.min(114, queueStartRef.current + state.index)
+      const resolvedName = state.title || SURAH_NAMES[currentSurahNumber - 1] || ''
       setSurah(currentSurahNumber)
-      if (state.title) setSurahName(state.title)
+      if (resolvedName) setSurahName(resolvedName)
       const current = selectionRef.current
       if (current) {
-        selectionRef.current = { ...current, surah: currentSurahNumber, surahName: state.title || current.surahName }
+        selectionRef.current = {
+          ...current,
+          surah: currentSurahNumber,
+          surahName: resolvedName || current.surahName,
+        }
       }
     }
 
@@ -172,22 +189,27 @@ export function QuranPlayerProvider({ children }: { children: ReactNode }) {
       audio.loop = repeatRef.current
       audio.onplaying = () => { if (mountedRef.current) { setPlaying(true); setLoading(false); } }
       audio.onpause = () => { if (mountedRef.current) setPlaying(false); }
-      
-      // ✅ التعديل هنا: قراءة اسم السورة الصحيح عند الانتقال التلقائي في الويب
+
       audio.onended = () => {
         if (!mountedRef.current) return
         const current = selectionRef.current
         if (current && current.surah < 114 && !audio.loop) {
-          playRef.current(current.surah + 1, SURAH_NAMES[current.surah], current.reciter, current.server)
+          const nextSurah = current.surah + 1
+          setProgress(0)
+          playRef.current(nextSurah, SURAH_NAMES[nextSurah - 1], current.reciter, current.server)
         } else {
           setPlaying(false)
           setLoading(false)
           setProgress(0)
         }
       }
-      
+
       audio.onerror = () => { if (mountedRef.current) { setPlaying(false); setLoading(false); } }
-      audio.ontimeupdate = () => { if (mountedRef.current && Number.isFinite(audio.duration) && audio.duration > 0) setProgress((audio.currentTime / audio.duration) * 100) }
+      audio.ontimeupdate = () => {
+        if (mountedRef.current && Number.isFinite(audio.duration) && audio.duration > 0) {
+          setProgress(Math.max(0, Math.min(100, (audio.currentTime / audio.duration) * 100)))
+        }
+      }
       audioRef.current = audio
     }
     return () => { mountedRef.current = false }
@@ -214,18 +236,21 @@ export function QuranPlayerProvider({ children }: { children: ReactNode }) {
         const audio = audioRef.current
         if (audio && !audio.paused) audio.pause()
       })
-      
-      // ✅ التعديل هنا: أسماء السور الصحيحة عند استخدام أزرار الميديا في الويب
+
       navigator.mediaSession.setActionHandler('nexttrack', () => {
         const current = selectionRef.current
         if (current && current.surah < 114) {
-           playRef.current(current.surah + 1, SURAH_NAMES[current.surah], current.reciter, current.server)
+          const nextSurah = current.surah + 1
+          setProgress(0)
+          playRef.current(nextSurah, SURAH_NAMES[nextSurah - 1], current.reciter, current.server)
         }
       })
       navigator.mediaSession.setActionHandler('previoustrack', () => {
         const current = selectionRef.current
         if (current && current.surah > 1) {
-           playRef.current(current.surah - 1, SURAH_NAMES[current.surah - 2], current.reciter, current.server)
+          const prevSurah = current.surah - 1
+          setProgress(0)
+          playRef.current(prevSurah, SURAH_NAMES[prevSurah - 1], current.reciter, current.server)
         }
       })
     } catch (e) {
@@ -251,7 +276,7 @@ export function QuranPlayerProvider({ children }: { children: ReactNode }) {
       } finally { polling = false }
     }
     void sync()
-    const interval = window.setInterval(() => { void sync() }, 2000)
+    const interval = window.setInterval(() => { void sync() }, 1000)
     return () => { cancelled = true; window.clearInterval(interval) }
   }, [applyNativeState])
 
@@ -283,13 +308,13 @@ export function QuranPlayerProvider({ children }: { children: ReactNode }) {
     const selection: Selection = { surah: number, surahName: name, reciter: selectedReciter, server }
     const url = surahAudioUrl(server, number)
     applySelection(selection)
+    setProgress(0)
     setLoading(true)
     saveLastPlayed({ surah: number, surahName: name, reciterId: selectedReciter.id })
 
     if (nativePlayerAvailable()) {
       const ui = JSON.stringify(selection)
-      lastUiRef.current = ui 
-      // ✅ تمرير اسم القارئ إلى buildQueue
+      lastUiRef.current = ui
       const items = buildQueue(number, server, name, selectedReciter.name)
       queueStartRef.current = number
       void runNative(async () => {
@@ -352,9 +377,46 @@ export function QuranPlayerProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const activeVerseSync = useMemo(() => {
+    if (!playing || !surah) {
+      return {
+        activeSurah: null as number | null,
+        activeAyah: null as number | null,
+        activeVerseKey: null as string | null,
+      }
+    }
+    const ayah = estimateAyahFromProgress(surah, progress)
+    if (!ayah) {
+      return {
+        activeSurah: surah,
+        activeAyah: null as number | null,
+        activeVerseKey: null as string | null,
+      }
+    }
+    return {
+      activeSurah: surah,
+      activeAyah: ayah,
+      activeVerseKey: `${surah}:${ayah}`,
+    }
+  }, [playing, progress, surah])
+
   const value: PlayerState = {
-    surah, surahName, reciter, moshafServer, playing, loading, progress, repeat,
-    play, toggle, stop, setRepeat, changeReciter,
+    surah,
+    surahName,
+    reciter,
+    moshafServer,
+    playing,
+    loading,
+    progress,
+    repeat,
+    activeSurah: activeVerseSync.activeSurah,
+    activeAyah: activeVerseSync.activeAyah,
+    activeVerseKey: activeVerseSync.activeVerseKey,
+    play,
+    toggle,
+    stop,
+    setRepeat,
+    changeReciter,
   }
 
   return <QuranPlayerContext.Provider value={value}>{children}</QuranPlayerContext.Provider>

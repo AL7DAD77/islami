@@ -14,9 +14,12 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import {
   BookOpen,
   Bookmark,
+  CheckCircle2,
   ChevronRight,
   Compass,
+  Download,
   Headphones,
+  Home,
   List,
   Loader2,
   Moon,
@@ -25,6 +28,8 @@ import {
   Sparkles,
   Sun,
   Trash2,
+  WifiOff,
+  X,
 } from 'lucide-react'
 
 import * as BookmarksLib from '@/lib/bookmarks'
@@ -35,13 +40,21 @@ import {
   useBookmarkState,
 } from '@/lib/bookmarks'
 
+import {
+  deleteOfflineSurah,
+  downloadSurahAudio,
+  downloadSurahsBatch,
+  getReciterOfflineStorageBytes,
+  isSurahDownloaded,
+  listDownloadedSurahsForReciter,
+  resolvePlayableSurahSource,
+} from '@/lib/quran-offline'
+
 import { cn } from '@/lib/utils'
 import { useNumberFormat } from '@/lib/numbers'
 import { useQuranPlayer } from '@/lib/quran-player'
 import { useSettings } from '@/lib/settings'
 import { SURAH_INFO } from '@/lib/quran-info'
-
-// ================= أنواع البيانات =================
 
 interface MushafMetaData {
   surahNames: string[]
@@ -116,6 +129,7 @@ type MenuSection =
   | 'wird'
   | 'dua'
   | 'index'
+  | 'offline'
 
 type IndexTab = 'surahs' | 'juz' | 'pages'
 
@@ -129,8 +143,8 @@ const REFERENCE_FONT_SIZE = 100
 const FIT_PADDING = 0.98
 const SURAH_HEADER_RATIO = 0.72
 
-const PRINT_GREEN = '#4f6b2e'
-const PRINT_GOLD = '#b8924a'
+const PRINT_GREEN = '#1f3a2c'
+const PRINT_LINE = '#c8c2b6'
 
 const META_URL = '/mushaf/meta.json'
 const PAGES_URL = '/mushaf-qcf4/pages'
@@ -138,20 +152,29 @@ const QUARTER_INDEX_URL = '/mushaf/quarter-index.json'
 
 const NIGHT_MODE_KEY = 'mushaf-night-mode'
 const WIRD_PAGES_KEY = 'mushaf-daily-wird-pages'
+const AUTO_FOLLOW_VERSE_KEY = 'mushaf-auto-follow-verse'
 const TARGET_PAGE_OVERRIDE_KEY = 'mushaf-target-page-override'
 const RECITER_SERVER_KEY = 'selected_reciter_server'
 const RECITER_NAME_KEY = 'selected_reciter_name'
+const RECITER_ID_KEY = 'selected_reciter_id'
 
 const DEFAULT_RECITER_SERVER =
   'https://server8.mp3quran.net/afs/'
 
 const DEFAULT_RECITER_NAME = 'مشاري العفاسي'
+const DEFAULT_RECITER_ID = 'afs'
 
 const KHATMAH_DUA =
   'اللهم ارحمني بالقرآن واجعله لي إماماً ونوراً وهدى ورحمة، اللهم ذكرني منه ما نسيت وعلمني منه ما جهلت وارزقني تلاوته آناء الليل وأطراف النهار واجعله لي حجة يا رب العالمين.'
 
 function clampPage(page: number): number {
   return Math.min(Math.max(page, 1), TOTAL_PAGES)
+}
+
+function formatSizeMb(bytes: number): string {
+  if (!bytes || bytes <= 0) return '٠.٠ ميجابايت'
+  const mb = bytes / (1024 * 1024)
+  return `${mb.toFixed(1)} ميجابايت`
 }
 
 function getSavedReadingPage(): number | null {
@@ -176,9 +199,17 @@ function getSavedReadingPage(): number | null {
       if (!k || !k.toLowerCase().includes('reading')) continue
       const raw = localStorage.getItem(k)
       if (!raw) continue
-      const parsed = JSON.parse(raw)
-      if (parsed && typeof parsed.page === 'number' && parsed.page >= 1 && parsed.page <= TOTAL_PAGES) {
-        return clampPage(parsed.page)
+      const parsed: unknown = JSON.parse(raw)
+      if (
+        parsed &&
+        typeof parsed === 'object' &&
+        'page' in parsed &&
+        typeof (parsed as { page?: unknown }).page === 'number'
+      ) {
+        const pg = (parsed as { page: number }).page
+        if (pg >= 1 && pg <= TOTAL_PAGES) {
+          return clampPage(pg)
+        }
       }
     }
   } catch {
@@ -205,47 +236,44 @@ function consumeTargetPageOverride(): number | null {
 function extractBookmarksList(
   bookmarkState: unknown,
   metaData: MushafMetaData | null,
+  _refreshTick?: number,
 ): Array<{
   key: string
   surahNumber: number
   surahName: string
   page: number
 }> {
+  void _refreshTick
   const candidates: SavedBookmarkItem[] = []
 
-  if (Array.isArray(bookmarkState)) {
-    candidates.push(...(bookmarkState as SavedBookmarkItem[]))
-  } else if (bookmarkState && typeof bookmarkState === 'object') {
-    const obj = bookmarkState as Record<string, unknown>
-    for (const field of ['bookmarks', 'items', 'list', 'pages']) {
-      if (Array.isArray(obj[field])) {
-        candidates.push(...(obj[field] as SavedBookmarkItem[]))
+  const pushFromUnknown = (val: unknown) => {
+    if (Array.isArray(val)) {
+      candidates.push(...(val as SavedBookmarkItem[]))
+      return
+    }
+    if (val && typeof val === 'object') {
+      const obj = val as Record<string, unknown>
+      for (const field of ['bookmarks', 'items', 'list', 'pages', 'data']) {
+        if (Array.isArray(obj[field])) {
+          candidates.push(...(obj[field] as SavedBookmarkItem[]))
+        }
       }
     }
   }
 
-  if (candidates.length === 0) {
-    try {
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i)
-        if (!key || !key.toLowerCase().includes('bookmark')) continue
-        const raw = localStorage.getItem(key)
-        if (!raw) continue
-        const parsed = JSON.parse(raw)
-        if (Array.isArray(parsed)) {
-          candidates.push(...(parsed as SavedBookmarkItem[]))
-        } else if (parsed && typeof parsed === 'object') {
-          const pObj = parsed as Record<string, unknown>
-          for (const field of ['bookmarks', 'items', 'list', 'pages']) {
-            if (Array.isArray(pObj[field])) {
-              candidates.push(...(pObj[field] as SavedBookmarkItem[]))
-            }
-          }
-        }
-      }
-    } catch {
-      // تجاهل أخطاء القراءة المحلية
+  pushFromUnknown(bookmarkState)
+
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (!key || !key.toLowerCase().includes('bookmark')) continue
+      const raw = localStorage.getItem(key)
+      if (!raw) continue
+      const parsed: unknown = JSON.parse(raw)
+      pushFromUnknown(parsed)
     }
+  } catch {
+    // تجاهل أخطاء القراءة المحلية
   }
 
   const normalized: Array<{
@@ -295,8 +323,8 @@ function DenseOrnamentSide({
   isNightMode: boolean
   mirror?: boolean
 }) {
-  const strokeColor = isNightMode ? '#d4af37' : '#09090b'
-  const fillColor = isNightMode ? '#c59d30' : '#09090b'
+  const strokeColor = isNightMode ? '#e4e4e7' : '#050505'
+  const fillColor = isNightMode ? '#d4d4d8' : '#050505'
 
   return (
     <svg
@@ -406,6 +434,11 @@ function renderLineContent(
   line: Line,
   size: number,
   color: string,
+  options?: {
+    activeVerseKey?: string | null
+    isNightMode?: boolean
+    enableHighlight?: boolean
+  },
 ) {
   const isSingleGlyphLine =
     isHeaderLine(line) || isBismillahLine(line)
@@ -437,17 +470,47 @@ function renderLineContent(
     )
   }
 
-  return line.words.map((word, wordIndex) =>
-    word.type === 'quarter' ? null : (
+  const activeKey = options?.enableHighlight
+    ? options?.activeVerseKey
+    : null
+  const isNight = Boolean(options?.isNightMode)
+
+  return line.words.map((word, wordIndex) => {
+    if (word.type === 'quarter') return null
+
+    const isHighlighted =
+      Boolean(activeKey) &&
+      Boolean(word.verse_key) &&
+      word.verse_key === activeKey
+
+    const highlightStyle = isHighlighted
+      ? {
+          backgroundColor: isNight
+            ? 'rgba(250, 204, 21, 0.24)'
+            : 'rgba(16, 185, 129, 0.22)',
+          color: isNight ? '#fef08a' : '#064e3b',
+          borderRadius: '4px',
+          boxShadow: isNight
+            ? '0 0 0 1px rgba(250, 204, 21, 0.35)'
+            : '0 0 0 1px rgba(16, 185, 129, 0.35)',
+        }
+      : undefined
+
+    return (
       <span
         key={wordIndex}
         title={word.text}
-        style={{ ...baseStyle, fontFamily: fontOf(word) }}
+        className="transition-colors duration-150"
+        style={{
+          ...baseStyle,
+          ...highlightStyle,
+          fontFamily: fontOf(word),
+        }}
       >
         {glyphOf(word)}
       </span>
-    ),
-  )
+    )
+  })
 }
 
 function Qcf4Fonts() {
@@ -530,12 +593,27 @@ export function MushafViewer({
   const [isPageLoading, setIsPageLoading] = useState(true)
   const [hasError, setHasError] = useState(false)
   const [isNightMode, setIsNightMode] = useState(false)
+  const [autoFollowVerse, setAutoFollowVerse] = useState(true)
+  const [bookmarksTick, setBookmarksTick] = useState(0)
 
   const [menuOpen, setMenuOpen] = useState(false)
   const [menuSection, setMenuSection] = useState<MenuSection>('main')
   const [indexTab, setIndexTab] = useState<IndexTab>('surahs')
   const [wirdPages, setWirdPages] = useState<number>(10)
   const [jumpPageInput, setJumpPageInput] = useState<string>('')
+
+  const [offlineTick, setOfflineTick] = useState(0)
+  const [isDownloadingCurrent, setIsDownloadingCurrent] = useState(false)
+  const [currentDownloadProgress, setCurrentDownloadProgress] = useState(0)
+  const [batchStatusText, setBatchStatusText] = useState<string | null>(null)
+  const [batchProgressPercent, setBatchProgressPercent] = useState<number | null>(null)
+  const [isBatchDownloading, setIsBatchDownloading] = useState(false)
+  const [offlineMessage, setOfflineMessage] = useState<string | null>(null)
+  const [playingFromOffline, setPlayingFromOffline] = useState(false)
+
+  const downloadAbortRef = useRef<AbortController | null>(null)
+  const activeObjectUrlRef = useRef<string | null>(null)
+  const lastFollowedVerseRef = useRef<string | null>(null)
 
   const [fontPx, setFontPx] = useState(REFERENCE_FONT_SIZE)
   const [rowPx, setRowPx] = useState<number | undefined>(
@@ -545,7 +623,7 @@ export function MushafViewer({
 
   const [showUi, setShowUi] = useState(true)
 
-  const uiTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const uiTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const [userScale, setUserScale] = useState(MIN_SCALE)
   const [pan, setPan] = useState<Point>({ x: 0, y: 0 })
@@ -558,10 +636,45 @@ export function MushafViewer({
   const pinchStartRef = useRef<PinchState | null>(null)
 
   const vibrationEnabledRef = useRef(vibrationEnabled)
+  const menuStateRef = useRef<{
+    menuOpen: boolean
+    menuSection: MenuSection
+  }>({
+    menuOpen: false,
+    menuSection: 'main',
+  })
 
   useEffect(() => {
     vibrationEnabledRef.current = vibrationEnabled
   }, [vibrationEnabled])
+
+  useEffect(() => {
+    menuStateRef.current = { menuOpen, menuSection }
+  }, [menuOpen, menuSection])
+
+  useEffect(() => {
+    return () => {
+      if (downloadAbortRef.current) {
+        downloadAbortRef.current.abort()
+      }
+      if (activeObjectUrlRef.current) {
+        URL.revokeObjectURL(activeObjectUrlRef.current)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    const onStorageChange = (e: StorageEvent) => {
+      if (!e.key || e.key.toLowerCase().includes('bookmark')) {
+        setBookmarksTick((t) => t + 1)
+      }
+      if (!e.key || e.key.toLowerCase().includes('offline')) {
+        setOfflineTick((t) => t + 1)
+      }
+    }
+    window.addEventListener('storage', onStorageChange)
+    return () => window.removeEventListener('storage', onStorageChange)
+  }, [])
 
   const vibrateDevice = useCallback(
     (duration = 10): void => {
@@ -583,6 +696,26 @@ export function MushafViewer({
 
   const bookmarkState = useBookmarkState()
   const player = useQuranPlayer()
+
+  const activeReciterInfo = useMemo(() => {
+    let server = player.moshafServer || DEFAULT_RECITER_SERVER
+    let reciterName = player.reciter?.name || DEFAULT_RECITER_NAME
+    let reciterId: string | number = player.reciter?.id || DEFAULT_RECITER_ID
+
+    try {
+      const savedServer = localStorage.getItem(RECITER_SERVER_KEY)
+      const savedName = localStorage.getItem(RECITER_NAME_KEY)
+      const savedId = localStorage.getItem(RECITER_ID_KEY)
+
+      if (savedServer && !player.moshafServer) server = savedServer
+      if (savedName && !player.reciter?.name) reciterName = savedName
+      if (savedId && !player.reciter?.id) reciterId = savedId
+    } catch {
+      // تجاهل أخطاء التخزين المحلي
+    }
+
+    return { reciterId, reciterName, server }
+  }, [player.moshafServer, player.reciter])
 
   const currentSurahIndex = useMemo(() => {
     if (!metaData?.surahStartPage) return 0
@@ -611,6 +744,31 @@ export function MushafViewer({
   }, [currentSurahIndex, metaData])
 
   const currentSurahInfo = SURAH_INFO[currentSurahIndex]
+
+  const isCurrentSurahDownloaded = useMemo(() => {
+    void offlineTick
+    return isSurahDownloaded(
+      activeReciterInfo.reciterId,
+      activeReciterInfo.server,
+      activeSurahNumber,
+    )
+  }, [activeReciterInfo, activeSurahNumber, offlineTick])
+
+  const downloadedSurahsList = useMemo(() => {
+    void offlineTick
+    return listDownloadedSurahsForReciter(
+      activeReciterInfo.reciterId,
+      activeReciterInfo.server,
+    )
+  }, [activeReciterInfo, offlineTick])
+
+  const downloadedStorageBytes = useMemo(() => {
+    void offlineTick
+    return getReciterOfflineStorageBytes(
+      activeReciterInfo.reciterId,
+      activeReciterInfo.server,
+    )
+  }, [activeReciterInfo, offlineTick])
 
   const currentJuzNumber = useMemo(() => {
     if (!metaData?.juzStartPage) return 1
@@ -649,77 +807,198 @@ export function MushafViewer({
   }, [currentPage, quarterIndex])
 
   const bookmarksList = useMemo(
-    () => extractBookmarksList(bookmarkState, metaData),
-    [bookmarkState, metaData],
+    () => extractBookmarksList(bookmarkState, metaData, bookmarksTick),
+    [bookmarkState, metaData, bookmarksTick],
   )
 
-  // معالجة زر الرجوع في النظام (Capacitor) للعودة أولاً إلى الشاشة الرئيسية للتطبيق
+  const isVerseOnCurrentPage = useMemo(() => {
+    if (!player.playing || !player.activeVerseKey || !pageData) {
+      return false
+    }
+    return pageData.lines.some((line) =>
+      line.words.some((word) => word.verse_key === player.activeVerseKey),
+    )
+  }, [pageData, player.activeVerseKey, player.playing])
+
   useEffect(() => {
-    let listenerRemove: (() => void) | undefined
-    let isMounted = true
+    if (!player.playing || !player.activeSurah || !metaData?.surahStartPage) {
+      lastFollowedVerseRef.current = null
+      return
+    }
 
-    const attachBackButton = async () => {
-      try {
-        const capWindow = window as unknown as {
-          Capacitor?: {
-            isNativePlatform?: () => boolean
-            Plugins?: {
-              App?: {
-                addListener?: (
-                  eventName: 'backButton',
-                  cb: (data: { canGoBack: boolean }) => void,
-                ) => Promise<{ remove: () => void }> | { remove: () => void }
-                exitApp?: () => void
-              }
-            }
-          }
-        }
+    if (!autoFollowVerse || menuOpen) return
 
-        const appPlugin = capWindow.Capacitor?.Plugins?.App
-        if (!appPlugin?.addListener) return
+    const verseKey = player.activeVerseKey
+    if (!verseKey) return
 
-        const handle = await appPlugin.addListener('backButton', () => {
-          if (!isMounted) return
+    if (isVerseOnCurrentPage) {
+      lastFollowedVerseRef.current = verseKey
+      return
+    }
 
-          if (menuOpen) {
-            if (menuSection !== 'main') {
-              setMenuSection('main')
-            } else {
-              setMenuOpen(false)
-            }
-            return
-          }
+    if (lastFollowedVerseRef.current === verseKey) {
+      return
+    }
 
-          const currentPath = window.location.pathname || '/'
-          if (currentPath !== '/') {
-            router.replace('/')
-            return
-          }
+    const surahStart = metaData.surahStartPage[player.activeSurah - 1]
+    if (!surahStart) return
 
-          appPlugin.exitApp?.()
-        })
-
-        if (isMounted && handle?.remove) {
-          listenerRemove = () => {
-            handle.remove()
-          }
-        }
-      } catch {
-        // تجاهل في بيئة الويب
+    let nextSurahStart = TOTAL_PAGES + 1
+    for (let i = player.activeSurah; i < metaData.surahStartPage.length; i++) {
+      if (metaData.surahStartPage[i] > surahStart) {
+        nextSurahStart = metaData.surahStartPage[i]
+        break
       }
     }
 
-    attachBackButton()
+    const totalVerses = SURAH_INFO[player.activeSurah - 1]?.verses || 1
+    const currentAyah = player.activeAyah || 1
+    const ratio = Math.min(Math.max((currentAyah - 1) / totalVerses, 0), 0.99999)
+    const spanPages = Math.max(1, nextSurahStart - surahStart)
+    const estimatedTargetPage = clampPage(
+      surahStart + Math.floor(ratio * spanPages),
+    )
+
+    lastFollowedVerseRef.current = verseKey
+
+    if (estimatedTargetPage !== currentPage) {
+      setCurrentPage(estimatedTargetPage)
+    } else if (currentPage < TOTAL_PAGES) {
+      setCurrentPage(currentPage + 1)
+    }
+  }, [
+    autoFollowVerse,
+    currentPage,
+    isVerseOnCurrentPage,
+    menuOpen,
+    metaData,
+    player.activeAyah,
+    player.activeSurah,
+    player.activeVerseKey,
+    player.playing,
+    player.progress,
+  ])
+
+  const exitToHomeScreen = useCallback(async () => {
+    try {
+      const capWindow = window as unknown as {
+        Capacitor?: {
+          Plugins?: {
+            AppExit?: {
+              exit?: () => Promise<void> | void
+            }
+            App?: {
+              exitApp?: () => Promise<void> | void
+            }
+          }
+        }
+      }
+
+      if (capWindow.Capacitor?.Plugins?.AppExit?.exit) {
+        await capWindow.Capacitor.Plugins.AppExit.exit()
+        return
+      }
+
+      if (capWindow.Capacitor?.Plugins?.App?.exitApp) {
+        await capWindow.Capacitor.Plugins.App.exitApp()
+      }
+    } catch {
+      // تجاهل في حال عدم توفر الإضافة
+    }
+  }, [])
+
+  const goToMainAppRoute = useCallback(() => {
+    setMenuOpen(false)
+    setMenuSection('main')
+
+    const path = window.location.pathname || ''
+    const isAlreadyHome =
+      path === '/' ||
+      path === '/index.html' ||
+      path === ''
+
+    if (isAlreadyHome) {
+      return false
+    }
+
+    try {
+      router.replace('/')
+    } catch {
+      // تجاهل
+    }
+
+    setTimeout(() => {
+      const current = window.location.pathname || ''
+      if (
+        current !== '/' &&
+        current !== '/index.html' &&
+        current !== ''
+      ) {
+        window.location.replace('/')
+      }
+    }, 150)
+
+    return true
+  }, [router])
+
+  useEffect(() => {
+    let isMounted = true
+    let removeCapacitorAppListener: (() => void) | undefined
+
+    const handleBackButtonEvent = () => {
+      if (!isMounted) return
+
+      const { menuOpen: isMenuOpen, menuSection: activeSection } =
+        menuStateRef.current
+
+      if (isMenuOpen) {
+        if (activeSection !== 'main') {
+          setMenuSection('main')
+        } else {
+          setMenuOpen(false)
+        }
+        return
+      }
+
+      const movedToHome = goToMainAppRoute()
+      if (!movedToHome) {
+        void exitToHomeScreen()
+      }
+    }
+
+    window.addEventListener('backButton', handleBackButtonEvent)
+
+    void (async () => {
+      try {
+        const { Capacitor } = await import('@capacitor/core')
+        if (!Capacitor.isNativePlatform()) return
+
+        const { App } = await import('@capacitor/app')
+        const listener = await App.addListener(
+          'backButton',
+          handleBackButtonEvent,
+        )
+        if (isMounted) {
+          removeCapacitorAppListener = () => {
+            void listener.remove()
+          }
+        } else {
+          await listener.remove()
+        }
+      } catch {
+        // يكتفي بمستمع window.addEventListener('backButton', ...)
+      }
+    })()
 
     return () => {
       isMounted = false
-      if (listenerRemove) {
-        listenerRemove()
+      window.removeEventListener('backButton', handleBackButtonEvent)
+      if (removeCapacitorAppListener) {
+        removeCapacitorAppListener()
       }
     }
-  }, [menuOpen, menuSection, router])
+  }, [exitToHomeScreen, goToMainAppRoute])
 
-  // تحميل meta.json والانتقال التلقائي لآخر موضع قراءة
   useEffect(() => {
     let isActive = true
 
@@ -767,13 +1046,15 @@ export function MushafViewer({
     }
   }, [initialPage, initialSurah])
 
-  // تحميل فهرس أرباع الأحزاب والورد اليومي المحفوظ
   useEffect(() => {
     let isActive = true
 
     try {
       const savedWird = Number(localStorage.getItem(WIRD_PAGES_KEY))
       if (savedWird > 0) setWirdPages(savedWird)
+
+      const savedFollow = localStorage.getItem(AUTO_FOLLOW_VERSE_KEY)
+      if (savedFollow === 'false') setAutoFollowVerse(false)
     } catch {}
 
     const loadQuarterIndex = async () => {
@@ -805,7 +1086,6 @@ export function MushafViewer({
     }
   }, [])
 
-  // تحميل صفحة المصحف
   useEffect(() => {
     let isActive = true
 
@@ -844,7 +1124,6 @@ export function MushafViewer({
     }
   }, [currentPage])
 
-  // انتظار تحميل الخطوط قبل القياس
   useEffect(() => {
     if (!pageData) return
 
@@ -886,7 +1165,6 @@ export function MushafViewer({
     }
   }, [pageData])
 
-  // قياس بدون transform
   useLayoutEffect(() => {
     if (!isPageMeasured || !pageData) return
 
@@ -1035,9 +1313,9 @@ export function MushafViewer({
     (event: React.MouseEvent) => {
       event.stopPropagation()
       vibrateDevice(10)
-      router.replace('/')
+      goToMainAppRoute()
     },
-    [router, vibrateDevice],
+    [goToMainAppRoute, vibrateDevice],
   )
 
   const handlePreviousPage = useCallback(() => {
@@ -1251,6 +1529,7 @@ export function MushafViewer({
 
       let server = DEFAULT_RECITER_SERVER
       let reciterName = DEFAULT_RECITER_NAME
+      let reciterId: string | number = DEFAULT_RECITER_ID
 
       try {
         server =
@@ -1259,6 +1538,10 @@ export function MushafViewer({
         reciterName =
           localStorage.getItem(RECITER_NAME_KEY) ||
           reciterName
+
+        reciterId =
+          localStorage.getItem(RECITER_ID_KEY) ||
+          reciterId
       } catch {
         // تجاهل أخطاء localStorage
       }
@@ -1277,11 +1560,32 @@ export function MushafViewer({
         ],
       }
 
+      const targetServer = player.moshafServer || server
+
+      void resolvePlayableSurahSource({
+        reciterId,
+        server: targetServer,
+        surahNumber: activeSurahNumber,
+      })
+        .then((resolved) => {
+          if (activeObjectUrlRef.current) {
+            URL.revokeObjectURL(activeObjectUrlRef.current)
+            activeObjectUrlRef.current = null
+          }
+          if (resolved.revokeUrl && resolved.src.startsWith('blob:')) {
+            activeObjectUrlRef.current = resolved.src
+          }
+          setPlayingFromOffline(resolved.isOffline)
+        })
+        .catch(() => {
+          setPlayingFromOffline(false)
+        })
+
       player.play(
         activeSurahNumber,
         surahName,
         player.reciter || defaultReciter,
-        player.moshafServer || server,
+        targetServer,
       )
     },
     [
@@ -1289,6 +1593,160 @@ export function MushafViewer({
       surahName,
       player,
       resetUiTimeout,
+      vibrateDevice,
+    ],
+  )
+
+  const handleDownloadCurrentSurah = useCallback(async () => {
+    if (isDownloadingCurrent || isBatchDownloading) return
+
+    vibrateDevice(12)
+    setOfflineMessage(null)
+    setIsDownloadingCurrent(true)
+    setCurrentDownloadProgress(5)
+
+    const controller = new AbortController()
+    downloadAbortRef.current = controller
+
+    try {
+      await downloadSurahAudio({
+        reciterId: activeReciterInfo.reciterId,
+        reciterName: activeReciterInfo.reciterName,
+        server: activeReciterInfo.server,
+        surahNumber: activeSurahNumber,
+        surahName,
+        signal: controller.signal,
+        onProgress: (pct) => setCurrentDownloadProgress(pct),
+      })
+      setOfflineTick((t) => t + 1)
+      setOfflineMessage(
+        `تم تحميل ${surahName} بصوت ${activeReciterInfo.reciterName} للعمل بدون إنترنت.`,
+      )
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        setOfflineMessage('تم إلغاء تحميل السورة.')
+      } else {
+        setOfflineMessage('تعذر تحميل السورة، تحقق من الاتصال بالإنترنت.')
+      }
+    } finally {
+      downloadAbortRef.current = null
+      setIsDownloadingCurrent(false)
+      setCurrentDownloadProgress(0)
+    }
+  }, [
+    activeReciterInfo,
+    activeSurahNumber,
+    isBatchDownloading,
+    isDownloadingCurrent,
+    surahName,
+    vibrateDevice,
+  ])
+
+  const handleCancelDownload = useCallback(() => {
+    if (downloadAbortRef.current) {
+      downloadAbortRef.current.abort()
+    }
+  }, [])
+
+  const handleDeleteCurrentSurah = useCallback(async () => {
+    vibrateDevice(12)
+    setOfflineMessage(null)
+    await deleteOfflineSurah({
+      reciterId: activeReciterInfo.reciterId,
+      server: activeReciterInfo.server,
+      surahNumber: activeSurahNumber,
+    })
+    setOfflineTick((t) => t + 1)
+    setOfflineMessage(`تم حذف نسخة ${surahName} المحفوظة من الجهاز.`)
+  }, [
+    activeReciterInfo,
+    activeSurahNumber,
+    surahName,
+    vibrateDevice,
+  ])
+
+  const handleDownloadBatch = useCallback(
+    async (mode: 'next10' | 'all114') => {
+      if (isBatchDownloading || isDownloadingCurrent || !metaData) return
+
+      vibrateDevice(14)
+      setOfflineMessage(null)
+      setIsBatchDownloading(true)
+      setBatchProgressPercent(0)
+
+      const startIdx = mode === 'next10' ? currentSurahIndex : 0
+      const endIdx =
+        mode === 'next10'
+          ? Math.min(startIdx + 10, 114)
+          : 114
+
+      const targetSurahs: Array<{ surahNumber: number; surahName: string }> = []
+      for (let i = startIdx; i < endIdx; i++) {
+        const sNum = i + 1
+        const sName = metaData.surahNames[i] || `سورة ${sNum}`
+        if (
+          !isSurahDownloaded(
+            activeReciterInfo.reciterId,
+            activeReciterInfo.server,
+            sNum,
+          )
+        ) {
+          targetSurahs.push({ surahNumber: sNum, surahName: sName })
+        }
+      }
+
+      if (targetSurahs.length === 0) {
+        setIsBatchDownloading(false)
+        setBatchStatusText(null)
+        setBatchProgressPercent(null)
+        setOfflineMessage('جميع السور المحددة محمّلة مسبقاً على جهازك.')
+        return
+      }
+
+      const controller = new AbortController()
+      downloadAbortRef.current = controller
+
+      try {
+        await downloadSurahsBatch({
+          reciterId: activeReciterInfo.reciterId,
+          reciterName: activeReciterInfo.reciterName,
+          server: activeReciterInfo.server,
+          surahs: targetSurahs,
+          signal: controller.signal,
+          onSurahStart: (sNum, idx, total) => {
+            const sTitle = metaData.surahNames[sNum - 1] || `سورة ${sNum}`
+            setBatchStatusText(
+              `جاري تحميل ${sTitle} (${formatValue(idx + 1)} / ${formatValue(total)})`,
+            )
+            setBatchProgressPercent(Math.round((idx / total) * 100))
+          },
+          onSurahComplete: (_, idx, total) => {
+            setOfflineTick((t) => t + 1)
+            setBatchProgressPercent(Math.round(((idx + 1) / total) * 100))
+          },
+        })
+        setOfflineMessage('اكتمل تحميل السور المحددة للعمل بدون إنترنت.')
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          setOfflineMessage('تم إيقاف التحميل الجماعي.')
+        } else {
+          setOfflineMessage('حدث خطأ أثناء التحميل الجماعي.')
+        }
+      } finally {
+        downloadAbortRef.current = null
+        setIsBatchDownloading(false)
+        setBatchStatusText(null)
+        setBatchProgressPercent(null)
+        setOfflineTick((t) => t + 1)
+      }
+    },
+    [
+      activeReciterInfo,
+      currentSurahIndex,
+      formatValue,
+      isBatchDownloading,
+      isDownloadingCurrent,
+      metaData,
       vibrateDevice,
     ],
   )
@@ -1305,6 +1763,7 @@ export function MushafViewer({
         surahName,
         currentPage,
       )
+      setBookmarksTick((t) => t + 1)
     },
     [
       activeSurahNumber,
@@ -1333,6 +1792,17 @@ export function MushafViewer({
     [resetUiTimeout, vibrateDevice],
   )
 
+  const handleAutoFollowToggle = useCallback(() => {
+    vibrateDevice(10)
+    setAutoFollowVerse((prev) => {
+      const next = !prev
+      try {
+        localStorage.setItem(AUTO_FOLLOW_VERSE_KEY, String(next))
+      } catch {}
+      return next
+    })
+  }, [vibrateDevice])
+
   const handleSaveWird = (pagesCount: number) => {
     const valid = Math.min(Math.max(pagesCount, 1), 604)
     setWirdPages(valid)
@@ -1355,25 +1825,26 @@ export function MushafViewer({
   const remainingPages = Math.max(0, TOTAL_PAGES - currentPage)
 
   const surface = isNightMode
-    ? 'rgba(24, 24, 27, 0.92)'
-    : 'rgba(255, 255, 255, 0.94)'
+    ? 'rgba(24, 24, 27, 0.95)'
+    : 'rgba(255, 255, 255, 0.96)'
 
   const bg = isNightMode ? '#101010' : '#fdfbf7'
-  const fg = isNightMode ? '#f4f4f5' : '#06140f'
+  const fg = isNightMode ? '#f4f4f5' : '#050505'
   const border = isNightMode
     ? 'rgba(63, 63, 70, 0.7)'
-    : '#e8dccb'
+    : '#ded8cc'
 
-  const accent = '#d4af37'
+  const accent = isNightMode ? '#e4e4e7' : '#050505'
 
-  const primary = isNightMode ? '#d4af37' : '#0a1f1a'
+  const primary = isNightMode ? '#f4f4f5' : '#09090b'
 
   const primaryText = isNightMode ? '#101010' : '#fdfbf7'
 
-  const printGreen = isNightMode ? '#d4af37' : PRINT_GREEN
-  const printGold = isNightMode ? '#8a7030' : PRINT_GOLD
+  const printGreen = isNightMode ? '#e4e4e7' : PRINT_GREEN
+  const printLine = isNightMode ? '#3f3f46' : PRINT_LINE
 
   const versesCount = currentSurahInfo?.verses
+  const isBarsVisible = showUi || menuOpen
 
   if (isLoading || !metaData) {
     return (
@@ -1415,18 +1886,18 @@ export function MushafViewer({
     >
       <Qcf4Fonts />
 
-      {/* الشريط العلوي الثابت بتصميم المصحف المطبوع */}
       <div
-        className="flex shrink-0 items-center justify-between px-3 pb-2 relative z-50"
+        className="relative z-40 flex shrink-0 items-center justify-between px-3 pb-2"
         style={{
-          paddingTop:
-            'calc(env(safe-area-inset-top, 0px) + 8px)',
-          color: printGreen,
-          borderBottom: `1px solid ${printGold}`,
+          paddingTop: 'calc(env(safe-area-inset-top, 0px) + 8px)',
+          paddingLeft: 'max(0.85rem, env(safe-area-inset-left))',
+          paddingRight: 'max(0.85rem, env(safe-area-inset-right))',
+          color: isNightMode ? '#f4f4f5' : '#050505',
+          borderBottom: `1px solid ${printLine}`,
           backgroundColor: bg,
         }}
       >
-        <span className="text-[13px] font-bold">
+        <span className="text-[13px] font-extrabold" style={{ color: printGreen }}>
           {formatValue(currentSurahIndex + 1)} {surahName}
           {versesCount
             ? ` (${formatValue(versesCount)})`
@@ -1440,12 +1911,11 @@ export function MushafViewer({
             : ''}
         </span>
 
-        <span className="text-[13px] font-bold">
+        <span className="text-[13px] font-extrabold">
           {formatValue(currentPage)}
         </span>
       </div>
 
-      {/* منطقة الصفحة */}
       <div
         ref={containerRef}
         className="relative min-h-0 flex-1"
@@ -1497,7 +1967,6 @@ export function MushafViewer({
             className="relative h-full w-full overflow-hidden px-1"
             onDoubleClick={handleDoubleClick}
           >
-            {/* قياس مخفي */}
             <div
               ref={measureRef}
               aria-hidden
@@ -1515,12 +1984,12 @@ export function MushafViewer({
                     line,
                     REFERENCE_FONT_SIZE,
                     fg,
+                    { enableHighlight: false },
                   )}
                 </div>
               ))}
             </div>
 
-            {/* الصفحة الفعلية */}
             <div
               className="flex h-full w-full flex-col justify-center"
               style={{
@@ -1554,44 +2023,42 @@ export function MushafViewer({
                         className="relative flex h-full w-[98%] items-center justify-between overflow-hidden rounded-lg px-1"
                         style={{
                           backgroundColor: isNightMode
-                            ? '#18140e'
-                            : '#f5ebd6',
+                            ? '#18181b'
+                            : '#f3efe6',
                           border: `1.5px solid ${
-                            isNightMode ? '#d4af37' : '#09090b'
+                            isNightMode ? '#52525b' : '#050505'
                           }`,
                           boxShadow: isNightMode
-                            ? 'inset 0 0 0 2px rgba(212, 175, 55, 0.25)'
-                            : 'inset 0 0 0 2px rgba(9, 9, 11, 0.25), 0 1px 3px rgba(9, 9, 11, 0.14)',
+                            ? 'inset 0 0 0 1px rgba(255, 255, 255, 0.08)'
+                            : 'inset 0 0 0 1px rgba(5, 5, 5, 0.14)',
                         }}
                       >
                         <DenseOrnamentSide isNightMode={isNightMode} />
 
-                        {/* البطاقة الوسطية لاسم السورة وبياناتها */}
                         <div
                           className="mx-1 flex h-[86%] min-w-[44%] max-w-[66%] flex-col items-center justify-center rounded-md px-2.5"
                           style={{
                             backgroundColor: isNightMode
-                              ? '#101012'
-                              : '#fffdf7',
+                              ? '#111113'
+                              : '#fdfbf7',
                             border: `1px solid ${
-                              isNightMode ? '#d4af37' : '#09090b'
+                              isNightMode ? '#71717a' : '#050505'
                             }`,
-                            boxShadow:
-                              'inset 0 0 0 1px rgba(9, 9, 11, 0.2)',
                           }}
                         >
                           <div className="leading-none">
                             {renderLineContent(
                               line,
                               fontPx * 0.95,
-                              isNightMode ? '#f4f4f5' : '#09090b',
+                              isNightMode ? '#f4f4f5' : '#050505',
+                              { enableHighlight: false },
                             )}
                           </div>
 
                           <div
-                            className="mt-0.5 flex items-center gap-1.5 text-[10px] font-bold leading-tight"
+                            className="mt-0.5 flex items-center gap-1.5 text-[10px] font-extrabold leading-tight"
                             style={{
-                              color: isNightMode ? '#d4af37' : '#09090b',
+                              color: isNightMode ? '#e4e4e7' : '#050505',
                             }}
                           >
                             <span>ترتيب {formatValue(activeSurahNumber)}</span>
@@ -1613,7 +2080,11 @@ export function MushafViewer({
                         <DenseOrnamentSide isNightMode={isNightMode} mirror />
                       </div>
                     ) : (
-                      renderLineContent(line, fontPx, fg)
+                      renderLineContent(line, fontPx, fg, {
+                        activeVerseKey: player.activeVerseKey,
+                        isNightMode,
+                        enableHighlight: player.playing,
+                      })
                     )}
                   </div>
                 )
@@ -1623,25 +2094,28 @@ export function MushafViewer({
         ) : null}
       </div>
 
-      {/* الشريط العائم */}
       <header
         className={cn(
-          'absolute inset-x-0 top-0 z-50 flex items-start justify-between gap-2 p-3 transition-all duration-300 pointer-events-auto',
-          showUi || menuOpen
-            ? 'opacity-100 translate-y-0'
-            : 'opacity-0 -translate-y-4 pointer-events-none',
+          'pointer-events-auto absolute inset-x-0 top-10 z-50 flex flex-wrap items-center justify-between gap-2 transition-all duration-300',
+          isBarsVisible
+            ? 'translate-y-0 opacity-100'
+            : 'pointer-events-none -translate-y-4 opacity-0',
         )}
-        style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
+        style={{
+          paddingTop: '0.35rem',
+          paddingLeft: 'max(1rem, env(safe-area-inset-left))',
+          paddingRight: 'max(1rem, env(safe-area-inset-right))',
+        }}
       >
         <div className="flex items-center gap-1.5">
           <button
             type="button"
             onClick={handleBackToMainApp}
-            className="flex size-10 items-center justify-center rounded-full border shadow-lg backdrop-blur-md transition-transform active:scale-90"
+            className="flex size-9 items-center justify-center rounded-full border shadow-lg backdrop-blur-md transition-transform active:scale-90"
             style={{ backgroundColor: surface, borderColor: border, color: fg }}
             aria-label="العودة إلى الرئيسية"
           >
-            <ChevronRight className="size-5" />
+            <ChevronRight className="size-4" />
           </button>
 
           <button
@@ -1649,39 +2123,41 @@ export function MushafViewer({
             onClick={(event) => {
               event.stopPropagation()
               vibrateDevice(10)
+              setBookmarksTick((t) => t + 1)
+              setOfflineTick((t) => t + 1)
               setMenuOpen((prev) => {
                 const next = !prev
                 if (!next) setMenuSection('main')
                 return next
               })
             }}
-            className="flex items-center gap-1.5 rounded-full border px-3 py-2 text-xs font-bold shadow-lg backdrop-blur-md transition-transform active:scale-95"
+            className="flex items-center gap-1 rounded-full border px-2.5 py-1.5 text-xs font-bold shadow-lg backdrop-blur-md transition-transform active:scale-95"
             style={{
               backgroundColor: menuOpen ? primary : surface,
               borderColor: border,
               color: menuOpen ? primaryText : fg,
             }}
           >
-            <List className="size-4" />
+            <List className="size-3.5" />
             <span>القائمة</span>
           </button>
         </div>
 
         <div
-          className="flex items-center gap-1 rounded-full border px-2 py-1 shadow-lg backdrop-blur-md"
+          className="flex max-w-full items-center gap-0.5 rounded-full border px-1.5 py-1 shadow-lg backdrop-blur-md"
           style={{ backgroundColor: surface, borderColor: border }}
         >
           <button
             type="button"
             onClick={handleNightModeToggle}
-            className="flex items-center gap-1.5 rounded-full px-3 py-1.5 transition-colors hover:bg-black/5 active:opacity-60"
-            style={{ color: accent }}
+            className="flex items-center gap-1 rounded-full px-2.5 py-1 transition-colors hover:bg-black/5 active:opacity-60"
+            style={{ color: fg }}
           >
-            {isNightMode ? <Sun className="size-4" /> : <Moon className="size-4" />}
-            <span className="text-xs font-bold">{isNightMode ? 'نهاري' : 'ليلي'}</span>
+            {isNightMode ? <Sun className="size-3.5" /> : <Moon className="size-3.5" />}
+            <span className="text-[11px] font-bold">{isNightMode ? 'نهاري' : 'ليلي'}</span>
           </button>
 
-          <div className="h-4 w-px bg-border" />
+          <div className="h-3.5 w-px bg-border" />
 
           <button
             type="button"
@@ -1689,35 +2165,37 @@ export function MushafViewer({
               event.stopPropagation()
               router.push('/quran/reciters')
             }}
-            className="flex items-center gap-1.5 rounded-full px-3 py-1.5 transition-colors hover:bg-black/5 active:opacity-60"
+            className="flex items-center gap-1 rounded-full px-2.5 py-1 transition-colors hover:bg-black/5 active:opacity-60"
             style={{ color: fg }}
           >
-            <Headphones className="size-4" />
-            <span className="text-xs font-bold">القارئ</span>
+            <Headphones className="size-3.5" />
+            <span className="text-[11px] font-bold">القارئ</span>
           </button>
 
-          <div className="h-4 w-px bg-border" />
+          <div className="h-3.5 w-px bg-border" />
 
           <button
             type="button"
             onClick={handlePlayToggle}
-            className="flex items-center gap-1.5 rounded-full px-3 py-1.5 transition-colors active:scale-95"
+            className="flex items-center gap-1 rounded-full px-2.5 py-1 transition-colors active:scale-95"
             style={{ backgroundColor: primary, color: primaryText }}
           >
             {isCurrentSurahPlaying ? (
               <>
-                <Pause className="size-4" fill="currentColor" />
-                <span className="text-xs font-bold">إيقاف</span>
+                <Pause className="size-3.5" fill="currentColor" />
+                <span className="text-[11px] font-bold">إيقاف</span>
               </>
             ) : (
               <>
-                <Play className="size-4" fill="currentColor" />
-                <span className="text-xs font-bold">تشغيل</span>
+                <Play className="size-3.5" fill="currentColor" />
+                <span className="text-[11px] font-bold">
+                  {isCurrentSurahDownloaded ? 'تشغيل أوفلاين' : 'تشغيل'}
+                </span>
               </>
             )}
           </button>
 
-          <div className="h-4 w-px bg-border" />
+          <div className="h-3.5 w-px bg-border" />
 
           <button
             type="button"
@@ -1725,16 +2203,90 @@ export function MushafViewer({
             className="flex items-center justify-center rounded-full p-1.5 transition-colors hover:bg-black/5 active:opacity-60"
             style={{ color: isBookmarkedPage ? accent : fg }}
           >
-            <Bookmark className="size-4" fill={isBookmarkedPage ? 'currentColor' : 'none'} />
+            <Bookmark className="size-3.5" fill={isBookmarkedPage ? 'currentColor' : 'none'} />
           </button>
         </div>
       </header>
 
-      {/* القائمة المنسدلة الشاملة فوق صفحة المصحف */}
+      <nav
+        aria-label="شريط أدوات المصحف السفلي"
+        onClick={(event) => event.stopPropagation()}
+        className={cn(
+          'pointer-events-auto fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-lg transition-all duration-300',
+          isBarsVisible
+            ? 'translate-y-0 opacity-100'
+            : 'pointer-events-none translate-y-6 opacity-0',
+        )}
+        style={{
+          paddingBottom: 'max(0.65rem, env(safe-area-inset-bottom))',
+          paddingLeft: 'max(0.85rem, env(safe-area-inset-left))',
+          paddingRight: 'max(0.85rem, env(safe-area-inset-right))',
+        }}
+      >
+        <div
+          className="flex items-center justify-around rounded-2xl border px-2 py-1.5 shadow-2xl backdrop-blur-xl"
+          style={{
+            backgroundColor: surface,
+            borderColor: border,
+            color: fg,
+          }}
+        >
+          <button
+            type="button"
+            onClick={handleBackToMainApp}
+            className="flex flex-col items-center gap-0.5 rounded-xl px-2.5 py-1 text-[11px] font-bold transition-colors hover:bg-black/5"
+          >
+            <Home className="size-4" />
+            <span>الرئيسية</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              resetUiTimeout()
+              setJumpPageInput(String(currentPage))
+              setMenuSection('index')
+              setMenuOpen(true)
+            }}
+            className="flex flex-col items-center gap-0.5 rounded-xl px-2.5 py-1 text-[11px] font-bold transition-colors hover:bg-black/5"
+          >
+            <List className="size-4" />
+            <span>الفهرس</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              resetUiTimeout()
+              setOfflineTick((t) => t + 1)
+              setMenuSection('offline')
+              setMenuOpen(true)
+            }}
+            className="flex flex-col items-center gap-0.5 rounded-xl px-2.5 py-1 text-[11px] font-bold transition-colors hover:bg-black/5"
+          >
+            <Download className="size-4" />
+            <span>التحميل</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleNightModeToggle}
+            className="flex flex-col items-center gap-0.5 rounded-xl px-2.5 py-1 text-[11px] font-bold transition-colors hover:bg-black/5"
+          >
+            {isNightMode ? (
+              <Sun className="size-4" />
+            ) : (
+              <Moon className="size-4" />
+            )}
+            <span>{isNightMode ? 'نهاري' : 'ليلي'}</span>
+          </button>
+        </div>
+      </nav>
+
       {menuOpen && (
         <div
           onClick={(event) => event.stopPropagation()}
-          className="fixed inset-x-3 top-20 z-[60] mx-auto max-h-[75dvh] w-auto max-w-md overflow-y-auto rounded-3xl border p-4 shadow-2xl backdrop-blur-xl"
+          className="fixed inset-x-3 top-24 z-60 mx-auto max-h-[70dvh] w-auto max-w-md overflow-y-auto rounded-3xl border p-4 shadow-2xl backdrop-blur-xl"
           style={{
             backgroundColor: surface,
             borderColor: border,
@@ -1746,18 +2298,19 @@ export function MushafViewer({
               <button
                 type="button"
                 onClick={() => setMenuSection('main')}
-                className="flex items-center gap-1 text-xs font-bold"
-                style={{ color: accent }}
+                className="flex items-center gap-1 text-xs font-extrabold"
+                style={{ color: fg }}
               >
                 <ChevronRight className="size-4" />
                 <span>العودة للقائمة</span>
               </button>
-              <span className="text-sm font-bold">
+              <span className="text-sm font-extrabold">
                 {menuSection === 'bookmarks' && 'العلامات المرجعية'}
                 {menuSection === 'khatmah' && 'ختمة القرآن'}
                 {menuSection === 'wird' && 'الورد اليومي'}
                 {menuSection === 'dua' && 'دعاء ختم القرآن'}
                 {menuSection === 'index' && 'الفهرس'}
+                {menuSection === 'offline' && 'التحميل بدون إنترنت'}
               </span>
             </div>
           )}
@@ -1769,10 +2322,21 @@ export function MushafViewer({
                 style={{ borderColor: border }}
               >
                 <div>
-                  <p className="text-[11px] opacity-70">الموضع الحالي</p>
-                  <p className="text-sm font-bold">
+                  <p className="text-[11px] opacity-75">الموضع الحالي</p>
+                  <p className="text-sm font-extrabold">
                     {surahName} · صفحة {formatValue(currentPage)}
                   </p>
+                  {player.playing && player.activeVerseKey && (
+                    <p className="mt-0.5 text-[11px] font-bold opacity-85">
+                      الآية الجارية: {formatValue(player.activeVerseKey)}
+                    </p>
+                  )}
+                  {playingFromOffline && isCurrentSurahPlaying && (
+                    <p className="mt-0.5 flex items-center gap-1 text-[11px] font-bold opacity-85">
+                      <WifiOff className="size-3" />
+                      <span>يعمل من الجهاز المحلي</span>
+                    </p>
+                  )}
                 </div>
                 <span
                   className="rounded-xl px-2.5 py-1 text-xs font-bold"
@@ -1784,15 +2348,51 @@ export function MushafViewer({
 
               <button
                 type="button"
-                onClick={() => setMenuSection('bookmarks')}
+                onClick={handleAutoFollowToggle}
                 className="flex items-center justify-between rounded-2xl border p-3 text-right transition-colors hover:bg-black/5"
                 style={{ borderColor: border }}
               >
                 <span className="flex items-center gap-2.5 text-sm font-bold">
-                  <Bookmark className="size-4" style={{ color: accent }} />
+                  <Sparkles className="size-4" />
+                  <span>تتبع الآيات والانتقال التلقائي</span>
+                </span>
+                <span className="text-xs font-bold opacity-85">
+                  {autoFollowVerse ? 'مفعّل' : 'متوقف'}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setOfflineTick((t) => t + 1)
+                  setMenuSection('offline')
+                }}
+                className="flex items-center justify-between rounded-2xl border p-3 text-right transition-colors hover:bg-black/5"
+                style={{ borderColor: border }}
+              >
+                <span className="flex items-center gap-2.5 text-sm font-bold">
+                  <Download className="size-4" />
+                  <span>تحميل التلاوات أوفلاين</span>
+                </span>
+                <span className="text-xs font-bold opacity-80">
+                  {formatValue(downloadedSurahsList.length)} / {formatValue(114)} سورة
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setBookmarksTick((t) => t + 1)
+                  setMenuSection('bookmarks')
+                }}
+                className="flex items-center justify-between rounded-2xl border p-3 text-right transition-colors hover:bg-black/5"
+                style={{ borderColor: border }}
+              >
+                <span className="flex items-center gap-2.5 text-sm font-bold">
+                  <Bookmark className="size-4" />
                   <span>العلامات المرجعية</span>
                 </span>
-                <span className="text-xs opacity-75">
+                <span className="text-xs font-bold opacity-80">
                   {formatValue(bookmarksList.length)} علامة
                 </span>
               </button>
@@ -1804,10 +2404,10 @@ export function MushafViewer({
                 style={{ borderColor: border }}
               >
                 <span className="flex items-center gap-2.5 text-sm font-bold">
-                  <Compass className="size-4" style={{ color: accent }} />
+                  <Compass className="size-4" />
                   <span>ختمة القرآن</span>
                 </span>
-                <span className="text-xs opacity-75">
+                <span className="text-xs font-bold opacity-80">
                   متبقي {formatValue(remainingPages)} صفحة
                 </span>
               </button>
@@ -1819,10 +2419,10 @@ export function MushafViewer({
                 style={{ borderColor: border }}
               >
                 <span className="flex items-center gap-2.5 text-sm font-bold">
-                  <BookOpen className="size-4" style={{ color: accent }} />
+                  <BookOpen className="size-4" />
                   <span>الورد اليومي</span>
                 </span>
-                <span className="text-xs opacity-75">
+                <span className="text-xs font-bold opacity-80">
                   {formatValue(wirdPages)} صفحات
                 </span>
               </button>
@@ -1838,10 +2438,10 @@ export function MushafViewer({
                 style={{ borderColor: border }}
               >
                 <span className="flex items-center gap-2.5 text-sm font-bold">
-                  <Headphones className="size-4" style={{ color: accent }} />
+                  <Headphones className="size-4" />
                   <span>القراء والتلاوات</span>
                 </span>
-                <span className="text-xs opacity-75">اختيار القارئ</span>
+                <span className="text-xs font-bold opacity-80">اختيار القارئ والرواية</span>
               </button>
 
               <button
@@ -1851,10 +2451,10 @@ export function MushafViewer({
                 style={{ borderColor: border }}
               >
                 <span className="flex items-center gap-2.5 text-sm font-bold">
-                  <Sparkles className="size-4" style={{ color: accent }} />
+                  <Sparkles className="size-4" />
                   <span>دعاء ختم القرآن</span>
                 </span>
-                <span className="text-xs opacity-75">عرض الدعاء</span>
+                <span className="text-xs font-bold opacity-80">عرض الدعاء</span>
               </button>
 
               <button
@@ -1875,6 +2475,201 @@ export function MushafViewer({
             </div>
           )}
 
+          {menuSection === 'offline' && (
+            <div className="space-y-3 text-xs">
+              <div className="rounded-2xl border p-3" style={{ borderColor: border }}>
+                <div className="flex items-center justify-between font-bold">
+                  <span>القارئ الحالي: {activeReciterInfo.reciterName}</span>
+                  <span>{formatSizeMb(downloadedStorageBytes)}</span>
+                </div>
+                <p className="mt-1 opacity-80">
+                  السور المحمّلة: {formatValue(downloadedSurahsList.length)} من {formatValue(114)} سورة
+                </p>
+              </div>
+
+              <div className="space-y-2.5 rounded-2xl border p-3" style={{ borderColor: border }}>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-extrabold">{surahName}</span>
+                  {isCurrentSurahDownloaded ? (
+                    <span className="flex items-center gap-1 font-bold">
+                      <CheckCircle2 className="size-4" />
+                      <span>محفوظة على الجهاز</span>
+                    </span>
+                  ) : (
+                    <span className="opacity-75">أونلاين فقط</span>
+                  )}
+                </div>
+
+                {isDownloadingCurrent && (
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between font-bold">
+                      <span>جاري التحميل...</span>
+                      <span>{formatValue(currentDownloadProgress)}%</span>
+                    </div>
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-black/10">
+                      <div
+                        className="h-full rounded-full transition-all"
+                        style={{
+                          width: `${currentDownloadProgress}%`,
+                          backgroundColor: primary,
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  {isDownloadingCurrent ? (
+                    <button
+                      type="button"
+                      onClick={handleCancelDownload}
+                      className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border py-2 font-bold"
+                      style={{ borderColor: border }}
+                    >
+                      <X className="size-3.5" />
+                      <span>إلغاء التحميل</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void handleDownloadCurrentSurah()
+                      }}
+                      disabled={isBatchDownloading}
+                      className="flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2 font-bold disabled:opacity-50"
+                      style={{ backgroundColor: primary, color: primaryText }}
+                    >
+                      <Download className="size-3.5" />
+                      <span>
+                        {isCurrentSurahDownloaded
+                          ? 'إعادة تحميل السورة'
+                          : 'تحميل السورة أوفلاين'}
+                      </span>
+                    </button>
+                  )}
+
+                  {isCurrentSurahDownloaded && !isDownloadingCurrent && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void handleDeleteCurrentSurah()
+                      }}
+                      className="flex items-center justify-center gap-1 rounded-xl border px-3 py-2 font-bold"
+                      style={{ borderColor: border }}
+                      aria-label="حذف السورة المحفوظة"
+                    >
+                      <Trash2 className="size-3.5" />
+                      <span>حذف</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-2 rounded-2xl border p-3" style={{ borderColor: border }}>
+                <p className="font-bold">تحميل مجموعة سور للقارئ الحالي:</p>
+
+                {isBatchDownloading && batchStatusText && (
+                  <div className="space-y-1.5 rounded-xl border p-2.5" style={{ borderColor: border }}>
+                    <div className="flex items-center justify-between font-bold">
+                      <span>{batchStatusText}</span>
+                      <span>{formatValue(batchProgressPercent ?? 0)}%</span>
+                    </div>
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-black/10">
+                      <div
+                        className="h-full rounded-full transition-all"
+                        style={{
+                          width: `${batchProgressPercent ?? 0}%`,
+                          backgroundColor: primary,
+                        }}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleCancelDownload}
+                      className="mt-1 flex w-full items-center justify-center gap-1 rounded-lg border py-1.5 font-bold"
+                      style={{ borderColor: border }}
+                    >
+                      <X className="size-3.5" />
+                      <span>إيقاف التحميل</span>
+                    </button>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void handleDownloadBatch('next10')
+                    }}
+                    disabled={isBatchDownloading || isDownloadingCurrent}
+                    className="rounded-xl border py-2 font-bold disabled:opacity-50"
+                    style={{ borderColor: border }}
+                  >
+                    تحميل ١٠ سور قادمة
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void handleDownloadBatch('all114')
+                    }}
+                    disabled={isBatchDownloading || isDownloadingCurrent}
+                    className="rounded-xl border py-2 font-bold disabled:opacity-50"
+                    style={{ borderColor: border }}
+                  >
+                    تحميل المصحف كاملاً
+                  </button>
+                </div>
+              </div>
+
+              {offlineMessage && (
+                <div
+                  className="rounded-xl border p-2.5 text-center font-bold"
+                  style={{ borderColor: border }}
+                >
+                  {offlineMessage}
+                </div>
+              )}
+
+              {downloadedSurahsList.length > 0 && (
+                <div className="max-h-36 space-y-1.5 overflow-y-auto pl-1">
+                  <p className="font-bold opacity-80">السور المحفوظة حالياً:</p>
+                  {downloadedSurahsList.map((item) => (
+                    <div
+                      key={`${item.reciterId}-${item.surahNumber}`}
+                      className="flex items-center justify-between rounded-xl border px-3 py-1.5 font-bold"
+                      style={{ borderColor: border }}
+                    >
+                      <span>
+                        {formatValue(item.surahNumber)}. {item.surahName}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="opacity-75">
+                          {formatSizeMb(item.sizeBytes)}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void deleteOfflineSurah({
+                              reciterId: activeReciterInfo.reciterId,
+                              server: activeReciterInfo.server,
+                              surahNumber: item.surahNumber,
+                            }).then(() => {
+                              setOfflineTick((t) => t + 1)
+                            })
+                          }}
+                          className="rounded-lg p-1 opacity-80 hover:opacity-100"
+                          aria-label={`حذف ${item.surahName}`}
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {menuSection === 'bookmarks' && (
             <div className="space-y-2.5">
               <button
@@ -1882,6 +2677,7 @@ export function MushafViewer({
                 onClick={() => {
                   vibrateDevice(15)
                   toggleBookmark(activeSurahNumber, surahName, currentPage)
+                  setBookmarksTick((t) => t + 1)
                 }}
                 className="w-full rounded-2xl py-2.5 text-xs font-bold"
                 style={{ backgroundColor: primary, color: primaryText }}
@@ -1893,7 +2689,7 @@ export function MushafViewer({
 
               {bookmarksList.length === 0 ? (
                 <div
-                  className="rounded-2xl border p-4 text-center text-xs opacity-75"
+                  className="rounded-2xl border p-4 text-center text-xs font-semibold opacity-80"
                   style={{ borderColor: border }}
                 >
                   لا توجد علامات مرجعية محفوظة حالياً.
@@ -1914,7 +2710,7 @@ export function MushafViewer({
                         <span>
                           {bm.surahName} · ص {formatValue(bm.page)}
                         </span>
-                        <span style={{ color: accent }}>انتقال</span>
+                        <span className="underline">انتقال</span>
                       </button>
 
                       <button
@@ -1922,8 +2718,9 @@ export function MushafViewer({
                         onClick={() => {
                           vibrateDevice(12)
                           toggleBookmark(bm.surahNumber, bm.surahName, bm.page)
+                          setBookmarksTick((t) => t + 1)
                         }}
-                        className="mr-2 rounded-lg p-1.5 opacity-75 hover:opacity-100"
+                        className="mr-2 rounded-lg p-1.5 opacity-80 hover:opacity-100"
                         aria-label="حذف العلامة"
                       >
                         <Trash2 className="size-3.5" />
@@ -1947,11 +2744,11 @@ export function MushafViewer({
                     className="h-full rounded-full transition-all"
                     style={{
                       width: `${khatmahPercent}%`,
-                      backgroundColor: accent,
+                      backgroundColor: primary,
                     }}
                   />
                 </div>
-                <div className="mt-3 flex justify-between text-xs opacity-80">
+                <div className="mt-3 flex justify-between text-xs font-semibold opacity-85">
                   <span>الصفحة الحالية: {formatValue(currentPage)}</span>
                   <span>المتبقي: {formatValue(remainingPages)} صفحة</span>
                 </div>
@@ -1970,7 +2767,7 @@ export function MushafViewer({
 
           {menuSection === 'wird' && (
             <div className="space-y-3">
-              <p className="text-xs opacity-80">
+              <p className="text-xs font-semibold opacity-85">
                 اختر مقدار الورد اليومي للانتقال المباشر إليه من صفحتك الحالية:
               </p>
               <div className="grid grid-cols-3 gap-2">
@@ -1994,7 +2791,7 @@ export function MushafViewer({
           )}
 
           {menuSection === 'dua' && (
-            <div className="rounded-2xl border p-4 text-center leading-8 text-sm font-medium" style={{ borderColor: border }}>
+            <div className="rounded-2xl border p-4 text-center leading-8 text-sm font-semibold" style={{ borderColor: border }}>
               {KHATMAH_DUA}
             </div>
           )}

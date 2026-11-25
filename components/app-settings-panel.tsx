@@ -207,19 +207,16 @@ export function AppSettingsPanel() {
   const navigationItems = [
     {
       label: 'إعدادات مواقيت الصلاة',
-      sublabel: '/prayer/settings',
       href: '/prayer/settings',
       icon: Compass,
     },
     {
       label: 'إعدادات الأذان والصوت',
-      sublabel: '/prayer/adhan',
       href: '/prayer/adhan',
       icon: Bell,
     },
     {
       label: 'التذكيرات والتنبيهات',
-      sublabel: '/more/reminders',
       href: '/more/reminders',
       icon: Bell,
     },
@@ -231,13 +228,11 @@ export function AppSettingsPanel() {
     },
     {
       label: 'إدارة الورد اليومي',
-      sublabel: '/quran/wird',
       href: '/quran/wird',
       icon: BookOpen,
     },
     {
       label: 'دعاء ختم القرآن',
-      sublabel: '/quran/khatmah-dua',
       href: '/quran/khatmah-dua',
       icon: Sparkles,
     },
@@ -373,7 +368,7 @@ export function AppSettingsPanel() {
                 <span>{item.label}</span>
               </span>
               <span className="flex items-center gap-1 text-xs font-bold opacity-80">
-                <span>{item.sublabel}</span>
+                {item.sublabel ? <span>{item.sublabel}</span> : null}
                 <ChevronLeft className="size-4" />
               </span>
             </button>

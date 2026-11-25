@@ -10,7 +10,22 @@ export default function PrivacyPage() {
   const content = isAr ? {
     intro: <>تشرح هذه السياسة كيف يتعامل تطبيق <strong>«إسلامي»</strong> مع المعلومات عند استخدامه، وما يُخزَّن على جهازك وما يُرسل إلى خدمات خارجية. نحن لا نطلب منك إنشاء حساب، ولا نطلب اسمك أو بريدك أو رقم هاتفك.</>,
     sections: [
-      { title: '١. ما يُحفظ على جهازك فقط', body: <><p>يحفظ التطبيق على جهازك إعداداتك: طريقة الحساب، والمدينة وإحداثياتها، وأصوات الأذان المختارة، وأوقات التنبيه، والعلامات المرجعية، وآخر موضع قراءة، وتقدم الورد اليومي (ومتتبع الختمة)، وعداد المسبحة، وقائمة «عباداتي» لإنجاز اليوم، <strong>وإعدادات التذكيرات الذكية (الصلاة على النبي والأذكار)</strong>. هذه البيانات لا تُرسل إلينا، ويصفّر «عباداتي» تلقائيًا كل يوم. والبحث في التطبيق يعمل على المحتوى المحفوظ فيه دون أي اتصال بالإنترنت.</p><p><strong>لحذفها:</strong> من إعدادات الهاتف ← التطبيقات ← إسلامي ← التخزين ← مسح البيانات، أو ألغِ تثبيت التطبيق.</p></> },
+      {
+        title: '١. ما يُحفظ على جهازك فقط',
+        body: (
+          <>
+            <p>
+              يحفظ التطبيق على جهازك إعداداتك: طريقة الحساب، والمدينة وإحداثياتها، وأصوات الأذان المختارة، وأوقات التنبيه، والعلامات المرجعية، وآخر موضع قراءة، وتقدم الورد اليومي (ومتتبع الختمة)، وعداد المسبحة، وقائمة «عباداتي» لإنجاز اليوم، <strong>وإعدادات التذكيرات الذكية (الصلاة على النبي والأذكار)</strong>. هذه البيانات لا تُرسل إلينا، ويصفّر «عباداتي» تلقائيًا كل يوم. والبحث في التطبيق يعمل على المحتوى المحفوظ فيه دون أي اتصال بالإنترنت.
+            </p>
+            <p>
+              <strong>ملفات الأذان الصوتية المختارة من الجهاز:</strong> عند اختيارك ملفًا صوتيًا من جهازك لإضافته إلى أصوات الأذان، يُحفظ الملف ويُعالج <strong>محليًا على جهازك فقط</strong> عبر مساحة التخزين المحلية للتطبيق (IndexedDB وlocalStorage) لأغراض المعاينة والتشغيل داخل التطبيق، ولا يتم رفعه أو إرساله إلى أي خوادم خارجية أو أطراف ثالثة.
+            </p>
+            <p>
+              <strong>لحذفها:</strong> يمكنك حذف أي صوت محلي مباشرة من شاشة إعدادات الأذان داخل التطبيق، أو حذف جميع البيانات من إعدادات الهاتف ← التطبيقات ← إسلامي ← التخزين ← مسح البيانات، أو إلغاء تثبيت التطبيق.
+            </p>
+          </>
+        ),
+      },
       { title: '٢. الموقع الجغرافي', body: <><p>يطلب التطبيق إذن الموقع <strong>اختياريًا</strong>، ويستخدمه لحساب مواقيت الصلاة واتجاه القبلة وتحديد مدينتك تلقائيًا. الحساب نفسه يتم على جهازك.</p><p>عند تحديد اسم مدينتك تلقائيًا، يُرسل التطبيق <strong>إحداثياتك التقريبية</strong> إلى خدمة تحويل الإحداثيات (BigDataCloud) لتعرف اسم المدينة. وعند البحث اليدوي عن مدينة، يُرسل النص الذي تكتبه إلى خدمة البحث عن المواقع (Open-Meteo).</p><p>يمكنك إلغاء إذن الموقع في أي وقت من إعدادات الهاتف، وعندها يستمر التطبيق بالمدينة التي اخترتها يدويًا.</p></> },
       { title: '٣. الإشعارات والأذان', body: <><p>يحتاج التطبيق إذن <strong>الإشعارات</strong> لعرض مواعيد الصلاة والأذان، و<strong>المنبهات الدقيقة</strong> لتشغيل الأذان في وقته <strong>ولجدولة التذكيرات الذكية (الصلاة على النبي والأذكار الدورية)</strong>، و<strong>الخدمة الأمامية</strong> لتشغيل الأذان والإشعار الدائم، و<strong>التشغيل عند الإقلاع</strong> لإعادة جدولة الأذان بعد إعادة تشغيل الهاتف، و<strong>الاهتزاز</strong> عند الانتقال بين الأذكار.</p><p>التطبيق <strong>لا يرسل إشعارات تسويقية</strong>، وكل الإشعارات تُولَّد على جهازك بحسب مواقيت الصلاة أو الأوقات التي تختارها للتذكيرات.</p></> },
       { title: '٤. الخدمات الخارجية', body: <><p>بعض الميزات تحتاج الاتصال بالإنترنت، وتُحمَّل منها البيانات مباشرة من خوادم تلك الخدمات. وكأي تطبيق يتصل بالإنترنت، تستقبل هذه الخدمات عنوان IP الخاص بجهازك حسب طبيعة الاتصال:</p><ul className="list-inside list-disc space-y-1"><li><strong>Al Quran Cloud</strong> (api.alquran.cloud): نصوص القرآن والأوراد، ويُرسل إليها رقم السورة أو الصفحة المطلوبة.</li><li><strong>mp3quran.net</strong>: قائمة القراء وبث التلاوات.</li><li><strong>Aladhan CDN</strong> (cdn.aladhan.com): ملفات صوت الأذان.</li><li><strong>BigDataCloud</strong>: تحويل الإحداثيات إلى اسم مدينة (انظر البند 2).</li><li><strong>Open-Meteo</strong>: البحث عن المدن بالاسم (انظر البند 2).</li></ul><p>عند تشغيل التلاوات الصوتية، يستخدم التطبيق نظام التشغيل (Media Session) لعرض أزرار التحكم على شاشة القفل، ولا يتم إرسال أي بيانات خاصة بك لهذا الغرض.</p><p>لكل خدمة سياسة خصوصية خاصة بها، ولا نتحكم في ما تفعله بالطلبات التي تستقبلها. يمكنك الاطلاع على سياساتها على مواقعها الرسمية.</p></> },
@@ -27,7 +42,22 @@ export default function PrivacyPage() {
   } : {
     intro: <>This policy explains how the <strong>"Islami"</strong> app handles information when used, what is stored on your device, and what is sent to external services. We do not ask you to create an account, nor do we ask for your name, email, or phone number.</>,
     sections: [
-      { title: '1. What is stored only on your device', body: <><p>The app stores on your device your settings: calculation method, city and coordinates, selected Adhan sounds, alert times, bookmarks, last reading position, daily wird progress (and Khatmah tracker), tasbih counter, "My Worship" list for today's completion, <strong>and smart reminder settings (Salawat on the Prophet and Adhkar)</strong>. This data is not sent to us, and "My Worship" resets automatically every day. In-app search works on locally stored content without any internet connection.</p><p><strong>To delete it:</strong> From phone settings → Apps → Islami → Storage → Clear data, or uninstall the app.</p></> },
+      {
+        title: '1. What is stored only on your device',
+        body: (
+          <>
+            <p>
+              The app stores on your device your settings: calculation method, city and coordinates, selected Adhan sounds, alert times, bookmarks, last reading position, daily wird progress (and Khatmah tracker), tasbih counter, "My Worship" list for today's completion, <strong>and smart reminder settings (Salawat on the Prophet and Adhkar)</strong>. This data is not sent to us, and "My Worship" resets automatically every day. In-app search works on locally stored content without any internet connection.
+            </p>
+            <p>
+              <strong>User-selected local Adhan audio files:</strong> When you select an audio file from your device to add to your Adhan sounds, the file is stored and processed <strong>locally on your device only</strong> via local app storage (IndexedDB and localStorage) for in-app preview and playback, and is never uploaded or transmitted to any external servers or third parties.
+            </p>
+            <p>
+              <strong>To delete it:</strong> You can delete any local audio file directly from the Adhan settings screen inside the app, or clear all data from phone settings → Apps → Islami → Storage → Clear data, or uninstall the app.
+            </p>
+          </>
+        ),
+      },
       { title: '2. Geolocation', body: <><p>The app requests location permission <strong>optionally</strong>, and uses it to calculate prayer times and Qibla direction and automatically determine your city. The calculation itself is done on your device.</p><p>When automatically determining your city name, the app sends your <strong>approximate coordinates</strong> to a coordinate conversion service (BigDataCloud) to know the city name. When manually searching for a city, the text you type is sent to a location search service (Open-Meteo).</p><p>You can revoke location permission at any time from phone settings, and the app will continue with the city you manually selected.</p></> },
       { title: '3. Notifications and Adhan', body: <><p>The app needs <strong>notifications</strong> permission to display prayer times and Adhan, <strong>exact alarms</strong> to play Adhan on time <strong>and to schedule smart reminders (Salawat on the Prophet and periodic Adhkar)</strong>, <strong>foreground service</strong> to play Adhan and the ongoing notification, <strong>boot startup</strong> to reschedule Adhan after phone restart, and <strong>vibration</strong> when transitioning between adhkar.</p><p>The app <strong>does not send marketing notifications</strong>, and all notifications are generated on your device based on prayer times or the times you choose for reminders.</p></> },
       { title: '4. External Services', body: <><p>Some features need internet connection, and data is loaded directly from those services' servers. Like any app connecting to the internet, these services receive your device's IP address according to the nature of the connection:</p><ul className="list-inside list-disc space-y-1"><li><strong>Al Quran Cloud</strong> (api.alquran.cloud): Quran texts and wirds; the requested surah or page number is sent to them.</li><li><strong>mp3quran.net</strong>: Reciters list and recitation streaming.</li><li><strong>Aladhan CDN</strong> (cdn.aladhan.com): Adhan audio files.</li><li><strong>BigDataCloud</strong>: Convert coordinates to city name (see section 2).</li><li><strong>Open-Meteo</strong>: Search for cities by name (see section 2).</li></ul><p>When playing audio recitations, the app uses the operating system (Media Session) to display control buttons on the lock screen, and no personal data is sent for this purpose.</p><p>Each service has its own privacy policy, and we do not control what it does with the requests it receives. You can review their policies on their official websites.</p></> },

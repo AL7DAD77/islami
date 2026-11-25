@@ -8,13 +8,21 @@ export function generateStaticParams() {
   return ADHKAR.map((c) => ({ id: c.id }))
 }
 
-export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}): Promise<Metadata> {
   const { id } = await params
   const c = getCategory(id)
   return c ? { title: `${c.title} | إسلامي` } : {}
 }
 
-export default async function AdhkarCategoryPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function AdhkarCategoryPage({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
   const { id } = await params
   const category = getCategory(id)
   if (!category) notFound()
@@ -28,7 +36,11 @@ export default async function AdhkarCategoryPage({ params }: { params: Promise<{
 
   return (
     <>
-      <PageHeader title={category.title} subtitle={category.description} backHref={isHisn ? '/adhkar/hisn' : '/adhkar'} />
+      <PageHeader
+        title={category.title}
+        subtitle={category.description}
+        backHref={isHisn ? '/adhkar/hisn' : '/adhkar'}
+      />
       <DhikrList
         key={category.id}
         items={category.items}

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { MoreVertical, X } from 'lucide-react'
+import { Settings, X } from 'lucide-react'
 import { AppSettingsPanel } from './app-settings-panel'
 import { cn } from '@/lib/utils'
 
@@ -35,7 +35,7 @@ export function ThreeDotsSettingsMenu({
         aria-expanded={open}
         className="flex size-10 items-center justify-center rounded-full border transition-colors hover:bg-black/5 active:scale-95"
       >
-        <MoreVertical className="size-5" />
+        <Settings className="size-5 text-amber-600" />
       </button>
 
       {open && (
