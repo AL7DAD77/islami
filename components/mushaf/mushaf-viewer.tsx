@@ -1287,7 +1287,8 @@ export function MushafViewer({
           FIT_PADDING) /
         widestLine
 
-      const heightBasedFont = computedRowHeight * 0.78
+      // زيادة النسبة لملء الشاشة بشكل أفضل
+      const heightBasedFont = computedRowHeight * 0.85
 
       const nextFont = Math.min(widthBasedFont, heightBasedFont)
 
@@ -1989,9 +1990,9 @@ export function MushafViewer({
 
       {/* شريط معلومات الصفحة العلوي الثابت */}
       <div
-        className="relative z-40 flex shrink-0 items-center justify-between px-3 pb-2"
+        className="relative z-40 flex shrink-0 items-center justify-between px-3 pb-1"
         style={{
-          paddingTop: 'calc(env(safe-area-inset-top, 0px) + 8px)',
+          paddingTop: 'calc(env(safe-area-inset-top, 0px) + 2px)',
           paddingLeft: 'max(0.85rem, env(safe-area-inset-left))',
           paddingRight: 'max(0.85rem, env(safe-area-inset-right))',
           color: isNightMode ? '#f4f4f5' : '#050505',
@@ -2020,22 +2021,23 @@ export function MushafViewer({
 
       {/* منطقة المصحف: عرض جميع الأسطر كاملة دون قص أو إزاحة */}
       <div
-        ref={containerRef}
-        className="relative min-h-0 flex-1 overflow-hidden"
-        style={{
-          paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 6px)',
-          touchAction: userScale > MIN_SCALE ? 'none' : 'pan-x',
-          transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${userScale})`,
-          transformOrigin: 'center center',
-          transition:
-            userScale === MIN_SCALE
-              ? 'transform 180ms ease-out'
-              : 'transform 60ms linear',
-        }}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-      >
+  ref={containerRef}
+  className="relative min-h-0 flex-1 overflow-hidden"
+  style={{
+    touchAction: userScale > MIN_SCALE ? 'none' : 'pan-x',
+    transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${userScale})`,
+    transformOrigin: 'center center',
+    transition:
+      userScale === MIN_SCALE
+        ? 'transform 180ms ease-out'
+        : 'transform 60ms linear',
+    // إضافة مساحة أمنية للأسفل لتجنب اختفاء الأسطر خلف الشريط السفلي
+    paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 2rem)',
+  }}
+  onTouchStart={handleTouchStart}
+  onTouchMove={handleTouchMove}
+  onTouchEnd={handleTouchEnd}
+>
         {(isPageLoading || !isPageMeasured) && !hasError && (
           <div className="absolute inset-0 z-10 flex items-center justify-center">
             <Loader2
@@ -2205,7 +2207,7 @@ export function MushafViewer({
       {/* الشريط العلوي العائم للتشغيل والحفظ والإعدادات */}
       <header
         className={cn(
-          'pointer-events-none absolute inset-x-0 top-12 z-50 flex flex-wrap items-center justify-between gap-2 transition-all duration-300',
+          'pointer-events-none absolute inset-x-0 top-1 z-50 flex flex-wrap items-center justify-between gap-2 transition-all duration-300',
           isBarsVisible
             ? 'translate-y-0 opacity-100'
             : '-translate-y-4 opacity-0',
