@@ -171,6 +171,14 @@ function clampPage(page: number): number {
   return Math.min(Math.max(page, 1), TOTAL_PAGES)
 }
 
+function isHomePath(pathname: string): boolean {
+  return (
+    pathname === '/' ||
+    pathname === '/index.html' ||
+    pathname === ''
+  )
+}
+
 function formatSizeMb(bytes: number): string {
   if (!bytes || bytes <= 0) return '٠.٠ ميجابايت'
   const mb = bytes / (1024 * 1024)
@@ -614,6 +622,8 @@ export function MushafViewer({
   const downloadAbortRef = useRef<AbortController | null>(null)
   const activeObjectUrlRef = useRef<string | null>(null)
   const lastFollowedVerseRef = useRef<string | null>(null)
+  const fallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isLeavingToHomeRef = useRef(false)
 
   const [fontPx, setFontPx] = useState(REFERENCE_FONT_SIZE)
   const [rowPx, setRowPx] = useState<number | undefined>(
@@ -659,6 +669,9 @@ export function MushafViewer({
       }
       if (activeObjectUrlRef.current) {
         URL.revokeObjectURL(activeObjectUrlRef.current)
+      }
+      if (fallbackTimerRef.current) {
+        clearTimeout(fallbackTimerRef.current)
       }
     }
   }, [])
@@ -879,47 +892,19 @@ export function MushafViewer({
     player.progress,
   ])
 
-  const exitToHomeScreen = useCallback(async () => {
-    try {
-      const capWindow = window as unknown as {
-        Capacitor?: {
-          Plugins?: {
-            AppExit?: {
-              exit?: () => Promise<void> | void
-            }
-            App?: {
-              exitApp?: () => Promise<void> | void
-            }
-          }
-        }
-      }
-
-      if (capWindow.Capacitor?.Plugins?.AppExit?.exit) {
-        await capWindow.Capacitor.Plugins.AppExit.exit()
-        return
-      }
-
-      if (capWindow.Capacitor?.Plugins?.App?.exitApp) {
-        await capWindow.Capacitor.Plugins.App.exitApp()
-      }
-    } catch {
-      // تجاهل في حال عدم توفر الإضافة
-    }
-  }, [])
-
-  const goToMainAppRoute = useCallback(() => {
+  const goToMainAppRoute = useCallback((): boolean => {
     setMenuOpen(false)
     setMenuSection('main')
 
-    const path = window.location.pathname || ''
-    const isAlreadyHome =
-      path === '/' ||
-      path === '/index.html' ||
-      path === ''
-
-    if (isAlreadyHome) {
+    const path = typeof window !== 'undefined' ? window.location.pathname || '' : ''
+    if (isHomePath(path)) {
       return false
     }
+
+    if (isLeavingToHomeRef.current) {
+      return true
+    }
+    isLeavingToHomeRef.current = true
 
     try {
       router.replace('/')
@@ -927,16 +912,22 @@ export function MushafViewer({
       // تجاهل
     }
 
-    setTimeout(() => {
-      const current = window.location.pathname || ''
-      if (
-        current !== '/' &&
-        current !== '/index.html' &&
-        current !== ''
-      ) {
-        window.location.replace('/')
+    if (fallbackTimerRef.current) {
+      clearTimeout(fallbackTimerRef.current)
+    }
+
+    fallbackTimerRef.current = setTimeout(() => {
+      try {
+        const current = window.location.pathname || ''
+        if (!isHomePath(current)) {
+          window.location.replace('/')
+        }
+      } catch {
+        // تجاهل
+      } finally {
+        isLeavingToHomeRef.current = false
       }
-    }, 150)
+    }, 450)
 
     return true
   }, [router])
@@ -945,8 +936,8 @@ export function MushafViewer({
     let isMounted = true
     let removeCapacitorAppListener: (() => void) | undefined
 
-    const handleBackButtonEvent = () => {
-      if (!isMounted) return
+    const handleBackAction = (): boolean => {
+      if (!isMounted) return false
 
       const { menuOpen: isMenuOpen, menuSection: activeSection } =
         menuStateRef.current
@@ -957,16 +948,27 @@ export function MushafViewer({
         } else {
           setMenuOpen(false)
         }
-        return
+        return true
       }
 
-      const movedToHome = goToMainAppRoute()
-      if (!movedToHome) {
-        void exitToHomeScreen()
+      const path =
+        typeof window !== 'undefined' ? window.location.pathname || '' : ''
+      if (!isHomePath(path)) {
+        goToMainAppRoute()
+        return true
+      }
+
+      return false
+    }
+
+    const handleWindowBackButton = (event: Event) => {
+      const handled = handleBackAction()
+      if (handled && 'preventDefault' in event) {
+        event.preventDefault()
       }
     }
 
-    window.addEventListener('backButton', handleBackButtonEvent)
+    window.addEventListener('backButton', handleWindowBackButton)
 
     void (async () => {
       try {
@@ -974,10 +976,9 @@ export function MushafViewer({
         if (!Capacitor.isNativePlatform()) return
 
         const { App } = await import('@capacitor/app')
-        const listener = await App.addListener(
-          'backButton',
-          handleBackButtonEvent,
-        )
+        const listener = await App.addListener('backButton', () => {
+          handleBackAction()
+        })
         if (isMounted) {
           removeCapacitorAppListener = () => {
             void listener.remove()
@@ -992,12 +993,12 @@ export function MushafViewer({
 
     return () => {
       isMounted = false
-      window.removeEventListener('backButton', handleBackButtonEvent)
+      window.removeEventListener('backButton', handleWindowBackButton)
       if (removeCapacitorAppListener) {
         removeCapacitorAppListener()
       }
     }
-  }, [exitToHomeScreen, goToMainAppRoute])
+  }, [goToMainAppRoute])
 
   useEffect(() => {
     let isActive = true
@@ -1273,9 +1274,17 @@ export function MushafViewer({
 
   useEffect(() => {
     document.body.classList.add('reading-fullscreen')
+    document.documentElement.style.overflow = 'hidden'
+    document.documentElement.style.overscrollBehavior = 'none'
+    document.body.style.overflow = 'hidden'
+    document.body.style.overscrollBehavior = 'none'
 
     return () => {
       document.body.classList.remove('reading-fullscreen')
+      document.documentElement.style.overflow = ''
+      document.documentElement.style.overscrollBehavior = ''
+      document.body.style.overflow = ''
+      document.body.style.overscrollBehavior = ''
     }
   }, [])
 
@@ -1850,8 +1859,8 @@ export function MushafViewer({
     return (
       <div
         dir="rtl"
-        className="flex min-h-dvh w-full items-center justify-center"
-        style={{ backgroundColor: bg }}
+        className="flex min-h-dvh w-full items-center justify-center overflow-hidden"
+        style={{ backgroundColor: bg, overscrollBehavior: 'none' }}
       >
         <div className="flex flex-col items-center gap-3">
           <Loader2
@@ -1877,7 +1886,8 @@ export function MushafViewer({
       style={{
         backgroundColor: bg,
         color: fg,
-        touchAction: 'pan-x pan-y',
+        touchAction: 'none',
+        overscrollBehavior: 'none',
       }}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
@@ -1886,6 +1896,7 @@ export function MushafViewer({
     >
       <Qcf4Fonts />
 
+      {/* شريط معلومات الصفحة العلوي الثابت */}
       <div
         className="relative z-40 flex shrink-0 items-center justify-between px-3 pb-2"
         style={{
@@ -1916,9 +1927,10 @@ export function MushafViewer({
         </span>
       </div>
 
+      {/* منطقة المصحف: محفوظة بالكامل دون تغيير أبعادها أو طريقة قياسها */}
       <div
         ref={containerRef}
-        className="relative min-h-0 flex-1"
+        className="relative min-h-0 flex-1 overflow-hidden"
         style={{
           transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${userScale})`,
           transformOrigin: 'center center',
@@ -2094,20 +2106,21 @@ export function MushafViewer({
         ) : null}
       </div>
 
+      {/* الشريط العلوي العائم للتشغيل والحفظ والإعدادات: مزاح بوضوح عن حواف الهاتف */}
       <header
         className={cn(
-          'pointer-events-auto absolute inset-x-0 top-10 z-50 flex flex-wrap items-center justify-between gap-2 transition-all duration-300',
+          'pointer-events-none absolute inset-x-0 top-12 z-50 flex flex-wrap items-center justify-between gap-2 transition-all duration-300',
           isBarsVisible
             ? 'translate-y-0 opacity-100'
-            : 'pointer-events-none -translate-y-4 opacity-0',
+            : '-translate-y-4 opacity-0',
         )}
         style={{
-          paddingTop: '0.35rem',
-          paddingLeft: 'max(1rem, env(safe-area-inset-left))',
-          paddingRight: 'max(1rem, env(safe-area-inset-right))',
+          marginTop: '0.35rem',
+          paddingLeft: 'calc(env(safe-area-inset-left, 0px) + 16px)',
+          paddingRight: 'calc(env(safe-area-inset-right, 0px) + 16px)',
         }}
       >
-        <div className="flex items-center gap-1.5">
+        <div className={cn('flex items-center gap-1.5', isBarsVisible ? 'pointer-events-auto' : 'pointer-events-none')}>
           <button
             type="button"
             onClick={handleBackToMainApp}
@@ -2144,7 +2157,10 @@ export function MushafViewer({
         </div>
 
         <div
-          className="flex max-w-full items-center gap-0.5 rounded-full border px-1.5 py-1 shadow-lg backdrop-blur-md"
+          className={cn(
+            'flex max-w-full items-center gap-0.5 rounded-full border px-1.5 py-1 shadow-lg backdrop-blur-md',
+            isBarsVisible ? 'pointer-events-auto' : 'pointer-events-none',
+          )}
           style={{ backgroundColor: surface, borderColor: border }}
         >
           <button
@@ -2208,19 +2224,20 @@ export function MushafViewer({
         </div>
       </header>
 
+      {/* الشريط السفلي العائم: مزاح بوضوح عن الحافة السفلية والجانبية للهاتف */}
       <nav
         aria-label="شريط أدوات المصحف السفلي"
         onClick={(event) => event.stopPropagation()}
         className={cn(
-          'pointer-events-auto fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-lg transition-all duration-300',
+          'fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-lg transition-all duration-300',
           isBarsVisible
-            ? 'translate-y-0 opacity-100'
+            ? 'pointer-events-auto translate-y-0 opacity-100'
             : 'pointer-events-none translate-y-6 opacity-0',
         )}
         style={{
-          paddingBottom: 'max(0.65rem, env(safe-area-inset-bottom))',
-          paddingLeft: 'max(0.85rem, env(safe-area-inset-left))',
-          paddingRight: 'max(0.85rem, env(safe-area-inset-right))',
+          paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)',
+          paddingLeft: 'calc(env(safe-area-inset-left, 0px) + 18px)',
+          paddingRight: 'calc(env(safe-area-inset-right, 0px) + 18px)',
         }}
       >
         <div
@@ -2286,11 +2303,12 @@ export function MushafViewer({
       {menuOpen && (
         <div
           onClick={(event) => event.stopPropagation()}
-          className="fixed inset-x-3 top-24 z-60 mx-auto max-h-[70dvh] w-auto max-w-md overflow-y-auto rounded-3xl border p-4 shadow-2xl backdrop-blur-xl"
+          className="fixed inset-x-4 top-28 z-60 mx-auto max-h-[66dvh] w-auto max-w-md overflow-y-auto rounded-3xl border p-4 shadow-2xl backdrop-blur-xl"
           style={{
             backgroundColor: surface,
             borderColor: border,
             color: fg,
+            overscrollBehavior: 'contain',
           }}
         >
           {menuSection !== 'main' && (
